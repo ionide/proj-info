@@ -2,9 +2,13 @@
 open Argu
 
 type CLIArguments =
-    | [<Mandatory; Unique; AltCommandLine("-p")>] Project of string
+    | [<MainCommand; Mandatory; Unique>] Project of string
     | Fsc_Args
     | Project_Refs
+    | [<AltCommandLine("-gp")>] Get_Property of string list
+    | [<AltCommandLine("-f")>] Framework of string
+    | [<AltCommandLine("-r")>] Runtime of string
+    | [<AltCommandLine("-c")>] Configuration of string
     | [<AltCommandLine("-v")>] Verbose
 with
     interface IArgParserTemplate with
@@ -14,8 +18,20 @@ with
             | Fsc_Args -> "get fsc arguments"
             | Project_Refs -> "get project references"
             | Verbose -> "verbose log"
+            | Framework _ -> "target framework, the TargetFramework msbuild property"
+            | Runtime _ -> "target runtime, the RuntimeIdentifier msbuild property"
+            | Configuration _ -> "configuration to use (like Debug), the Configuration msbuild property"
+            | Get_Property _ -> "msbuild property to get (allow multiple)"
 
-open Railway
+open Inspect
+
+type Errors =
+    | InvalidArgs of Argu.ArguParseException
+    | InvalidArgsState of string
+    | ProjectFileNotFound of string
+    | GenericError of string
+    | RaisedException of System.Exception * string
+    | ExecutionError of GetProjectInfoErrors<Medallion.Shell.CommandResult>
 
 let parseArgsCommandLine argv =
     try
@@ -28,7 +44,21 @@ let parseArgsCommandLine argv =
         | _ ->
             reraise ()
 
-open Inspect
+open Medallion.Shell
+open Railway
+
+let runCmd log exePath args =
+    log (sprintf "running '%s %s'" exePath (args |> String.concat " "))
+    let cmd = Command.Run(exePath, args |> Array.ofList |> Array.map box)
+
+    let result = cmd.Result
+    log "output:"
+    cmd.StandardOutput.ReadToEnd() |> log
+
+    log "error:"
+    cmd.StandardError.ReadToEnd() |> log
+
+    result.ExitCode, result
 
 let realMain argv = attempt {
 
@@ -52,48 +82,49 @@ let realMain argv = attempt {
         then Error (ProjectFileNotFound projPath)
         else Ok ()
 
-    let! _ = install_target_file log projPath
+    let globalArgs =
+        [ results.TryGetResult <@ Framework @>, "TargetFramework"
+          results.TryGetResult <@ Runtime @>, "RuntimeIdentifier"
+          results.TryGetResult <@ Configuration @>, "Configuration" ]
+        |> List.choose (fun (a,p) -> a |> Option.map (fun x -> (p,x)))
+        |> List.map (MSBuild.MSbuildCli.Property)
 
-    let msbuildExec args =
-        let cmd = dotnetMsbuild (runCmd log) (projPath :: args)
-        log "output:"
-        cmd.StandardOutput.ReadToEnd()
-        |> log
-        log "error:"
-        cmd.StandardError.ReadToEnd()
-        |> log
+    let allCmds =
+        [ results.TryGetResult <@ Fsc_Args @> |> Option.map (fun _ -> getFscArgs)
+          results.TryGetResult <@ Project_Refs @> |> Option.map (fun _ -> getP2PRefs)
+          results.TryGetResult <@ Get_Property @> |> Option.map (fun p -> (fun () -> getProperties p)) ]
 
-        cmd.Result
-
-    let exec getArgs () =
-        let tmp = System.IO.Path.GetTempFileName()
-        let args, parse = getArgs tmp
-        let result = msbuildExec args
-        if result.Success then
-            parse ()
-        else
-            Error result
-
-    let cmds =
-        [ <@ Fsc_Args @>, (exec getFscArgs)
-          <@ Project_Refs @>, (exec getP2PRefsArgs) ]
+    let cmds = allCmds |> List.choose id
 
     let! cmd =
-        match cmds |> List.filter (fst >> results.TryGetResult >> Option.isSome) with
+        match cmds with
         | [] -> Error (InvalidArgsState "specify one get argument")
         | [x] -> Ok x
         | _ -> Error (InvalidArgsState "specify only one get argument")
 
-    let c, f = cmd
+    let exec getArgs additionalArgs = attempt {
+        let msbuildExec = dotnetMsbuild (runCmd log)
 
-    let r = f ()
+        let! r =
+            projPath
+            |> getProjectInfo log msbuildExec [getArgs] additionalArgs
+            |> Result.mapError ExecutionError
+
+        return r |> List.map (Result.mapError ExecutionError)
+        }
+
+    let! results = exec cmd globalArgs
+
+    let! r =
+        match results with
+        | [x] -> x
+        | xs -> Error (GenericError (sprintf "unexpected multiple results from msbuild '%A'" xs))
 
     let out =
         match r with
-        | Ok (FscArgs args) -> args
-        | Ok (P2PRefs args) -> args
-        | Error _ -> []
-
+        | FscArgs args -> args
+        | P2PRefs args -> args
+        | Properties args -> args |> List.map (fun (x,y) -> sprintf "%s=%s" x y)
     out |> List.iter (printfn "%s")
 
     return r
@@ -128,3 +159,9 @@ let main argv =
             printfn "%s:" message
             printfn "%A" ex
             6
+        | ExecutionError (MSBuildFailed (i, r)) ->
+            printfn "%i %A" i r
+            7
+        | ExecutionError (UnexpectedMSBuildResult r) ->
+            printfn "%A" r
+            8

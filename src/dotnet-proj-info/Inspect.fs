@@ -1,18 +1,38 @@
 module Inspect
 
 open System.IO
-open Medallion.Shell
 
-let runCmd log exePath args =
-    log (sprintf "running '%s %s'" exePath (args |> String.concat " "))
-    Command.Run(exePath, args |> Array.ofList |> Array.map box)
+module MSBuild =
+    type MSbuildCli =
+         | Property of string * string
+         | Target of string
+         | Switch of string
+         | Project of string
 
-let dotnetMsbuild run args =
+    let sprintfMsbuildArg a =
+        //TODO quote
+        match a with
+         | Property (k,v) -> sprintf "/p:%s=%s" k v
+         | Target t -> sprintf "/t:%s" t
+         | Switch w -> sprintf "/%s" w
+         | Project w -> w
+
+open MSBuild
+
+type GetProjectInfoErrors<'T> =
+    | UnexpectedMSBuildResult of string
+    | MSBuildFailed of int * 'T
+
+let dotnetMsbuild run project args =
     let dotnetExe = @"dotnet"
-    let msbuildArgs = "msbuild" :: args @ ["/nologo"; "/verbosity:quiet"]
-    run dotnetExe msbuildArgs
+    let msbuildArgs =
+        Project(project) :: args @ [ Switch "nologo"; Switch "verbosity:quiet"]
+        |> List.map (MSBuild.sprintfMsbuildArg)
+    match run dotnetExe ("msbuild" :: msbuildArgs) with
+    | 0, x -> Ok x
+    | n, x -> Error (MSBuildFailed (n,x))
 
-let install_target_file log projPath =
+let install_target_file log templates projPath =
     let projDir, projName = Path.GetDirectoryName(projPath), Path.GetFileName(projPath)
     let objDir = Path.Combine(projDir, "obj")
     let targetFileDestPath = Path.Combine(objDir, (sprintf "%s.proj-info.targets" projName))
@@ -26,17 +46,32 @@ let install_target_file log projPath =
   <PropertyGroup>
     <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
   </PropertyGroup>
+        """
+        + (templates |> String.concat (System.Environment.NewLine))
+        +
+        """
+</Project>
+        """
 
-  <Target Name="_Inspect_GetProjectReferences">
-    <Message Text="%(ProjectReference.FullPath)" Importance="High" />
-    <WriteLinesToFile
-            Condition=" '$(_Inspect_GetProjectReferences_OutFile)' != '' "
-            File="$(_Inspect_GetProjectReferences_OutFile)"
-            Lines="@(ProjectReference -> '%(FullPath)')"
-            Overwrite="true"
-            Encoding="UTF-8"/>
-  </Target>
+    log (sprintf "writing helper target file in '%s'" targetFileDestPath)
+    File.WriteAllText(targetFileDestPath, targetFileTemplate.Trim())
 
+    Ok targetFileDestPath
+
+type GetResult =
+     | FscArgs of string list
+     | P2PRefs of string list
+     | Properties of (string * string) list
+
+let parseFscArgsOut outFile =
+    let lines =
+        File.ReadAllLines(outFile)
+        |> List.ofArray
+    Ok (FscArgs lines)
+
+let getFscArgs () =
+    let template =
+        """
   <Target Name="_Inspect_FscArgs"
           DependsOnTargets="ResolveReferences;CoreCompile">
     <Message Text="%(FscCommandLineArgs.Identity)" Importance="High" />
@@ -47,33 +82,15 @@ let install_target_file log projPath =
             Overwrite="true" 
             Encoding="UTF-8"/>
   </Target>
-
-</Project>
         """.Trim()
-
-    log (sprintf "writing helper target file in '%s'" targetFileDestPath)
-    File.WriteAllText(targetFileDestPath, targetFileTemplate)
-
-    Ok targetFileDestPath
-
-type GetResult =
-     | FscArgs of string list
-     | P2PRefs of string list
-
-let parseFscArgsOut outFile =
-    let lines =
-        File.ReadAllLines(outFile)
-        |> List.ofArray
-    Ok (FscArgs lines)
-
-let getFscArgs outFile =
+    let outFile = System.IO.Path.GetTempFileName()
     let args =
-        [ "/p:SkipCompilerExecution=true"
-          "/p:ProvideCommandLineArgs=true"
-          "/p:CopyBuildOutputToOutputDirectory=false"
-          "/t:_Inspect_FscArgs"
-          sprintf "/p:_Inspect_FscArgs_OutFile=%s" outFile ]
-    args, (fun () -> parseFscArgsOut outFile)
+        [ Property ("SkipCompilerExecution", "true")
+          Property ("ProvideCommandLineArgs" , "true")
+          Property ("CopyBuildOutputToOutputDirectory", "false")
+          Target "_Inspect_FscArgs"
+          Property ("_Inspect_FscArgs_OutFile", outFile) ]
+    template, args, (fun () -> parseFscArgsOut outFile)
 
 let parseP2PRefsOut outFile =
     let lines =
@@ -81,8 +98,98 @@ let parseP2PRefsOut outFile =
         |> List.ofArray
     Ok (P2PRefs lines)
 
-let getP2PRefsArgs outFile =
+let getP2PRefs () =
+    let template =
+        """
+  <Target Name="_Inspect_GetProjectReferences">
+    <Message Text="%(ProjectReference.FullPath)" Importance="High" />
+    <WriteLinesToFile
+            Condition=" '$(_Inspect_GetProjectReferences_OutFile)' != '' "
+            File="$(_Inspect_GetProjectReferences_OutFile)"
+            Lines="@(ProjectReference -> '%(FullPath)')"
+            Overwrite="true"
+            Encoding="UTF-8"/>
+  </Target>
+        """.Trim()
+    let outFile = System.IO.Path.GetTempFileName()
     let args =
-        [ "/t:_Inspect_GetProjectReferences"
-          sprintf "/p:_Inspect_GetProjectReferences_OutFile=%s" outFile ]
-    args, (fun () -> parseP2PRefsOut outFile)
+        [ Target "_Inspect_GetProjectReferences"
+          Property ("_Inspect_GetProjectReferences_OutFile", outFile) ]
+    template, args, (fun () -> parseP2PRefsOut outFile)
+
+let parsePropertiesOut outFile =
+    let firstAndRest (delim: char) (s: string) =
+        match s.IndexOf(delim) with
+        | -1 -> None
+        | index -> Some(s.Substring(0, index), s.Substring(index + 1))
+
+    let lines =
+        File.ReadAllLines(outFile)
+        |> Array.filter (fun s -> s.Length > 0)
+        |> Array.map (fun s -> match s |> firstAndRest '=' with Some x -> Ok x | None -> Error s)
+        |> List.ofArray
+
+    match lines |> List.partition (function Ok _ -> true | Error _ -> false) with
+    | l, [] ->
+        l
+        |> List.choose (function Ok x -> Some x | Error _ -> None)
+        |> (fun x -> Ok (Properties x))
+    | _, err ->
+        err
+        |> List.choose (function Ok _ -> None | Error x -> Some x)
+        |> sprintf "invalid temp file content '%A'"
+        |> (fun x -> Error (UnexpectedMSBuildResult x))
+
+let getProperties props =
+    let template =
+        """
+  <Target Name="_Inspect_GetProperties"
+          DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+        """
+        + (
+            props
+            |> List.mapi (fun i p -> sprintf """
+        <_Inspect_GetProperties_OutLines Include="P%i">
+            <PropertyName>%s</PropertyName>
+            <PropertyValue>$(%s)</PropertyValue>
+        </_Inspect_GetProperties_OutLines>
+                                             """ i p p)
+            |> List.map (fun s -> s.TrimEnd())
+            |> String.concat (System.Environment.NewLine) )
+        +
+        """
+    </ItemGroup>
+    <Message Text="%(_Inspect_GetProperties_OutLines.PropertyName)=%(_Inspect_GetProperties_OutLines.PropertyValue)" Importance="High" />
+    <WriteLinesToFile
+            Condition=" '$(_Inspect_GetProperties_OutFile)' != '' "
+            File="$(_Inspect_GetProperties_OutFile)"
+            Lines="@(_Inspect_GetProperties_OutLines -> '%(PropertyName)=%(PropertyValue)')"
+            Overwrite="true" 
+            Encoding="UTF-8"/>
+  </Target>
+        """.Trim()
+    let outFile = System.IO.Path.GetTempFileName()
+    let args =
+        [ Target "_Inspect_GetProperties"
+          Property ("_Inspect_GetProperties_OutFile", outFile) ]
+    template, args, (fun () -> parsePropertiesOut outFile)
+
+let getProjectInfo log msbuildExec getters additionalArgs projPath =
+
+    let templates, argsList, parsers = 
+        getters
+        |> List.map (fun getArgs -> getArgs ())
+        |> List.unzip3
+
+    match install_target_file log templates projPath with
+    | Error e -> Error e
+    | Ok _ ->
+        let args = argsList |> List.concat
+
+        match msbuildExec projPath (args @ additionalArgs) with
+        | Error e -> Error e
+        | Ok _ ->
+            parsers
+            |> List.map (fun parse -> parse ())
+            |> Ok

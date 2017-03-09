@@ -6,7 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="DomainTypes.fs" />
     <Compile Include="Railway.fs" />
     <Compile Include="Inspect.fs" />
     <Compile Include="Program.fs" />
