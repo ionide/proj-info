@@ -115,24 +115,20 @@ let realMain argv = attempt {
 
         let! r =
             projPath
-            |> getProjectInfo log msbuildExec [getArgs] additionalArgs
+            |> getProjectInfo log msbuildExec getArgs additionalArgs
             |> Result.mapError ExecutionError
 
-        return r |> List.map (Result.mapError ExecutionError)
+        return r
         }
 
-    let! results = exec cmd globalArgs
-
-    let! r =
-        match results with
-        | [x] -> x
-        | xs -> Error (GenericError (sprintf "unexpected multiple results from msbuild '%A'" xs))
+    let! r = exec cmd globalArgs
 
     let out =
         match r with
         | FscArgs args -> args
         | P2PRefs args -> args
         | Properties args -> args |> List.map (fun (x,y) -> sprintf "%s=%s" x y)
+
     out |> List.iter (printfn "%s")
 
     return r

@@ -175,7 +175,7 @@ let getProperties props =
           Property ("_Inspect_GetProperties_OutFile", outFile) ]
     template, args, (fun () -> parsePropertiesOut outFile)
 
-let getProjectInfo log msbuildExec getters additionalArgs projPath =
+let getProjectInfos log msbuildExec getters additionalArgs projPath =
 
     let templates, argsList, parsers = 
         getters
@@ -193,3 +193,12 @@ let getProjectInfo log msbuildExec getters additionalArgs projPath =
             parsers
             |> List.map (fun parse -> parse ())
             |> Ok
+
+let getProjectInfo log msbuildExec getArgs additionalArgs projPath =
+
+    let template, args, parse =  getArgs ()
+
+    projPath
+    |> install_target_file log [template]
+    |> Result.bind (fun _ -> msbuildExec projPath (args @ additionalArgs))
+    |> Result.bind (fun _ -> parse ())
