@@ -2,7 +2,7 @@
 open Argu
 
 type CLIArguments =
-    | [<MainCommand; Mandatory; Unique>] Project of string
+    | [<MainCommand; Unique>] Project of string
     | Fsc_Args
     | Project_Refs
     | [<AltCommandLine("-gp")>] Get_Property of string list
@@ -46,6 +46,7 @@ let parseArgsCommandLine argv =
 
 open Medallion.Shell
 open Railway
+open System.IO
 
 let runCmd log exePath args =
     log (sprintf "running '%s %s'" exePath (args |> String.concat " "))
@@ -72,13 +73,20 @@ let realMain argv = attempt {
     let! proj =
         match results.TryGetResult <@ Project @> with
         | Some p -> Ok p
-        | None -> Error (InvalidArgsState "--project argument is required")
+        | None ->
+            let workDir = Directory.GetCurrentDirectory()
+            match Directory.GetFiles(workDir, "*.*proj") |> List.ofArray with
+            | [] ->
+                Error (InvalidArgsState "no .*proj project found in current directory, use --project argument to specify path")
+            | [x] -> Ok x
+            | xs ->
+                Error (InvalidArgsState "multiple .*proj found in current directory, use --project argument to specify path")
 
-    let projPath = System.IO.Path.GetFullPath(proj)
+    let projPath = Path.GetFullPath(proj)
 
     log (sprintf "resolved project path '%s'" projPath)
 
-    do! if not (System.IO.File.Exists projPath)
+    do! if not (File.Exists projPath)
         then Error (ProjectFileNotFound projPath)
         else Ok ()
 
