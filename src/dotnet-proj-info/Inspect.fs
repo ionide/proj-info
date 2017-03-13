@@ -182,17 +182,12 @@ let getProjectInfos log msbuildExec getters additionalArgs projPath =
         |> List.map (fun getArgs -> getArgs ())
         |> List.unzip3
 
-    match install_target_file log templates projPath with
-    | Error e -> Error e
-    | Ok _ ->
-        let args = argsList |> List.concat
+    let args = argsList |> List.concat
 
-        match msbuildExec projPath (args @ additionalArgs) with
-        | Error e -> Error e
-        | Ok _ ->
-            parsers
-            |> List.map (fun parse -> parse ())
-            |> Ok
+    projPath
+    |> install_target_file log templates
+    |> Result.bind (fun _ -> msbuildExec projPath (args @ additionalArgs))
+    |> Result.map (fun _ -> parsers |> List.map (fun parse -> parse ()))
 
 let getProjectInfo log msbuildExec getArgs additionalArgs projPath =
 
