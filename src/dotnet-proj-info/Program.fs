@@ -23,7 +23,7 @@ with
             | Configuration _ -> "configuration to use (like Debug), the Configuration msbuild property"
             | Get_Property _ -> "msbuild property to get (allow multiple)"
 
-open Inspect
+open Dotnet.ProjInfo.Inspect
 
 type Errors =
     | InvalidArgs of Argu.ArguParseException

@@ -1,4 +1,4 @@
-module Inspect
+module Dotnet.ProjInfo.Inspect
 
 open System.IO
 

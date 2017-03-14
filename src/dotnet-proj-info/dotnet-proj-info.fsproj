@@ -7,7 +7,6 @@
 
   <ItemGroup>
     <Compile Include="Railway.fs" />
-    <Compile Include="Inspect.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -16,6 +15,10 @@
     <PackageReference Include="FSharp.Core" Version="4.1.*" />
     <PackageReference Include="Argu" Version="3.7.*" />
     <PackageReference Include="MedallionShell" Version="1.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dotnet.ProjInfo\Dotnet.ProjInfo.fsproj" />
   </ItemGroup>
 
 </Project>
