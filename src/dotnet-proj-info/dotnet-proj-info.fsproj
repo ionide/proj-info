@@ -18,7 +18,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Dotnet.ProjInfo\Dotnet.ProjInfo.fsproj" />
+    <ProjectReference Include="..\Dotnet.ProjInfo\Dotnet.ProjInfo.fsproj" >
+      <PackageVersion>0.2.0</PackageVersion>
+    </ProjectReference>
   </ItemGroup>
 
 </Project>

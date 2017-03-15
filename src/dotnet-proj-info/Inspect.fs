@@ -2,6 +2,23 @@ module Dotnet.ProjInfo.Inspect
 
 open System.IO
 
+#if NET45
+let inline Ok x = Choice1Of2 x
+let inline Error x = Choice2Of2 x
+
+let inline (|Ok|Error|) x =
+    match x with
+    | Choice1Of2 x -> Ok x
+    | Choice2Of2 e -> Error e
+
+type private Result<'Ok,'Err> = Choice<'Ok,'Err>
+
+module private Result =
+  let map f inp = match inp with Error e -> Error e | Ok x -> Ok (f x)
+  let mapError f inp = match inp with Error e -> Error (f e) | Ok x -> Ok x
+  let bind f inp = match inp with Error e -> Error e | Ok x -> f x        
+#endif
+
 module MSBuild =
     type MSbuildCli =
          | Property of string * string
@@ -81,6 +98,11 @@ let getFscArgs () =
             Lines="@(FscCommandLineArgs -> '%(Identity)')"
             Overwrite="true" 
             Encoding="UTF-8"/>
+    <!-- WriteLinesToFile doesnt create the file if @(FscCommandLineArgs) is empty -->
+    <Touch
+        Condition=" '$(_Inspect_FscArgs_OutFile)' != '' "
+        Files="$(_Inspect_FscArgs_OutFile)"
+        AlwaysCreate="True" />
   </Target>
         """.Trim()
     let outFile = System.IO.Path.GetTempFileName()
@@ -109,6 +131,11 @@ let getP2PRefs () =
             Lines="@(ProjectReference -> '%(FullPath)')"
             Overwrite="true"
             Encoding="UTF-8"/>
+    <!-- WriteLinesToFile doesnt create the file if @(ProjectReference) is empty -->
+    <Touch
+        Condition=" '$(_Inspect_GetProjectReferences_OutFile)' != '' "
+        Files="$(_Inspect_GetProjectReferences_OutFile)"
+        AlwaysCreate="True" />
   </Target>
         """.Trim()
     let outFile = System.IO.Path.GetTempFileName()
