@@ -50,7 +50,7 @@ open System.IO
 
 let runCmd log exePath args =
     log (sprintf "running '%s %s'" exePath (args |> String.concat " "))
-    let cmd = Command.Run(exePath, args |> Array.ofList |> Array.map box)
+    let cmd = Command.Run(exePath, args |> List.map (fun s -> s.Trim('"')) |> Array.ofList |> Array.map box)
 
     let result = cmd.Result
     log "output:"

@@ -27,12 +27,16 @@ module MSBuild =
          | Project of string
 
     let sprintfMsbuildArg a =
-        //TODO quote
+        let quote (s: string) =
+            if s.Contains(" ")
+            then sprintf "\"%s\"" s
+            else s
+
         match a with
-         | Property (k,v) -> sprintf "/p:%s=%s" k v
-         | Target t -> sprintf "/t:%s" t
+         | Property (k,v) -> sprintf "/p:%s=%s" k v |> quote
+         | Target t -> sprintf "/t:%s" t |> quote
          | Switch w -> sprintf "/%s" w
-         | Project w -> w
+         | Project w -> w |> quote
 
 open MSBuild
 
