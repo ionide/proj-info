@@ -110,6 +110,7 @@ let getFscArgs () =
         [ Property ("SkipCompilerExecution", "true")
           Property ("ProvideCommandLineArgs" , "true")
           Property ("CopyBuildOutputToOutputDirectory", "false")
+          Property ("UseCommonOutputDirectory", "true")
           Target "_Inspect_FscArgs"
           Property ("_Inspect_FscArgs_OutFile", outFile) ]
     template, args, (fun () -> parseFscArgsOut outFile)
