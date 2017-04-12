@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFrameworks>netstandard1.6;net45</TargetFrameworks>
+    <Description>Get msbuild info</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,5 +14,7 @@
     <PackageReference Include="FSharp.Core" Condition=" '$(TargetFramework)' == 'net45' " Version="4.0.0.1" />
     <PackageReference Include="FSharp.NET.Sdk" Version="1.0.*" PrivateAssets="All" />
   </ItemGroup>
+
+  <Import Project="..\PackagesInfo.props" />
 
 </Project>

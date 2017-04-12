@@ -3,6 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp1.0</TargetFramework>
+    <Description>Get msbuild info as cli tool</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,9 +19,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Dotnet.ProjInfo\Dotnet.ProjInfo.fsproj" >
-      <PackageVersion>0.2.0</PackageVersion>
-    </ProjectReference>
+    <ProjectReference Include="..\Dotnet.ProjInfo\Dotnet.ProjInfo.fsproj" />
   </ItemGroup>
+
+  <Import Project="..\PackagesInfo.props" />
 
 </Project>
