@@ -1,9 +1,7 @@
-﻿// Learn more about F# at http://fsharp.org
-
-open System
+﻿open System
 
 [<EntryPoint>]
 let main argv =
-    l1.Say.hello "F#!"
+    l2.Say.hello "F#!"
     l1.Say.jsonstuff()
-    0 // return an integer exit code
+    0
