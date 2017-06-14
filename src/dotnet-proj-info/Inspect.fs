@@ -38,11 +38,21 @@ module MSBuild =
          | Switch w -> sprintf "/%s" w
          | Project w -> w |> quote
 
+    let (|ConditionEquals|_|) (str: string) (arg: string) = 
+        if System.String.Compare(str, arg, System.StringComparison.OrdinalIgnoreCase) = 0
+        then Some() else None
+
+    let (|StringList|_|) (str: string)  = 
+        str.Split([| ';' |], System.StringSplitOptions.RemoveEmptyEntries)
+        |> List.ofArray
+        |> Some
+
 open MSBuild
 
 type GetProjectInfoErrors<'T> =
     | UnexpectedMSBuildResult of string
     | MSBuildFailed of int * 'T
+    | MSBuildSkippedTarget
 
 let dotnetMsbuild run project args =
     let dotnetExe = @"dotnet"
@@ -82,7 +92,20 @@ let install_target_file log templates projPath =
 type GetResult =
      | FscArgs of string list
      | P2PRefs of string list
+     | ResolvedP2PRefs of ResolvedP2PRefsInfo list
      | Properties of (string * string) list
+and ResolvedP2PRefsInfo = { ProjectReferenceFullPath: string; TargetFramework: string; Others: (string * string) list }
+
+let getNewTempFilePath () =
+    let outFile = System.IO.Path.GetTempFileName()
+    if File.Exists outFile then File.Delete outFile
+    outFile
+
+let bindSkipped f outFile =
+    if not(File.Exists outFile) then
+        Error MSBuildSkippedTarget
+    else
+        f outFile
 
 let parseFscArgsOut outFile =
     let lines =
@@ -94,6 +117,7 @@ let getFscArgs () =
     let template =
         """
   <Target Name="_Inspect_FscArgs"
+          Condition=" '$(IsCrossTargetingBuild)' != 'true' "
           DependsOnTargets="ResolveReferences;CoreCompile">
     <Message Text="%(FscCommandLineArgs.Identity)" Importance="High" />
     <WriteLinesToFile
@@ -109,7 +133,7 @@ let getFscArgs () =
         AlwaysCreate="True" />
   </Target>
         """.Trim()
-    let outFile = System.IO.Path.GetTempFileName()
+    let outFile = getNewTempFilePath ()
     let args =
         [ Property ("SkipCompilerExecution", "true")
           Property ("ProvideCommandLineArgs" , "true")
@@ -117,7 +141,7 @@ let getFscArgs () =
           Property ("UseCommonOutputDirectory", "true")
           Target "_Inspect_FscArgs"
           Property ("_Inspect_FscArgs_OutFile", outFile) ]
-    template, args, (fun () -> parseFscArgsOut outFile)
+    template, args, (fun () -> bindSkipped parseFscArgsOut outFile)
 
 let parseP2PRefsOut outFile =
     let lines =
@@ -143,11 +167,11 @@ let getP2PRefs () =
         AlwaysCreate="True" />
   </Target>
         """.Trim()
-    let outFile = System.IO.Path.GetTempFileName()
+    let outFile = getNewTempFilePath ()
     let args =
         [ Target "_Inspect_GetProjectReferences"
           Property ("_Inspect_GetProjectReferences_OutFile", outFile) ]
-    template, args, (fun () -> parseP2PRefsOut outFile)
+    template, args, (fun () -> bindSkipped parseP2PRefsOut outFile)
 
 let parsePropertiesOut outFile =
     let firstAndRest (delim: char) (s: string) =
@@ -201,11 +225,73 @@ let getProperties props =
             Encoding="UTF-8"/>
   </Target>
         """.Trim()
-    let outFile = System.IO.Path.GetTempFileName()
+    let outFile = getNewTempFilePath ()
     let args =
         [ Target "_Inspect_GetProperties"
           Property ("_Inspect_GetProperties_OutFile", outFile) ]
-    template, args, (fun () -> parsePropertiesOut outFile)
+    template, args, (fun () -> bindSkipped parsePropertiesOut outFile)
+
+let parseResolvedP2PRefOut outFile =
+    /// Example:
+    /// ProjectReferenceFullPath=..\l1.fsproj;TargetFramework=net45;ProjectHasSingleTargetFramework=false;ProjectIsRidAgnostic=true
+
+    let lines =
+        File.ReadAllLines(outFile)
+        |> Array.collect (fun s -> s.Split([| ';' |], System.StringSplitOptions.RemoveEmptyEntries))
+        |> Array.map (fun s -> s.Split([| '=' |], System.StringSplitOptions.RemoveEmptyEntries))
+        |> Array.map (fun s -> match s with [| k; v |] -> k,v | _ -> failwithf "parsing resolved p2p refs, invalid key value '%A'" s)
+
+    let p2ps =
+        match lines with
+        | [| |] -> []
+        | lines ->
+            let g =
+                lines
+                |> Array.mapFold (fun s (k,v) ->
+                    let i = if k = "ProjectReferenceFullPath" then s + 1 else s
+                    (i,k,v), i) 0
+                |> fst
+                |> Array.groupBy (fun (i,k,v) -> i)
+                |> Array.map (fun (_,items) -> items |> Array.map (fun (i,k,v) -> k,v))
+            g
+            |> Array.map (fun lines ->
+                    let props = lines |> Map.ofArray
+                    let path = props |> Map.find "ProjectReferenceFullPath"
+                    let tfm = props |> Map.find "TargetFramework"
+                    { ProjectReferenceFullPath = path; TargetFramework = tfm; Others = lines |> List.ofArray }
+                )
+            |> List.ofArray
+
+    Ok (ResolvedP2PRefs p2ps)
+
+let getResolvedP2PRefs () =
+    let template =
+        """
+  <Target Name="_Inspect_GetResolvedProjectReferences"
+          Condition=" '$(IsCrossTargetingBuild)' != 'true' "
+          DependsOnTargets="ResolveProjectReferencesDesignTime">
+    <Message Text="%(_MSBuildProjectReferenceExistent.FullPath)" Importance="High" />
+    <Message Text="%(_MSBuildProjectReferenceExistent.SetTargetFramework)" Importance="High" />
+    <WriteLinesToFile
+            Condition=" '$(_Inspect_GetResolvedProjectReferences_OutFile)' != '' "
+            File="$(_Inspect_GetResolvedProjectReferences_OutFile)"
+            Lines="@(_MSBuildProjectReferenceExistent -> 'ProjectReferenceFullPath=%(FullPath);%(SetTargetFramework)')"
+            Overwrite="true"
+            Encoding="UTF-8"/>
+    <!-- WriteLinesToFile doesnt create the file if @(_MSBuildProjectReferenceExistent) is empty -->
+    <Touch
+        Condition=" '$(_Inspect_GetResolvedProjectReferences_OutFile)' != '' "
+        Files="$(_Inspect_GetResolvedProjectReferences_OutFile)"
+        AlwaysCreate="True" />
+  </Target>
+        """.Trim()
+    let outFile = getNewTempFilePath ()
+    let args =
+        [ Property ("DesignTimeBuild", "true")
+          Target "_Inspect_GetResolvedProjectReferences"
+          Property ("_Inspect_GetResolvedProjectReferences_OutFile", outFile) ]
+    template, args, (fun () -> bindSkipped parseResolvedP2PRefOut outFile)
+
 
 let getProjectInfos log msbuildExec getters additionalArgs projPath =
 
