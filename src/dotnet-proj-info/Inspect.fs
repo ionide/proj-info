@@ -237,9 +237,15 @@ let parseResolvedP2PRefOut outFile =
 
     let lines =
         File.ReadAllLines(outFile)
+        |> Array.map (fun s -> s.Trim())
+        |> Array.filter ((<>) "")
         |> Array.collect (fun s -> s.Split([| ';' |], System.StringSplitOptions.RemoveEmptyEntries))
         |> Array.map (fun s -> s.Split([| '=' |], System.StringSplitOptions.RemoveEmptyEntries))
-        |> Array.map (fun s -> match s with [| k; v |] -> k,v | _ -> failwithf "parsing resolved p2p refs, invalid key value '%A'" s)
+        |> Array.map (fun s ->
+            match s with
+            | [| k; v |] -> k,v
+            | [| k |] -> k,""
+            | _ -> failwithf "parsing resolved p2p refs, invalid key value '%A'" s)
 
     let p2ps =
         match lines with
