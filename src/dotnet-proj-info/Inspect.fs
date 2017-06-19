@@ -96,10 +96,10 @@ type GetResult =
      | Properties of (string * string) list
 and ResolvedP2PRefsInfo = { ProjectReferenceFullPath: string; TargetFramework: string; Others: (string * string) list }
 
-let getNewTempFilePath () =
+let getNewTempFilePath suffix =
     let outFile = System.IO.Path.GetTempFileName()
     if File.Exists outFile then File.Delete outFile
-    outFile
+    sprintf "%s.%s" outFile suffix
 
 let bindSkipped f outFile =
     if not(File.Exists outFile) then
@@ -133,7 +133,7 @@ let getFscArgs () =
         AlwaysCreate="True" />
   </Target>
         """.Trim()
-    let outFile = getNewTempFilePath ()
+    let outFile = getNewTempFilePath "FscArgs.txt"
     let args =
         [ Property ("SkipCompilerExecution", "true")
           Property ("ProvideCommandLineArgs" , "true")
@@ -167,7 +167,7 @@ let getP2PRefs () =
         AlwaysCreate="True" />
   </Target>
         """.Trim()
-    let outFile = getNewTempFilePath ()
+    let outFile = getNewTempFilePath "GetProjectReferences.txt"
     let args =
         [ Target "_Inspect_GetProjectReferences"
           Property ("_Inspect_GetProjectReferences_OutFile", outFile) ]
@@ -225,7 +225,7 @@ let getProperties props =
             Encoding="UTF-8"/>
   </Target>
         """.Trim()
-    let outFile = getNewTempFilePath ()
+    let outFile = getNewTempFilePath "GetProperties.txt"
     let args =
         [ Target "_Inspect_GetProperties"
           Property ("_Inspect_GetProperties_OutFile", outFile) ]
@@ -298,7 +298,7 @@ let getResolvedP2PRefs () =
         AlwaysCreate="True" />
   </Target>
         """.Trim()
-    let outFile = getNewTempFilePath ()
+    let outFile = getNewTempFilePath "GetResolvedProjectReferences.txt"
     let args =
         [ Property ("DesignTimeBuild", "true")
           Target "_Inspect_GetResolvedProjectReferences"
