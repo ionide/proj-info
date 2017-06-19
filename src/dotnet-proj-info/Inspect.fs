@@ -235,8 +235,10 @@ let parseResolvedP2PRefOut outFile =
     /// Example:
     /// ProjectReferenceFullPath=..\l1.fsproj;TargetFramework=net45;ProjectHasSingleTargetFramework=false;ProjectIsRidAgnostic=true
 
+    let allLines = File.ReadAllLines(outFile)
+
     let lines =
-        File.ReadAllLines(outFile)
+        allLines
         |> Array.map (fun s -> s.Trim())
         |> Array.filter ((<>) "")
         |> Array.collect (fun s -> s.Split([| ';' |], System.StringSplitOptions.RemoveEmptyEntries))
@@ -262,9 +264,14 @@ let parseResolvedP2PRefOut outFile =
             g
             |> Array.map (fun lines ->
                     let props = lines |> Map.ofArray
-                    let path = props |> Map.find "ProjectReferenceFullPath"
-                    let tfm = props |> Map.find "TargetFramework"
-                    { ProjectReferenceFullPath = path; TargetFramework = tfm; Others = lines |> List.ofArray }
+                    let pathOpt = props |> Map.tryFind "ProjectReferenceFullPath"
+                    let tfmOpt = props |> Map.tryFind "TargetFramework"
+                    match pathOpt, tfmOpt with
+                    | Some path, Some tfm ->
+                        { ProjectReferenceFullPath = path; TargetFramework = tfm; Others = lines |> List.ofArray }
+                    | _ ->
+                        failwithf "parsing resolved p2p refs, expected properties not found '%A'" allLines
+
                 )
             |> List.ofArray
 
