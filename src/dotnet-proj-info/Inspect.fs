@@ -197,10 +197,11 @@ let parsePropertiesOut outFile =
         |> (fun x -> Error (UnexpectedMSBuildResult x))
 
 let getProperties props =
-    let template =
+    let templateF isCrossgen =
         """
-  <Target Name="_Inspect_GetProperties"
-          DependsOnTargets="ResolveReferences">
+  <Target Name="_Inspect_GetProperties_""" + (if isCrossgen then "CrossGen" else "NotCrossGen") + """"
+          Condition=" '$(IsCrossTargetingBuild)' """ + (if isCrossgen then "==" else "!=") + """ 'true' "
+          """ + (if isCrossgen then "" else "DependsOnTargets=\"ResolveReferences\"" ) + """ >
     <ItemGroup>
         """
         + (
@@ -225,6 +226,22 @@ let getProperties props =
             Encoding="UTF-8"/>
   </Target>
         """.Trim()
+
+    //doing like that (crossgen/notcrossgen) because ResolveReferences doesnt exists
+    //if is crossgen
+
+    let templateAll =
+        """
+  <Target Name="_Inspect_GetProperties"
+          DependsOnTargets="_Inspect_GetProperties_CrossGen;_Inspect_GetProperties_NotCrossGen" />
+        """
+
+    let template =
+        [ templateF true
+          templateF false
+          templateAll ]
+        |> String.concat (System.Environment.NewLine)
+    
     let outFile = getNewTempFilePath "GetProperties.txt"
     let args =
         [ Target "_Inspect_GetProperties"
