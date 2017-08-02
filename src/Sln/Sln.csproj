@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard1.4</TargetFramework>
+    <TargetFrameworks>netstandard1.4;net45</TargetFrameworks>
+    <Description>Parse sln files</Description>
   </PropertyGroup>
 
 </Project>
