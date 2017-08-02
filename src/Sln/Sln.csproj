@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFrameworks>netstandard1.4;net45</TargetFrameworks>
     <Description>Parse sln files</Description>
+    <DefineConstants>FULL_SLN_PARSER;$(DefineConstants)</DefineConstants>
   </PropertyGroup>
 
 </Project>
