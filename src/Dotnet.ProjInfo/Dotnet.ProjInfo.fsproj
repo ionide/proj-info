@@ -1,8 +1,9 @@
-﻿<Project Sdk="FSharp.NET.Sdk;Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>netstandard1.6;net45</TargetFrameworks>
     <Description>Get msbuild info</Description>
+    <AssemblyName>Dotnet.ProjInfo.Matthid</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,7 +13,6 @@
   <ItemGroup>
     <PackageReference Include="FSharp.Core" Condition=" '$(TargetFramework)' == 'netstandard1.6' " Version="4.1.*" />
     <PackageReference Include="FSharp.Core" Condition=" '$(TargetFramework)' == 'net45' " Version="4.0.0.1" />
-    <PackageReference Include="FSharp.NET.Sdk" Version="1.0.*" PrivateAssets="All" />
   </ItemGroup>
 
   <Import Project="..\PackagesInfo.props" />
