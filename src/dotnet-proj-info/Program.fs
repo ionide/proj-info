@@ -10,6 +10,9 @@ type CLIArguments =
     | [<AltCommandLine("-r")>] Runtime of string
     | [<AltCommandLine("-c")>] Configuration of string
     | [<AltCommandLine("-v")>] Verbose
+    | MSBuild of string
+    | DotnetCli of string
+    | MSBuild_Host of MSBuildHostPicker
 with
     interface IArgParserTemplate with
         member s.Usage =
@@ -22,6 +25,13 @@ with
             | Runtime _ -> "target runtime, the RuntimeIdentifier msbuild property"
             | Configuration _ -> "configuration to use (like Debug), the Configuration msbuild property"
             | Get_Property _ -> "msbuild property to get (allow multiple)"
+            | MSBuild _ -> "MSBuild path (default \"msbuild\")"
+            | DotnetCli _ -> "Dotnet CLI path (default \"dotnet\")"
+            | MSBuild_Host _ -> "the Msbuild host, if auto then oldsdk=MSBuild dotnetSdk=DotnetCLI"
+and MSBuildHostPicker =
+    | Auto = 1
+    | MSBuild  = 2
+    | DotnetMSBuild = 3
 
 open Dotnet.ProjInfo.Inspect
 
@@ -151,6 +161,10 @@ let realMain argv = attempt {
           results.TryGetResult <@ Project_Refs @> |> Option.map (fun _ -> getP2PRefs)
           results.TryGetResult <@ Get_Property @> |> Option.map (fun p -> (fun () -> getProperties p)) ]
 
+    let msbuildPath = results.GetResult(<@ MSBuild @>, defaultValue = "msbuild")
+    let dotnetPath = results.GetResult(<@ DotnetCli @>, defaultValue = "dotnet")
+    let dotnetHostPicker = results.GetResult(<@ MSBuild_Host @>, defaultValue = MSBuildHostPicker.Auto)
+
     let cmds = allCmds |> List.choose id
 
     let! cmd =
@@ -162,12 +176,20 @@ let realMain argv = attempt {
     let exec getArgs additionalArgs = attempt {
         let msbuildExec =
             let projDir = Path.GetDirectoryName(projPath)
-            let msbuildHost =
-                if isDotnetSdk then
-                    MSBuildExePath.DotnetMsbuild "dotnet"
-                else
-                    MSBuildExePath.Path "msbuild"
-            msbuild msbuildHost (runCmd log projDir)
+            let rec msbuildHost host =
+                match host with
+                | MSBuildHostPicker.MSBuild ->
+                    MSBuildExePath.Path msbuildPath
+                | MSBuildHostPicker.DotnetMSBuild ->
+                    MSBuildExePath.DotnetMsbuild dotnetPath
+                | MSBuildHostPicker.Auto ->
+                    if isDotnetSdk then
+                        msbuildHost MSBuildHostPicker.DotnetMSBuild
+                    else
+                        msbuildHost MSBuildHostPicker.MSBuild
+                | x ->
+                    failwithf "Unexpected msbuild host '%A'" x
+            msbuild (msbuildHost dotnetHostPicker) (runCmd log projDir)
 
         let! r =
             if isDotnetSdk then
