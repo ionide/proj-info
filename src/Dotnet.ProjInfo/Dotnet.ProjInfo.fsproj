@@ -9,7 +9,7 @@
     <Compile Include="ExternalFSharp\MissingApi.fs" />
     <Compile Include="ExternalFSharp\FscConfig.fs" />
 
-    <ProjectReference Include="..\Dotnet.ProjInfo.Helpers\Dotnet.ProjInfo.Helpers.csproj" />
+    <ProjectReference Include="..\Dotnet.ProjInfo.Helpers\Dotnet.ProjInfo.Helpers.csproj" PrivateAssets="All" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,6 +20,16 @@
     <PackageReference Include="FSharp.Core" Condition=" '$(TargetFramework)' == 'netstandard1.6' " Version="4.1.*" />
     <PackageReference Include="FSharp.Core" Condition=" '$(TargetFramework)' == 'net45' " Version="4.0.0.1" />
   </ItemGroup>
+
+  <!-- HACK: p2p of type project, not package (ref https://github.com/NuGet/Home/issues/3891 ) -->
+  <PropertyGroup>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeP2POutput</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+  <Target Name="IncludeP2POutput" Condition=" '$(TargetFramework)' != 'netstandard1.6' ">
+    <ItemGroup>
+      <BuildOutputInPackage Include="$(MSBuildProjectDirectory)/$(OutputPath)Dotnet.ProjInfo.Helpers.dll" />
+    </ItemGroup>
+  </Target>
 
   <Import Project="..\PackagesInfo.props" />
 
