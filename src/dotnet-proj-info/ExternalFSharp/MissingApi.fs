@@ -27,7 +27,6 @@ namespace Microsoft.Build.Framework
         default x.StandardOutputEncoding = System.Text.Encoding.UTF8
 
         abstract GenerateFullPathToTool : unit -> string
-        abstract LogToolCommand: string -> unit
 
         abstract member ExecuteTool : pathToTool: string * responseFileCommands: string * commandLineCommands: string -> int
         default x.ExecuteTool(pathToTool: string, responseFileCommands: string, commandLineCommands: string) =
