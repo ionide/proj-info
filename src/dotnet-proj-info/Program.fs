@@ -162,10 +162,12 @@ let realMain argv = attempt {
     let exec getArgs additionalArgs = attempt {
         let msbuildExec =
             let projDir = Path.GetDirectoryName(projPath)
-            if isDotnetSdk then
-                dotnetMsbuild (runCmd log projDir)
-            else
-                msbuild (MSBuildExePath.Path "msbuild") (runCmd log projDir)
+            let msbuildHost =
+                if isDotnetSdk then
+                    MSBuildExePath.DotnetMsbuild "dotnet"
+                else
+                    MSBuildExePath.Path "msbuild"
+            msbuild msbuildHost (runCmd log projDir)
 
         let! r =
             if isDotnetSdk then
