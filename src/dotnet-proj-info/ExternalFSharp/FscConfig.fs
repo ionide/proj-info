@@ -65,7 +65,7 @@ let config props =
     bind (fun prop -> fsc.PreferredUILang <- prop) "PreferredUILang"
     bindBool (fun prop -> fsc.ProvideCommandLineArgs <- prop) "ProvideCommandLineArgs"
     bindBool (fun prop -> fsc.PublicSign <- prop) "PublicSign"
-    bindArray (fun prop -> fsc.References <- prop) "ReferencePath"
+    bindArray (fun prop -> fsc.References <- prop) "References"
     bind (fun prop -> fsc.ReferencePath <- prop) "ReferencePath"
     bindArray (fun prop -> fsc.Resources <- prop) "Resources"
     bindBool (fun prop -> fsc.SkipCompilerExecution <- prop) "SkipCompilerExecution"

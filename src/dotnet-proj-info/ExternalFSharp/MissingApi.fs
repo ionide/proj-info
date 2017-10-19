@@ -8,7 +8,7 @@ namespace Microsoft.Build.Framework
     type TaskItem(arg: string) =
 
         interface ITaskItem with
-            member val ItemSpec: string = "" with get, set
+            member val ItemSpec: string = arg with get, set
 
             member __.GetMetadata(key: string) =
                 ""
