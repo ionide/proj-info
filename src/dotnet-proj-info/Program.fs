@@ -125,7 +125,7 @@ let realMain argv = attempt {
                 |> Result.mapError ExecutionError
             | ProjectRecognizer.OldSdk ->
                 projPath
-                |> getProjectInfo log msbuildExec getArgs additionalArgs
+                |> getProjectInfoOldSdk log msbuildExec getArgs additionalArgs
                 |> Result.mapError ExecutionError
             | ProjectRecognizer.Unsupported ->
                 Errors.GenericError "unsupported project format"

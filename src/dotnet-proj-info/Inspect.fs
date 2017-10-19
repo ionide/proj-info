@@ -481,6 +481,16 @@ let getProjectInfosOldSdk log msbuildExec getters additionalArgs (projPath: stri
     |> Result.bind (fun targetPath -> msbuildExec projPath (args @ additionalArgs @ [ Property("CustomAfterMicrosoftCommonTargets", targetPath) ]))
     |> Result.map (fun _ -> parsers |> List.map (fun parse -> parse ()))
 
+let getProjectInfoOldSdk log msbuildExec getArgs additionalArgs projPath =
+    //TODO refactor to use getProjectInfosOldSdk
+    let template, args, parse =  getArgs ()
+
+    getNewTempFilePath "proj-info.oldsdk-hook.targets"
+    |> writeTargetFile log [template]
+    |> Result.bind (fun targetPath -> msbuildExec projPath (args @ additionalArgs @ [ Property("CustomAfterMicrosoftCommonTargets", targetPath) ]))
+    |> Result.bind (fun _ -> parse ())
+
+
 module ProjectRecognizer =
 
     let (|DotnetSdk|OldSdk|Unsupported|) file =
