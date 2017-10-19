@@ -96,7 +96,7 @@ let realMain argv = attempt {
             Ok (true, getFscArgs)
         | ProjectRecognizer.OldSdk ->
             //let justPrintProps = List.map (fun (k,v) -> sprintf "%s=%s" k v)
-            let asFscArgs = Dotnet.ProjInfo.FakeMsbuildTasks.config
+            let asFscArgs = Dotnet.ProjInfo.FakeMsbuildTasks.getResponseFile
             Ok (false, getFscArgsOldSdk (asFscArgs >> Ok))
         | ProjectRecognizer.Unsupported ->
             Errors.GenericError "unsupported project format"
