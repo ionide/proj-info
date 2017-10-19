@@ -6,7 +6,7 @@
     <PackageTags>mbuild;dotnet;sdk;csproj;fsproj</PackageTags>
     <RepositoryUrl>https://github.com/enricosada/dotnet-proj-info.git</RepositoryUrl>
 
-    <RepoRootDir>$(MSBuildThisFileDirectory)</RepoRootDir>
+    <RepoRootDir>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)\.."))</RepoRootDir>
     <NupkgsDir>$(RepoRootDir)bin/nupkg</NupkgsDir>
     <Version Condition=" '$(Version)' == '' ">0.8.0$(VersionSuffix)</Version>
   </PropertyGroup>
