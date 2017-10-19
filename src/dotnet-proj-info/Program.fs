@@ -183,3 +183,6 @@ let main argv =
         | ExecutionError (UnexpectedMSBuildResult r) ->
             printfn "%A" r
             8
+        | ExecutionError (MSBuildSkippedTarget) ->
+            printfn "internal error, target was skipped"
+            9
