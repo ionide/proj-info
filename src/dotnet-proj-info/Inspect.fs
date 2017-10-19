@@ -55,14 +55,25 @@ type GetProjectInfoErrors<'T> =
     | MSBuildFailed of int * 'T
     | MSBuildSkippedTarget
 
-let dotnetMsbuild run project args =
-    let dotnetExe = @"dotnet"
+[<RequireQualifiedAccess>]
+type MSBuildExePath =
+    | Path of string
+    | DotnetMsbuild of dotnetExePath: string 
+
+let msbuild msbuildExe run project args =
+    let exe, beforeArgs =
+        match msbuildExe with
+        | MSBuildExePath.Path path -> path, []
+        | MSBuildExePath.DotnetMsbuild path -> path, ["msbuild"]
     let msbuildArgs =
         Project(project) :: args @ [ Switch "nologo"; Switch "verbosity:quiet"]
         |> List.map (MSBuild.sprintfMsbuildArg)
-    match run dotnetExe ("msbuild" :: msbuildArgs) with
+    match run exe (beforeArgs @ msbuildArgs) with
     | 0, x -> Ok x
     | n, x -> Error (MSBuildFailed (n,x))
+
+let dotnetMsbuild run project args =
+    msbuild (MSBuildExePath.DotnetMsbuild "dotnet") run project args
 
 let write_target_file log templates targetFileDestPath =
     // https://github.com/dotnet/cli/issues/5650
