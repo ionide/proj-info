@@ -423,7 +423,7 @@ let getFscArgsOldSdk propsToFscArgs () =
         |> List.map (fun s -> s.Trim().TrimEnd('>'))
         |> List.map (fun s -> s.Split([| '=' |], StringSplitOptions.RemoveEmptyEntries) |> List.ofArray)
         |> List.filter (not << List.isEmpty)
-        |> List.choose (fun kv -> match kv with [k;v] -> Some (k,v) | _ -> failwithf "unexpected line '%A'" kv)
+        |> List.choose (fun kv -> match kv with [k;v] -> Some (k,v.Trim('"')) | _ -> failwithf "unexpected line '%A'" kv)
 
     let template =
         """

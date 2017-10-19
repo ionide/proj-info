@@ -46,7 +46,7 @@ namespace Microsoft.Build.Framework
         abstract HostObject : obj
         default x.HostObject = Unchecked.defaultof<obj>
 
-        member x.ToolExe: string = ""
+        member val ToolExe: string = "" with get, set
         member x.Log: TaskLoggingHelper = TaskLoggingHelper ()
 
     type OutputAttribute () =
@@ -54,31 +54,41 @@ namespace Microsoft.Build.Framework
 
 namespace Microsoft.Build.Utilities
 
+    open System
     open Microsoft.Build.Framework
 
     type CommandLineBuilder () =
-        
-        member x.AppendTextUnquoted (s:string) =
-            ()
 
-        
+        let sb = System.Text.StringBuilder()
+
+        member x.AppendTextUnquoted (s:string) =
+            sb.AppendLine(s) |> ignore
+
         member x.AppendSwitch (s:string) =
-            ()
+            sb.AppendLine(s) |> ignore
 
         member x.AppendSwitchUnquotedIfNotNull (switch: string, value: string, ?sep: string) =
-            ()
+            if not(String.IsNullOrEmpty(switch)) then
+                x.AppendTextUnquoted(sprintf "%s%s" switch value)
 
         member x.AppendSwitchUnquotedIfNotNull (switch: string, values: string array, ?sep: string) =
-            ()
+            if not(String.IsNullOrEmpty(switch)) then
+                x.AppendTextUnquoted(sprintf "%s%A" switch values)
 
         member x.AppendSwitchIfNotNull (switch: string, value: string, ?sep: string) =
-            ()
+            if not(String.IsNullOrEmpty(switch)) then
+                x.AppendTextUnquoted(sprintf "%s%A" switch value)
 
         member x.AppendSwitchIfNotNull (switch: string, value: string array, ?sep: string) =
-            ()
+            if not(String.IsNullOrEmpty(switch)) then
+                x.AppendTextUnquoted(sprintf "%s%A" switch value)
 
         member x.AppendFileNamesIfNotNull (filenames: ITaskItem array, sep: string) =
-            ()
+            if not(isNull(filenames)) then
+                x.AppendTextUnquoted(sprintf "%A" filenames)
+
+        override x.ToString() =
+            sb.ToString()
 
 namespace Internal.Utilities
 
