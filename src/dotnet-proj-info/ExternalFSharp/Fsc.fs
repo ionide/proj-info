@@ -162,12 +162,16 @@ type [<Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1704:Iden
     let mutable targetType : string = null
     let mutable toolExe : string = "fsc.exe"
     let mutable toolPath : string = 
+#if FX_FSC_BUILD_ALWAYS_OK
+        ""
+#else
         let locationOfThisDll = 
             try Some(System.IO.Path.GetDirectoryName(typeof<FscCommandLineBuilder>.Assembly.Location))
             with _ -> None
         match FSharpEnvironment.BinFolderOfDefaultFSharpCompiler(locationOfThisDll) with
         | Some s -> s
         | None -> ""
+#endif
     let mutable treatWarningsAsErrors : bool = false
     let mutable useStandardResourceNames : bool = false
     let mutable warningsAsErrors : string = null
@@ -597,6 +601,9 @@ type [<Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1704:Iden
                 |> Array.map (fun (arg: string) -> TaskItem(arg) :> ITaskItem)
                 |> Array.toList
 
+#if FX_FSC_BUILD_ALWAYS_OK
+        0
+#else
         if skipCompilerExecution then
             0
         else
@@ -626,6 +633,7 @@ type [<Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1704:Iden
                 | e ->
                     System.Diagnostics.Debug.Assert(false, "HostObject received by Fsc task did not have a Compile method or the compile method threw an exception. "+(e.ToString()))
                     reraise()
+#endif
 
     override fsc.GenerateCommandLineCommands() =
         let builder = new FscCommandLineBuilder()

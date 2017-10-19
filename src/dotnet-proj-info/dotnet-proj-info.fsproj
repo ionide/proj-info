@@ -4,6 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp1.0</TargetFramework>
     <Description>Get msbuild info as cli tool</Description>
+    <DefineConstants>FX_FSC_BUILD_ALWAYS_OK</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
