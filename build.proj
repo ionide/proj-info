@@ -1,0 +1,25 @@
+<Project ToolsVersion="15.0">
+
+  <Import Project="Directory.Build.props" />
+
+  <Target Name="Build">
+    <Exec Command='dotnet build src/dotnet-proj-info' />
+  </Target>
+
+  <Target Name="Restore">
+    <Exec Command="paket.bootstrapper.exe" WorkingDirectory=".paket" ConsoleToMSBuild="true" />
+    <Exec Command="paket.exe restore" WorkingDirectory=".paket" ConsoleToMSBuild="true" />
+  </Target>
+
+  <Target Name="Pack">
+    <RemoveDir Directories="$(NupkgsDir)" />
+    <Exec Command='dotnet pack src/dotnet-proj-info -c Release -o "$(NupkgsDir)" /p:Version=$(Version)' />
+    <Exec Command='dotnet pack src/Dotnet.ProjInfo -c Release -o "$(NupkgsDir)" /p:Version=$(Version)' />
+  </Target>
+
+  <Target Name="Test">
+  </Target>
+
+  <Target Name="VSTest" DependsOnTargets="VSTest" />
+
+</Project>

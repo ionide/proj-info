@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
     <Authors>Enrico Sada</Authors>
     <PackageProjectUrl>https://github.com/enricosada/dotnet-proj-info/</PackageProjectUrl>
     <PackageTags>mbuild;dotnet;sdk;csproj;fsproj</PackageTags>
     <RepositoryUrl>https://github.com/enricosada/dotnet-proj-info.git</RepositoryUrl>
+
+    <NupkgsDir>$(MSBuildThisFileDirectory)bin/nupkg</NupkgsDir>
+    <Version Condition=" '$(Version)' == '' ">0.8.0$(VersionSuffix)</Version>
   </PropertyGroup>
 </Project>
