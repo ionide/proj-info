@@ -1,0 +1,20 @@
+language: csharp
+
+mono: 5.2.0
+dotnet: 2.0.0
+
+install:
+  # workaround for missing .net 4.5 targing pack
+  - export FrameworkPathOverride=$(dirname $(which mono))/../lib/mono/4.5/
+
+script:
+  - dotnet pack -v n
+  - dotnet test -v n
+
+matrix:
+  include:
+    - os: linux
+      dist: trusty
+      sudo: required
+    - os: osx
+      osx_image: xcode9

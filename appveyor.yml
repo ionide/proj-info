@@ -1,0 +1,10 @@
+image:
+  - Visual Studio 2017
+
+build_script:
+  - cmd: dotnet pack -v n
+  - cmd: dotnet test -v n
+
+artifacts:
+  - path: bin\nupkg\*.nupkg
+    name: nupkgs
