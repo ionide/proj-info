@@ -12,7 +12,8 @@
     <TestArgs Include="--get-property AssemblyName" />
   </ItemGroup>
 
-  <Target Name="Test">
+  <Target Name="Test" Inputs="@(TestArgs)" Outputs="%(Identity).Dummy">
+    <Message Text="Running test with '%(TestArgs.Identity)'" />
     <Exec Command='dotnet run -p "$(RepoRootDir)/src/dotnet-proj-info/dotnet-proj-info.fsproj" -f netcoreapp2.0 -- "$(RepoRootDir)/test/sdk1/app c1/app c1.fsproj" %(TestArgs.Identity) -v' IgnoreStandardErrorWarningFormat="true" />
   </Target>
 

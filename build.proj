@@ -18,6 +18,7 @@
   </Target>
 
   <Target Name="Test">
+    <Exec Command='dotnet test -v n' WorkingDirectory="test" IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
   <Target Name="VSTest" DependsOnTargets="Test" />
