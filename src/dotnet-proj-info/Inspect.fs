@@ -450,3 +450,17 @@ let getFscArgsOldSdk () =
           Property ("_Inspect_CoreCompilePropsOldSdk_OutFile", outFile) ]
     template, args, (fun () -> bindSkipped parsePropertiesOut outFile)
 
+
+let getProjectInfosOldSdk log msbuildExec getters additionalArgs (projPath: string) =
+
+    let templates, argsList, parsers = 
+        getters
+        |> List.map (fun getArgs -> getArgs ())
+        |> List.unzip3
+
+    let args = argsList |> List.concat
+
+    getNewTempFilePath "proj-info.oldsdk-hook.targets"
+    |> write_target_file log templates
+    |> Result.bind (fun targetPath -> msbuildExec projPath (args @ additionalArgs @ [ Property("CustomAfterMicrosoftCommonTargets", targetPath) ]))
+    |> Result.map (fun _ -> parsers |> List.map (fun parse -> parse ()))
