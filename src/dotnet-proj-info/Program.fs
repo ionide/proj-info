@@ -192,14 +192,14 @@ let realMain argv = attempt {
             msbuild (msbuildHost dotnetHostPicker) (runCmd log projDir)
 
         let! r =
-            if isDotnetSdk then
-                projPath
-                |> getProjectInfo log msbuildExec getArgs additionalArgs
-                |> Result.mapError ExecutionError
-            else
-                projPath
-                |> getProjectInfoOldSdk log msbuildExec getArgs additionalArgs
-                |> Result.mapError ExecutionError
+            let getInfo =
+                if isDotnetSdk then
+                    getProjectInfo
+                else
+                    getProjectInfoOldSdk
+            projPath
+            |> getInfo log msbuildExec getArgs additionalArgs
+            |> Result.mapError ExecutionError
 
         return r
         }
