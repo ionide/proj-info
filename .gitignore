@@ -238,3 +238,4 @@ _Pvt_Extensions
 # Repo-specific files
 
 .dotnetsdk
+/.paket/
