@@ -368,7 +368,7 @@ let getProjectInfo log msbuildExec getArgs additionalArgs projPath =
 let getFscArgsOldSdk propsToFscArgs () =
 
     //from https://github.com/Microsoft/visualfsharp/blob/e5762fd1ed1fcb3fc70c978688204a35cfae1a3e/src/fsharp/FSharp.Build/Microsoft.FSharp.Targets#L264-L309
-    //as string, for easier maintenance
+    //as string, yes, for easier maintenance to copy/paste from previous source
     let props =
         """
               BaseAddress="$(BaseAddress)"
