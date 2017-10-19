@@ -6,6 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="ExternalFSharp\MissingApi.fs" />
+    <Compile Include="ExternalFSharp\FscConfig.fs" />
     <Compile Include="..\dotnet-proj-info\Inspect.fs" />
   </ItemGroup>
 
