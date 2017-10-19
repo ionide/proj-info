@@ -75,7 +75,7 @@ let msbuild msbuildExe run project args =
 let dotnetMsbuild run project args =
     msbuild (MSBuildExePath.DotnetMsbuild "dotnet") run project args
 
-let write_target_file log templates targetFileDestPath =
+let writeTargetFile log templates targetFileDestPath =
     // https://github.com/dotnet/cli/issues/5650
 
     let targetFileTemplate = 
@@ -102,7 +102,7 @@ let install_target_file log templates projPath =
     let objDir = Path.Combine(projDir, "obj")
     let targetFileDestPath = Path.Combine(objDir, (sprintf "%s.proj-info.targets" projName))
 
-    write_target_file log templates targetFileDestPath
+    writeTargetFile log templates targetFileDestPath
 
 type GetResult =
      | FscArgs of string list
@@ -472,6 +472,6 @@ let getProjectInfosOldSdk log msbuildExec getters additionalArgs (projPath: stri
     let args = argsList |> List.concat
 
     getNewTempFilePath "proj-info.oldsdk-hook.targets"
-    |> write_target_file log templates
+    |> writeTargetFile log templates
     |> Result.bind (fun targetPath -> msbuildExec projPath (args @ additionalArgs @ [ Property("CustomAfterMicrosoftCommonTargets", targetPath) ]))
     |> Result.map (fun _ -> parsers |> List.map (fun parse -> parse ()))
