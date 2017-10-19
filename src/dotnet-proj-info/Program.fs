@@ -95,7 +95,8 @@ let realMain argv = attempt {
         | ProjectRecognizer.DotnetSdk ->
             Ok (true, getFscArgs)
         | ProjectRecognizer.OldSdk ->
-            Ok (false, getFscArgs)
+            let justPrintProps = List.map (fun (k,v) -> sprintf "%s=%s" k v)
+            Ok (false, getFscArgsOldSdk (justPrintProps >> Ok))
         | ProjectRecognizer.Unsupported ->
             Errors.GenericError "unsupported project format"
             |> Result.Error
