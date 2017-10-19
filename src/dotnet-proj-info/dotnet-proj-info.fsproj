@@ -21,7 +21,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Dotnet.ProjInfo\Dotnet.ProjInfo.fsproj" />
-    <ProjectReference Include="..\Dotnet.ProjInfo.Helpers\Dotnet.ProjInfo.Helpers.csproj" />
   </ItemGroup>
 
   <Import Project="..\PackagesInfo.props" />
