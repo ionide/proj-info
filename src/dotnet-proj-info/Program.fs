@@ -90,6 +90,16 @@ let realMain argv = attempt {
         then Error (ProjectFileNotFound projPath)
         else Ok ()
 
+    let! (isDotnetSdk, getFscArgsBySdk) =
+        match projPath with
+        | ProjectRecognizer.DotnetSdk ->
+            Ok (true, getFscArgs)
+        | ProjectRecognizer.OldSdk ->
+            Ok (false, getFscArgs)
+        | ProjectRecognizer.Unsupported ->
+            Errors.GenericError "unsupported project format"
+            |> Result.Error
+
     let globalArgs =
         [ results.TryGetResult <@ Framework @>, "TargetFramework"
           results.TryGetResult <@ Runtime @>, "RuntimeIdentifier"
@@ -98,7 +108,7 @@ let realMain argv = attempt {
         |> List.map (MSBuild.MSbuildCli.Property)
 
     let allCmds =
-        [ results.TryGetResult <@ Fsc_Args @> |> Option.map (fun _ -> getFscArgs)
+        [ results.TryGetResult <@ Fsc_Args @> |> Option.map (fun _ -> getFscArgsBySdk)
           results.TryGetResult <@ Project_Refs @> |> Option.map (fun _ -> getP2PRefs)
           results.TryGetResult <@ Get_Property @> |> Option.map (fun p -> (fun () -> getProperties p)) ]
 
@@ -112,24 +122,20 @@ let realMain argv = attempt {
 
     let exec getArgs additionalArgs = attempt {
         let msbuildExec =
-            match projPath with
-            | ProjectRecognizer.DotnetSdk -> dotnetMsbuild (runCmd log)
-            | ProjectRecognizer.OldSdk -> msbuild (MSBuildExePath.Path "msbuild") (runCmd log)
-            | ProjectRecognizer.Unsupported -> dotnetMsbuild (runCmd log)
+            if isDotnetSdk then
+                dotnetMsbuild (runCmd log)
+            else
+                msbuild (MSBuildExePath.Path "msbuild") (runCmd log)
 
         let! r =
-            match projPath with
-            | ProjectRecognizer.DotnetSdk ->
+            if isDotnetSdk then
                 projPath
                 |> getProjectInfo log msbuildExec getArgs additionalArgs
                 |> Result.mapError ExecutionError
-            | ProjectRecognizer.OldSdk ->
+            else
                 projPath
                 |> getProjectInfoOldSdk log msbuildExec getArgs additionalArgs
                 |> Result.mapError ExecutionError
-            | ProjectRecognizer.Unsupported ->
-                Errors.GenericError "unsupported project format"
-                |> Result.Error
 
         return r
         }
