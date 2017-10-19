@@ -19,6 +19,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Dotnet.ProjInfo\Dotnet.ProjInfo.fsproj" />
+
+    <ProjectReference Condition=" '$(TargetFramework)' != 'netcoreapp1.0' " Include="..\Dotnet.ProjInfo.Helpers\Dotnet.ProjInfo.Helpers.csproj" PrivateAssets="All" />
   </ItemGroup>
 
   <Import Project="..\PackagesInfo.props" />
