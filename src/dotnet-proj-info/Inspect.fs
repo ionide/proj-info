@@ -204,7 +204,7 @@ let parsePropertiesOut outFile =
     | l, [] ->
         l
         |> List.choose (function Ok x -> Some x | Error _ -> None)
-        |> (fun x -> Ok (Properties x))
+        |> (fun x -> Ok x)
     | _, err ->
         err
         |> List.choose (function Ok _ -> None | Error x -> Some x)
@@ -261,7 +261,9 @@ let getProperties props =
     let args =
         [ Target "_Inspect_GetProperties"
           Property ("_Inspect_GetProperties_OutFile", outFile) ]
-    template, args, (fun () -> bindSkipped parsePropertiesOut outFile)
+    template, args, (fun () -> outFile
+                               |> bindSkipped parsePropertiesOut
+                               |> Result.map Properties)
 
 let parseResolvedP2PRefOut outFile =
     /// Example:
