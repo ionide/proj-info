@@ -99,7 +99,3 @@ let inline getResponseFileFromTask props (fsc: ^a) =
 
     responseFileText.Split([| Environment.NewLine |], StringSplitOptions.RemoveEmptyEntries)
     |> List.ofArray
-
-let getResponseFile props =
-    let fsc = Microsoft.FSharp.Build.Fsc()
-    getResponseFileFromTask props fsc
