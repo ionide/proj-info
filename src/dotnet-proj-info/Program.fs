@@ -111,12 +111,25 @@ let realMain argv = attempt {
         | _ -> Error (InvalidArgsState "specify only one get argument")
 
     let exec getArgs additionalArgs = attempt {
-        let msbuildExec = dotnetMsbuild (runCmd log)
+        let msbuildExec =
+            match projPath with
+            | ProjectRecognizer.DotnetSdk -> dotnetMsbuild (runCmd log)
+            | ProjectRecognizer.OldSdk -> msbuild (MSBuildExePath.Path "msbuild") (runCmd log)
+            | ProjectRecognizer.Unsupported -> dotnetMsbuild (runCmd log)
 
         let! r =
-            projPath
-            |> getProjectInfo log msbuildExec getArgs additionalArgs
-            |> Result.mapError ExecutionError
+            match projPath with
+            | ProjectRecognizer.DotnetSdk ->
+                projPath
+                |> getProjectInfo log msbuildExec getArgs additionalArgs
+                |> Result.mapError ExecutionError
+            | ProjectRecognizer.OldSdk ->
+                projPath
+                |> getProjectInfo log msbuildExec getArgs additionalArgs
+                |> Result.mapError ExecutionError
+            | ProjectRecognizer.Unsupported ->
+                Errors.GenericError "unsupported project format"
+                |> Result.Error
 
         return r
         }
@@ -128,6 +141,7 @@ let realMain argv = attempt {
         | FscArgs args -> args
         | P2PRefs args -> args
         | Properties args -> args |> List.map (fun (x,y) -> sprintf "%s=%s" x y)
+        | ResolvedP2PRefs _ -> []
 
     out |> List.iter (printfn "%s")
 
