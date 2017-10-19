@@ -30,24 +30,29 @@ namespace Microsoft.Build.Framework
         abstract member GenerateResponseFileCommands : unit -> string
 
         abstract ToolName : string 
-        abstract ToolExe: string
         abstract StandardErrorEncoding : System.Text.Encoding
+        default x.StandardErrorEncoding = System.Text.Encoding.UTF8
+
         abstract StandardOutputEncoding : System.Text.Encoding
+        default x.StandardOutputEncoding = System.Text.Encoding.UTF8
+
         abstract GenerateFullPathToTool : unit -> string
         abstract LogToolCommand: string -> unit
-        abstract ExecuteTool : pathToTool: string * responseFileCommands: string * commandLineCommands: string -> int
-        abstract HostObject : obj
 
-        abstract Log: TaskLoggingHelper
+        abstract member ExecuteTool : pathToTool: string * responseFileCommands: string * commandLineCommands: string -> int
+        default x.ExecuteTool(pathToTool: string, responseFileCommands: string, commandLineCommands: string) =
+            0
+
+        abstract HostObject : obj
+        default x.HostObject = Unchecked.defaultof<obj>
+
+        member x.ToolExe: string = ""
+        member x.Log: TaskLoggingHelper = TaskLoggingHelper ()
 
     type OutputAttribute () =
         inherit System.Attribute()
 
 namespace Microsoft.Build.Utilities
-    module Dummy =
-        do ()
-
-namespace Internal.Utilities
 
     open Microsoft.Build.Framework
 
@@ -74,3 +79,11 @@ namespace Internal.Utilities
 
         member x.AppendFileNamesIfNotNull (filenames: ITaskItem array, sep: string) =
             ()
+
+namespace Internal.Utilities
+
+    module FSBuild =
+        module SR =
+            
+            let toolpathUnknown () = ""
+
