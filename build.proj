@@ -20,6 +20,6 @@
   <Target Name="Test">
   </Target>
 
-  <Target Name="VSTest" DependsOnTargets="VSTest" />
+  <Target Name="VSTest" DependsOnTargets="Test" />
 
 </Project>
