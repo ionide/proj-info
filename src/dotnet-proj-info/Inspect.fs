@@ -480,3 +480,23 @@ let getProjectInfosOldSdk log msbuildExec getters additionalArgs (projPath: stri
     |> writeTargetFile log templates
     |> Result.bind (fun targetPath -> msbuildExec projPath (args @ additionalArgs @ [ Property("CustomAfterMicrosoftCommonTargets", targetPath) ]))
     |> Result.map (fun _ -> parsers |> List.map (fun parse -> parse ()))
+
+module ProjectRecognizer =
+
+    let (|DotnetSdk|OldSdk|Unsupported|) file =
+        //Easy way to detect new fsproj is to check the msbuild version of .fsproj
+        //Post 1.0 has Sdk attribute (like `Sdk="FSharp.NET.Sdk;Microsoft.NET.Sdk"`), use that
+        //for checking .NET Core fsproj.
+        let rec getProjectType (sr:StreamReader) limit =
+            // post preview5 dropped this, check Sdk field
+            let isNetCore (line:string) = line.ToLower().Contains("sdk=")
+            if limit = 0 then
+                Unsupported // unsupported project type
+            else
+                let line = sr.ReadLine()
+                if not <| line.Contains("ToolsVersion") && not <| line.Contains("Sdk=") then
+                    getProjectType sr (limit-1)
+                else
+                    if isNetCore line then DotnetSdk else OldSdk
+        use sr = File.OpenText(file)
+        getProjectType sr 3
