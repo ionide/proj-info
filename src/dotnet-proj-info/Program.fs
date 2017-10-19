@@ -31,7 +31,8 @@ type Errors =
     | ProjectFileNotFound of string
     | GenericError of string
     | RaisedException of System.Exception * string
-    | ExecutionError of GetProjectInfoErrors<Medallion.Shell.CommandResult>
+    | ExecutionError of GetProjectInfoErrors<ShellCommandResult>
+and ShellCommandResult = ShellCommandResult of workingDir: string * exePath: string * args: string
 
 let parseArgsCommandLine argv =
     try
@@ -44,22 +45,52 @@ let parseArgsCommandLine argv =
         | _ ->
             reraise ()
 
-open Medallion.Shell
 open Railway
 open System.IO
 
-let runCmd log exePath args =
+let runCmd log workingDir exePath args =
     log (sprintf "running '%s %s'" exePath (args |> String.concat " "))
-    let cmd = Command.Run(exePath, args |> List.map (fun s -> s.Trim('"')) |> Array.ofList |> Array.map box)
 
-    let result = cmd.Result
+    let logOut = System.Collections.Concurrent.ConcurrentQueue<string>()
+    let logErr = System.Collections.Concurrent.ConcurrentQueue<string>()
+
+    let runProcess (workingDir: string) (exePath: string) (args: string) =
+        let psi = System.Diagnostics.ProcessStartInfo()
+        psi.FileName <- exePath
+        psi.WorkingDirectory <- workingDir
+        psi.RedirectStandardOutput <- true
+        psi.RedirectStandardError <- true
+        psi.Arguments <- args
+        psi.CreateNoWindow <- true
+        psi.UseShellExecute <- false
+
+        use p = new System.Diagnostics.Process()
+        p.StartInfo <- psi
+
+        p.OutputDataReceived.Add(fun ea -> logOut.Enqueue (ea.Data))
+
+        p.ErrorDataReceived.Add(fun ea -> logErr.Enqueue (ea.Data))
+
+        p.Start() |> ignore
+        p.BeginOutputReadLine()
+        p.BeginErrorReadLine()
+        p.WaitForExit()
+
+        let exitCode = p.ExitCode
+
+        exitCode, (workingDir, exePath, args)
+
+    let exitCode, result = runProcess workingDir exePath (args |> String.concat " ")
+
     log "output:"
-    cmd.StandardOutput.ReadToEnd() |> log
+    logOut.ToArray()
+    |> Array.iter log
 
     log "error:"
-    cmd.StandardError.ReadToEnd() |> log
+    logErr.ToArray()
+    |> Array.iter log
 
-    result.ExitCode, result
+    exitCode, (ShellCommandResult result)
 
 let realMain argv = attempt {
 
@@ -130,10 +161,11 @@ let realMain argv = attempt {
 
     let exec getArgs additionalArgs = attempt {
         let msbuildExec =
+            let projDir = Path.GetDirectoryName(projPath)
             if isDotnetSdk then
-                dotnetMsbuild (runCmd log)
+                dotnetMsbuild (runCmd log projDir)
             else
-                msbuild (MSBuildExePath.Path "msbuild") (runCmd log)
+                msbuild (MSBuildExePath.Path "msbuild") (runCmd log projDir)
 
         let! r =
             if isDotnetSdk then
