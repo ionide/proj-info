@@ -7,6 +7,8 @@ namespace Microsoft.Build.Framework
     type TaskLoggingHelper () =
         member __.LogMessageFromText(message: string, importance: MessageImportance) =
             ()
+        member __.LogError(message: string, _: string array) =
+            ()
 
     [<AbstractClass>]
     type ToolTask () =
@@ -40,6 +42,10 @@ namespace Microsoft.Build.Framework
     type OutputAttribute () =
         inherit System.Attribute()
 
+namespace Microsoft.Build.Exceptions
+
+    exception BuildAbortedException
+
 namespace Internal.Utilities
 
     module FSBuild =
@@ -47,3 +53,6 @@ namespace Internal.Utilities
             
             let toolpathUnknown () = ""
 
+
+    module FSharpEnvironment =
+        let BinFolderOfDefaultFSharpCompiler (_: string option) = Some "dummy path"
