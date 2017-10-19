@@ -1,5 +1,6 @@
 module Dotnet.ProjInfo.Inspect
 
+open System
 open System.IO
 
 #if NET45
@@ -348,3 +349,104 @@ let getProjectInfo log msbuildExec getArgs additionalArgs projPath =
     |> install_target_file log [template]
     |> Result.bind (fun _ -> msbuildExec projPath (args @ additionalArgs))
     |> Result.bind (fun _ -> parse ())
+
+
+
+let getFscArgsOldSdk () =
+
+    //from https://github.com/Microsoft/visualfsharp/blob/e5762fd1ed1fcb3fc70c978688204a35cfae1a3e/src/fsharp/FSharp.Build/Microsoft.FSharp.Targets#L264-L309
+    //as string, for easier maintenance
+    let props =
+        """
+              BaseAddress="$(BaseAddress)"
+              CodePage="$(CodePage)"
+              DebugSymbols="$(DebugSymbols)"
+              DebugType="$(DebugType)"
+              DefineConstants="$(DefineConstants)"
+              DelaySign="$(DelaySign)"
+              DisabledWarnings="$(NoWarn)"
+              DocumentationFile="$(DocumentationFile)"
+              DotnetFscCompilerPath="$(DotnetFscCompilerPath)"
+              EmbedAllSources="$(EmbedAllSources)"
+              Embed="$(Embed)"
+              GenerateInterfaceFile="$(GenerateInterfaceFile)"
+              HighEntropyVA="$(HighEntropyVA)"
+              KeyFile="$(KeyOriginatorFile)"
+              LCID="$(LCID)"
+              NoFramework="true"
+              Optimize="$(Optimize)"
+              OtherFlags="$(OtherFlags)"
+              OutputAssembly="@(IntermediateAssembly)"
+              PdbFile="$(PdbFile)"
+              Platform="$(PlatformTarget)"
+              Prefer32Bit="$(Actual32Bit)"
+              PreferredUILang="$(PreferredUILang)"
+              ProvideCommandLineArgs="$(ProvideCommandLineArgs)"
+              PublicSign="$(PublicSign)"
+              References="@(ReferencePath)"
+              ReferencePath="$(ReferencePath)"
+              Resources="@(ActualEmbeddedResources)"
+              SkipCompilerExecution="$(SkipCompilerExecution)"
+              SourceLink="$(SourceLink)"
+              Sources="@(CompileBefore);@(Compile);@(CompileAfter)"
+              Tailcalls="$(Tailcalls)"
+              TargetType="$(OutputType)"
+              TargetProfile="$(TargetProfile)"
+              ToolExe="$(FscToolExe)"
+              ToolPath="$(FscToolPath)"
+              TreatWarningsAsErrors="$(TreatWarningsAsErrors)"
+              UseStandardResourceNames="$(UseStandardResourceNames)"
+              Utf8Output="$(Utf8Output)"
+              VersionFile="$(VersionFile)"
+              VisualStudioStyleErrors="$(VisualStudioStyleErrors)"
+              WarningLevel="$(WarningLevel)"
+              WarningsAsErrors="$(WarningsAsErrors)"
+              Win32ManifestFile="$(Win32Manifest)"
+              Win32ResourceFile="$(Win32Resource)"
+              SubsystemVersion="$(SubsystemVersion)">
+        """
+        |> fun s -> s.Split([| '\n' |], StringSplitOptions.RemoveEmptyEntries)
+        |> List.ofArray
+        |> List.map (fun s -> s.Trim().TrimEnd('>'))
+        |> List.map (fun s -> s.Split([| '=' |], StringSplitOptions.RemoveEmptyEntries) |> List.ofArray)
+        |> List.filter (not << List.isEmpty)
+        |> List.choose (fun kv -> match kv with [k;v] -> Some (k,v) | _ -> failwithf "unexpected line '%A'" kv)
+
+    let template =
+        """
+  <!-- Override CoreCompile target -->
+  <Target Name="CoreCompile" DependsOnTargets="$(CoreCompileDependsOn)">
+    <ItemGroup>
+        """
+        + (
+            props
+            |> List.mapi (fun i (p,v) -> sprintf """
+        <_Inspect_CoreCompilePropsOldSdk_OutLines Include="P%i">
+            <PropertyName>%s</PropertyName>
+            <PropertyValue>%s</PropertyValue>
+        </_Inspect_CoreCompilePropsOldSdk_OutLines>
+                                             """ i p v)
+            |> List.map (fun s -> s.TrimEnd())
+            |> String.concat (System.Environment.NewLine) )
+        +
+        """
+    </ItemGroup>
+    <Message Text="%(_Inspect_CoreCompilePropsOldSdk_OutLines.PropertyName)=%(_Inspect_CoreCompilePropsOldSdk_OutLines.PropertyValue)" Importance="High" />
+    <WriteLinesToFile
+            Condition=" '$(_Inspect_CoreCompilePropsOldSdk_OutFile)' != '' "
+            File="$(_Inspect_CoreCompilePropsOldSdk_OutFile)"
+            Lines="@(_Inspect_CoreCompilePropsOldSdk_OutLines -> '%(PropertyName)=%(PropertyValue)')"
+            Overwrite="true" 
+            Encoding="UTF-8"/>
+  </Target>
+        """.Trim()
+    let outFile = getNewTempFilePath "CoreCompilePropsOldSdk.txt"
+    let args =
+        [ Property ("CopyBuildOutputToOutputDirectory", "false")
+          Property ("UseCommonOutputDirectory", "true")
+          Property ("BuildingInsideVisualStudio", "true")
+          Property ("ShouldUnsetParentConfigurationAndPlatform", "true")
+          Target "Build"
+          Property ("_Inspect_CoreCompilePropsOldSdk_OutFile", outFile) ]
+    template, args, (fun () -> bindSkipped parsePropertiesOut outFile)
+
