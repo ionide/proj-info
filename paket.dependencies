@@ -1,6 +1,7 @@
 
 // the Fsc build task
 github Microsoft/visualfsharp:Visual-Studio-2017-Version-15.4 src/fsharp/FSharp.Build/Fsc.fs
+github Microsoft/visualfsharp:Visual-Studio-2017-Version-15.4 src/fsharp/FSharp.Build/Microsoft.FSharp.Targets
 
 // msbuild classes from Mono
 github mono/mono:mono-5.2.0.224 mcs/class/Microsoft.Build.Utilities/Microsoft.Build.Utilities/CommandLineBuilder.cs
