@@ -341,7 +341,7 @@ let getProjectInfos log msbuildExec getters additionalArgs projPath =
     |> Result.map (fun _ -> parsers |> List.map (fun parse -> parse ()))
 
 let getProjectInfo log msbuildExec getArgs additionalArgs projPath =
-
+    //TODO refactor to use getProjectInfos
     let template, args, parse =  getArgs ()
 
     projPath
