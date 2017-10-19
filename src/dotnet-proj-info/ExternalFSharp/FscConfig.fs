@@ -10,7 +10,7 @@ open System
 
 type ITaskItemArray = Microsoft.Build.Framework.ITaskItem array
 
-let inline config' props (fsc: ^a) =
+let inline getResponseFileFromTask props (fsc: ^a) =
 
     let m : Map<string, string> = props |> Map.ofList
     let prop k =
@@ -93,11 +93,13 @@ let inline config' props (fsc: ^a) =
     "Win32ResourceFile" |> bind (fun prop -> (^a: (member set_Win32ResourceFile: string -> unit) (fsc, prop)))
     "SubsystemVersion" |> bind (fun prop -> (^a: (member set_SubsystemVersion: string -> unit) (fsc, prop)))
 
+    //TODO force SkipCompilerExecution ?
+
     let responseFileText = (^a: (member GenerateResponseFileCommands: unit -> string) (fsc))
 
     responseFileText.Split([| Environment.NewLine |], StringSplitOptions.RemoveEmptyEntries)
     |> List.ofArray
 
-let config props =
+let getResponseFile props =
     let fsc = Microsoft.FSharp.Build.Fsc()
-    config' props fsc
+    getResponseFileFromTask props fsc
