@@ -63,11 +63,7 @@ let dotnetMsbuild run project args =
     | 0, x -> Ok x
     | n, x -> Error (MSBuildFailed (n,x))
 
-let install_target_file log templates projPath =
-    let projDir, projName = Path.GetDirectoryName(projPath), Path.GetFileName(projPath)
-    let objDir = Path.Combine(projDir, "obj")
-    let targetFileDestPath = Path.Combine(objDir, (sprintf "%s.proj-info.targets" projName))
-
+let write_target_file log templates targetFileDestPath =
     // https://github.com/dotnet/cli/issues/5650
 
     let targetFileTemplate = 
@@ -88,6 +84,13 @@ let install_target_file log templates projPath =
     File.WriteAllText(targetFileDestPath, targetFileTemplate.Trim())
 
     Ok targetFileDestPath
+
+let install_target_file log templates projPath =
+    let projDir, projName = Path.GetDirectoryName(projPath), Path.GetFileName(projPath)
+    let objDir = Path.Combine(projDir, "obj")
+    let targetFileDestPath = Path.Combine(objDir, (sprintf "%s.proj-info.targets" projName))
+
+    write_target_file log templates targetFileDestPath
 
 type GetResult =
      | FscArgs of string list
