@@ -5,9 +5,9 @@ namespace Microsoft.Build.Framework
         | Normal
 
     type TaskLoggingHelper () =
-        member __.LogMessageFromText(message: string, importance: MessageImportance) =
+        member __.LogMessageFromText(_message: string, _importance: MessageImportance) =
             ()
-        member __.LogError(message: string, _: string array) =
+        member __.LogError(_message: string, _: string array) =
             ()
 
     [<AbstractClass>]
@@ -29,7 +29,7 @@ namespace Microsoft.Build.Framework
         abstract GenerateFullPathToTool : unit -> string
 
         abstract member ExecuteTool : pathToTool: string * responseFileCommands: string * commandLineCommands: string -> int
-        default x.ExecuteTool(pathToTool: string, responseFileCommands: string, commandLineCommands: string) =
+        default x.ExecuteTool(_pathToTool: string, _responseFileCommands: string, _commandLineCommands: string) =
             0
 
         abstract HostObject : obj
