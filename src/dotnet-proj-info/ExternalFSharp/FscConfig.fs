@@ -36,7 +36,7 @@ let config props =
         | None -> ()
         | Some l ->
             l
-            |> Array.map Microsoft.Build.Framework.TaskItem
+            |> Array.map Microsoft.Build.Utilities.TaskItem
             |> Array.map (fun x -> x :> Microsoft.Build.Framework.ITaskItem)
             |> f
 
