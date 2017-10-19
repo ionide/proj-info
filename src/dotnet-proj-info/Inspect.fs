@@ -365,7 +365,7 @@ let getProjectInfo log msbuildExec getArgs additionalArgs projPath =
 
 
 
-let getFscArgsOldSdk () =
+let getFscArgsOldSdk propsToFscArgs () =
 
     //from https://github.com/Microsoft/visualfsharp/blob/e5762fd1ed1fcb3fc70c978688204a35cfae1a3e/src/fsharp/FSharp.Build/Microsoft.FSharp.Targets#L264-L309
     //as string, for easier maintenance
@@ -461,7 +461,10 @@ let getFscArgsOldSdk () =
           Property ("ShouldUnsetParentConfigurationAndPlatform", "true")
           Target "Build"
           Property ("_Inspect_CoreCompilePropsOldSdk_OutFile", outFile) ]
-    template, args, (fun () -> bindSkipped parsePropertiesOut outFile)
+    template, args, (fun () -> outFile
+                               |> bindSkipped parsePropertiesOut
+                               |> Result.bind propsToFscArgs
+                               |> Result.map FscArgs)
 
 
 let getProjectInfosOldSdk log msbuildExec getters additionalArgs (projPath: string) =
