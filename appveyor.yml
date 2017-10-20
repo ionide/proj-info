@@ -17,3 +17,4 @@ build_script:
 artifacts:
   - path: bin\nupkg\*.nupkg
     name: nupkgs
+    type: NuGetPackage
