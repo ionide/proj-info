@@ -363,6 +363,7 @@ let getProjectInfo log msbuildExec getArgs additionalArgs projPath =
     |> Result.bind (fun _ -> msbuildExec projPath (args @ additionalArgs))
     |> Result.bind (fun _ -> parse ())
 
+#if !NETSTANDARD1_6
 
 let getFscArgsOldSdk propsToFscArgs () =
 
@@ -433,6 +434,7 @@ let getProjectInfoOldSdk log msbuildExec getArgs additionalArgs projPath =
     |> Result.bind (fun targetPath -> msbuildExec projPath (args @ additionalArgs @ [ Property("CustomAfterMicrosoftCommonTargets", targetPath) ]))
     |> Result.bind (fun _ -> parse ())
 
+#endif
 
 module ProjectRecognizer =
 

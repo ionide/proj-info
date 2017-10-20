@@ -131,10 +131,10 @@ let realMain argv = attempt {
         then Error (ProjectFileNotFound projPath)
         else Ok ()
 
-    let! (isDotnetSdk, getFscArgsBySdk) =
+    let! (isDotnetSdk, getProjectInfoBySdk, getFscArgsBySdk) =
         match projPath with
         | ProjectRecognizer.DotnetSdk ->
-            Ok (true, getFscArgs)
+            Ok (true, getProjectInfo, getFscArgs)
         | ProjectRecognizer.OldSdk ->
 #if NETCOREAPP1_0
             Errors.GenericError "unsupported project format on .net core 1.0, use at least .net core 2.0"
@@ -143,7 +143,7 @@ let realMain argv = attempt {
             let asFscArgs props =
                 let fsc = Microsoft.FSharp.Build.Fsc()
                 Dotnet.ProjInfo.FakeMsbuildTasks.getResponseFileFromTask props fsc
-            Ok (false, getFscArgsOldSdk (asFscArgs >> Ok))
+            Ok (false, getProjectInfoOldSdk, getFscArgsOldSdk (asFscArgs >> Ok))
 #endif
         | ProjectRecognizer.Unsupported ->
             Errors.GenericError "unsupported project format"
@@ -192,13 +192,8 @@ let realMain argv = attempt {
             msbuild (msbuildHost dotnetHostPicker) (runCmd log projDir)
 
         let! r =
-            let getInfo =
-                if isDotnetSdk then
-                    getProjectInfo
-                else
-                    getProjectInfoOldSdk
             projPath
-            |> getInfo log msbuildExec getArgs additionalArgs
+            |> getProjectInfoBySdk log msbuildExec getArgs additionalArgs
             |> Result.mapError ExecutionError
 
         return r
