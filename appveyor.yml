@@ -1,7 +1,14 @@
 image:
   - Visual Studio 2017
 
+before_build:
+  - ps: >-
+    $versionSuffixPR="-PR$($env:APPVEYOR_PULL_REQUEST_NUMBER)-$($env:APPVEYOR_BUILD_ID.PadLeft(5, '0'))"
+    $versionSuffixBRANCH="-$($env:APPVEYOR_REPO_BRANCH)-$($env:APPVEYOR_BUILD_ID.PadLeft(5, '0'))"
+    $env:VersionSuffix=if ("$env:APPVEYOR_REPO_TAG" -eq "true") { "" } else { if ("$env:APPVEYOR_PULL_REQUEST_NUMBER") { $versionSuffixPR } else { $versionSuffixBRANCH } }
+
 build_script:
+  - cmd: echo vs %VersionSuffix%"
   - cmd: dotnet pack -v n
   - cmd: dotnet test -v n
 
