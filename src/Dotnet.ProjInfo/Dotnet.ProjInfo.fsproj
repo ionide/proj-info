@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' != 'netstandard1.6' ">
+    <!-- old fsproj is not supported on netstandard1.6 -->
     <Compile Include="ExternalFSharp\MissingApi.fs" />
     <Compile Include="ExternalFSharp\FscConfig.fs" />
 
@@ -20,6 +21,11 @@
     <PackageReference Include="FSharp.Core" Condition=" '$(TargetFramework)' == 'netstandard1.6' " Version="4.1.*" />
     <PackageReference Include="FSharp.Core" Condition=" '$(TargetFramework)' == 'net45' " Version="4.0.0.1" />
   </ItemGroup>
+
+  <PropertyGroup Condition=" '$(TargetFramework)' == 'net45' ">
+    <!-- no need to reference System.ValueTuple nupkg on net45 because use FSharp.Core v4.0 -->
+    <DisableImplicitSystemValueTupleReference>true</DisableImplicitSystemValueTupleReference>
+  </PropertyGroup>
 
   <!-- HACK: p2p of type project, not package (ref https://github.com/NuGet/Home/issues/3891 ) -->
   <PropertyGroup>
