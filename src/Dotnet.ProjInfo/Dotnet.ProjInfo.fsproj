@@ -11,6 +11,8 @@
     <Compile Include="ExternalFSharp\FscConfig.fs" />
 
     <ProjectReference Include="..\Dotnet.ProjInfo.Helpers\Dotnet.ProjInfo.Helpers.csproj" PrivateAssets="All" />
+
+    <EmbeddedResource Include="..\..\paket-files\Microsoft\visualfsharp\src\fsharp\FSharp.Build\Microsoft.FSharp.Targets" />
   </ItemGroup>
 
   <ItemGroup>

@@ -364,66 +364,9 @@ let getProjectInfo log msbuildExec getArgs additionalArgs projPath =
     |> Result.bind (fun _ -> parse ())
 
 
-
 let getFscArgsOldSdk propsToFscArgs () =
 
-    //from https://github.com/Microsoft/visualfsharp/blob/e5762fd1ed1fcb3fc70c978688204a35cfae1a3e/src/fsharp/FSharp.Build/Microsoft.FSharp.Targets#L264-L309
-    //as string, yes, for easier maintenance to copy/paste from previous source
-    let props =
-        """
-              BaseAddress="$(BaseAddress)"
-              CodePage="$(CodePage)"
-              DebugSymbols="$(DebugSymbols)"
-              DebugType="$(DebugType)"
-              DefineConstants="$(DefineConstants)"
-              DelaySign="$(DelaySign)"
-              DisabledWarnings="$(NoWarn)"
-              DocumentationFile="$(DocumentationFile)"
-              DotnetFscCompilerPath="$(DotnetFscCompilerPath)"
-              EmbedAllSources="$(EmbedAllSources)"
-              Embed="$(Embed)"
-              GenerateInterfaceFile="$(GenerateInterfaceFile)"
-              HighEntropyVA="$(HighEntropyVA)"
-              KeyFile="$(KeyOriginatorFile)"
-              LCID="$(LCID)"
-              NoFramework="true"
-              Optimize="$(Optimize)"
-              OtherFlags="$(OtherFlags)"
-              OutputAssembly="@(IntermediateAssembly)"
-              PdbFile="$(PdbFile)"
-              Platform="$(PlatformTarget)"
-              Prefer32Bit="$(Actual32Bit)"
-              PreferredUILang="$(PreferredUILang)"
-              ProvideCommandLineArgs="$(ProvideCommandLineArgs)"
-              PublicSign="$(PublicSign)"
-              References="@(ReferencePath)"
-              ReferencePath="$(ReferencePath)"
-              Resources="@(ActualEmbeddedResources)"
-              SkipCompilerExecution="$(SkipCompilerExecution)"
-              SourceLink="$(SourceLink)"
-              Sources="@(CompileBefore);@(Compile);@(CompileAfter)"
-              Tailcalls="$(Tailcalls)"
-              TargetType="$(OutputType)"
-              TargetProfile="$(TargetProfile)"
-              ToolExe="$(FscToolExe)"
-              ToolPath="$(FscToolPath)"
-              TreatWarningsAsErrors="$(TreatWarningsAsErrors)"
-              UseStandardResourceNames="$(UseStandardResourceNames)"
-              Utf8Output="$(Utf8Output)"
-              VersionFile="$(VersionFile)"
-              VisualStudioStyleErrors="$(VisualStudioStyleErrors)"
-              WarningLevel="$(WarningLevel)"
-              WarningsAsErrors="$(WarningsAsErrors)"
-              Win32ManifestFile="$(Win32Manifest)"
-              Win32ResourceFile="$(Win32Resource)"
-              SubsystemVersion="$(SubsystemVersion)">
-        """
-        |> fun s -> s.Split([| '\n' |], StringSplitOptions.RemoveEmptyEntries)
-        |> List.ofArray
-        |> List.map (fun s -> s.Trim().TrimEnd('>'))
-        |> List.map (fun s -> s.Split([| '=' |], StringSplitOptions.RemoveEmptyEntries) |> List.ofArray)
-        |> List.filter (not << List.isEmpty)
-        |> List.choose (fun kv -> match kv with [k;v] -> Some (k,v.Trim('"')) | _ -> failwithf "unexpected line '%A'" kv)
+    let props = FakeMsbuildTasks.getFscTaskProperties ()
 
     let template =
         """

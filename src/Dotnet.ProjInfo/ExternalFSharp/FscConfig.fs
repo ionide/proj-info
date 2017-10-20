@@ -99,3 +99,55 @@ let inline getResponseFileFromTask props (fsc: ^a) =
 
     responseFileText.Split([| Environment.NewLine |], StringSplitOptions.RemoveEmptyEntries)
     |> List.ofArray
+
+type internal Dummy() = inherit Object()
+
+open System.Reflection
+
+let getResourceFileAsString resourceName =
+    let assembly = typeof<Dummy>.GetTypeInfo().Assembly
+
+    use stream = assembly.GetManifestResourceStream(resourceName)
+    match stream with
+    | null -> failwithf "Resource '%s' not found in assembly '%s'" resourceName (assembly.FullName)
+    | stream ->
+        use reader = new IO.StreamReader(stream)
+
+        reader.ReadToEnd()
+
+let getFscTaskProperties () =
+
+    let msFsharpTargetText = getResourceFileAsString "Microsoft.FSharp.Targets"
+
+    let doc =
+        try
+            System.Xml.Linq.XDocument.Parse(msFsharpTargetText)
+        with ex ->
+            failwithf "Cannot parse xml embedded resource, %A" ex
+
+    let xnNs name = System.Xml.Linq.XName.Get(name, doc.Root.GetDefaultNamespace().NamespaceName)
+    let xn name = System.Xml.Linq.XName.Get(name)
+    let attr name (x: Xml.Linq.XElement) = x.Attributes(xn name) |> Seq.map (fun a -> a.Value) |> Seq.tryHead
+    let els name (x: Xml.Linq.XElement) = x.Elements(xnNs name)
+    let el name (x: Xml.Linq.XElement) = x |> els name |> Seq.tryHead
+
+    let targets =
+        doc.Root
+        |> els "Target"
+
+    let coreCompile =
+        targets
+        |> Seq.tryFind (attr "Name" >> Option.exists ((=) "CoreCompile"))
+
+    match coreCompile with
+    | None ->
+        failwithf "CoreCompile target not found from embedded resource"
+    | Some t ->
+        match t |> el "Fsc" with
+        | None ->
+            failwithf "FscTask not found from embedded resource"
+        | Some fscTask ->
+            fscTask.Attributes()
+            |> Seq.filter (fun a -> a.Name.LocalName <> "Condition")
+            |> Seq.map (fun a -> a.Name.LocalName, a.Value)
+            |> List.ofSeq
