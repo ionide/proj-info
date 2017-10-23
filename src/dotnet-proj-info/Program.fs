@@ -74,6 +74,11 @@ let runCmd log workingDir exePath args =
         psi.CreateNoWindow <- true
         psi.UseShellExecute <- false
 
+        //the env var `MSBUILD_EXE_PATH` override the msbuild used.
+        //Calling directly the msbuild to use is useless and is wrong
+        //when used as clitool (`dotnet` set it to its msbuild dll)
+        psi.Environment.Remove("MSBUILD_EXE_PATH") |> ignore
+
         use p = new System.Diagnostics.Process()
         p.StartInfo <- psi
 
