@@ -78,6 +78,11 @@ let runCmd log workingDir exePath args =
         //Calling directly the msbuild to use is useless and is wrong
         //when used as clitool (`dotnet` set it to its msbuild dll)
         psi.Environment.Remove("MSBUILD_EXE_PATH") |> ignore
+        printfn "envs:"
+        psi.Environment
+        |> Seq.map (fun kv -> kv.Key, kv.Value)
+        |> Seq.sortBy fst
+        |> Seq.iter (fun (k,v) -> printfn "- '%s': '%s'" k v)
 
         use p = new System.Diagnostics.Process()
         p.StartInfo <- psi
