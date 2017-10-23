@@ -84,11 +84,6 @@ let runCmd log workingDir exePath args =
         for msbuildEnvVar in msbuildEnvVars do
             psi.Environment.Remove(msbuildEnvVar) |> ignore
 
-        printfn "envs:"
-        psi.Environment
-        |> Seq.map (fun kv -> kv.Key, kv.Value)
-        |> Seq.sortBy fst
-        |> Seq.iter (fun (k,v) -> printfn "- '%s': '%s'" k v)
 
         use p = new System.Diagnostics.Process()
         p.StartInfo <- psi
