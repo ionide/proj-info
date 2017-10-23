@@ -74,10 +74,16 @@ let runCmd log workingDir exePath args =
         psi.CreateNoWindow <- true
         psi.UseShellExecute <- false
 
-        //the env var `MSBUILD_EXE_PATH` override the msbuild used.
-        //Calling directly the msbuild to use is useless and is wrong
-        //when used as clitool (`dotnet` set it to its msbuild dll)
-        psi.Environment.Remove("MSBUILD_EXE_PATH") |> ignore
+        //Some env var like `MSBUILD_EXE_PATH` override the msbuild used.
+        //The dotnet cli (`dotnet`) set these when calling child processes, and
+        //is wrong because these override some properties of the called msbuild
+        let msbuildEnvVars =
+            psi.Environment.Keys
+            |> Seq.filter (fun s -> s.StartsWith("msbuild", StringComparison.OrdinalIgnoreCase))
+            |> Seq.toList
+        for msbuildEnvVar in msbuildEnvVars do
+            psi.Environment.Remove(msbuildEnvVar) |> ignore
+
         printfn "envs:"
         psi.Environment
         |> Seq.map (fun kv -> kv.Key, kv.Value)
