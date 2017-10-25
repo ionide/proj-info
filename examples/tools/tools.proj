@@ -5,7 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <DotNetCliToolReference Include="dotnet-proj-info" Version="0.6.0" />
+    <DotNetCliToolReference Include="dotnet-proj-info" Version="0.8.0" />
   </ItemGroup>
 
 </Project>

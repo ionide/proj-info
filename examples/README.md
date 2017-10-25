@@ -39,5 +39,23 @@ It's possibile to pass usual .NET Core Tools arguments (like `-c`, `-f`, `-r`).
 See `--help` for more info
 
 ```bash
-dotnet proj-info ../sdk1/l1/l1.fsproj --gp MyCustomProp OutputType Version Configuration -c Release
+dotnet proj-info ../sdk1/l1/l1.fsproj -gp MyCustomProp OutputType Version Configuration -c Release
+```
+
+### old sdk (verbose fsproj)
+
+These are supported too from version 0.8
+
+NOTE: require `msbuild` in PATH, or pass `--msbuild` with full path to msbuild
+
+Like before
+
+```
+dotnet proj-info ../oldsdk/l1/l1.fsproj --fsc-args
+```
+
+Or to get properties passing the msbuild to use
+
+```
+dotnet proj-info ../oldsdk/l1/l1.fsproj -gp MyCustomProp OutputType Version Configuration --msbuild "C:\Program Files (x86)\MSBuild\14.0\Bin\MSBuild.exe"
 ```
