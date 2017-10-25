@@ -6,11 +6,25 @@ see `examples` directory
 
 ## Build
 
-to create packages:
+Run:
 
-```
-set VERSION=1.2.3
-build.cmd
+```bash
+dotnet build
 ```
 
-will create packages with version `1.2.3` in `artifacts\nupkgs`
+To run tests:
+
+```bash
+dotnet test -v n
+```
+
+To create packages:
+
+```bash
+dotnet pack
+```
+
+will create packages in `artifacts\nupkgs`
+
+pass `/p:Version=1.2.3` to create a package with version `1.2.3`
+

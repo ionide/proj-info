@@ -1,9 +1,19 @@
-﻿<Project Sdk="FSharp.NET.Sdk;Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard1.6;net45</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;netstandard1.6;net45</TargetFrameworks>
     <Description>Get msbuild info</Description>
   </PropertyGroup>
+
+  <ItemGroup Condition=" '$(TargetFramework)' != 'netstandard1.6' ">
+    <!-- old fsproj is not supported on netstandard1.6 -->
+    <Compile Include="ExternalFSharp\MissingApi.fs" />
+    <Compile Include="ExternalFSharp\FscConfig.fs" />
+
+    <ProjectReference Include="..\Dotnet.ProjInfo.Helpers\Dotnet.ProjInfo.Helpers.csproj" PrivateAssets="All" />
+
+    <EmbeddedResource Include="..\..\paket-files\Microsoft\visualfsharp\src\fsharp\FSharp.Build\Microsoft.FSharp.Targets" />
+  </ItemGroup>
 
   <ItemGroup>
     <Compile Include="..\dotnet-proj-info\Inspect.fs" />
@@ -12,9 +22,21 @@
   <ItemGroup>
     <PackageReference Include="FSharp.Core" Condition=" '$(TargetFramework)' == 'netstandard1.6' " Version="4.1.*" />
     <PackageReference Include="FSharp.Core" Condition=" '$(TargetFramework)' == 'net45' " Version="4.0.0.1" />
-    <PackageReference Include="FSharp.NET.Sdk" Version="1.0.*" PrivateAssets="All" />
   </ItemGroup>
 
-  <Import Project="..\PackagesInfo.props" />
+  <PropertyGroup Condition=" '$(TargetFramework)' == 'net45' ">
+    <!-- no need to reference System.ValueTuple nupkg on net45 because use FSharp.Core v4.0 -->
+    <DisableImplicitSystemValueTupleReference>true</DisableImplicitSystemValueTupleReference>
+  </PropertyGroup>
+
+  <!-- HACK: p2p of type project, not package (ref https://github.com/NuGet/Home/issues/3891 ) -->
+  <PropertyGroup>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeP2POutput</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+  <Target Name="IncludeP2POutput" Condition=" '$(TargetFramework)' != 'netstandard1.6' ">
+    <ItemGroup>
+      <BuildOutputInPackage Include="$(MSBuildProjectDirectory)/$(OutputPath)Dotnet.ProjInfo.Helpers.dll" />
+    </ItemGroup>
+  </Target>
 
 </Project>

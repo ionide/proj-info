@@ -10,6 +10,9 @@ type CLIArguments =
     | [<AltCommandLine("-r")>] Runtime of string
     | [<AltCommandLine("-c")>] Configuration of string
     | [<AltCommandLine("-v")>] Verbose
+    | MSBuild of string
+    | DotnetCli of string
+    | MSBuild_Host of MSBuildHostPicker
 with
     interface IArgParserTemplate with
         member s.Usage =
@@ -22,6 +25,13 @@ with
             | Runtime _ -> "target runtime, the RuntimeIdentifier msbuild property"
             | Configuration _ -> "configuration to use (like Debug), the Configuration msbuild property"
             | Get_Property _ -> "msbuild property to get (allow multiple)"
+            | MSBuild _ -> "MSBuild path (default \"msbuild\")"
+            | DotnetCli _ -> "Dotnet CLI path (default \"dotnet\")"
+            | MSBuild_Host _ -> "the Msbuild host, if auto then oldsdk=MSBuild dotnetSdk=DotnetCLI"
+and MSBuildHostPicker =
+    | Auto = 1
+    | MSBuild  = 2
+    | DotnetMSBuild = 3
 
 open Dotnet.ProjInfo.Inspect
 
@@ -31,7 +41,8 @@ type Errors =
     | ProjectFileNotFound of string
     | GenericError of string
     | RaisedException of System.Exception * string
-    | ExecutionError of GetProjectInfoErrors<Medallion.Shell.CommandResult>
+    | ExecutionError of GetProjectInfoErrors<ShellCommandResult>
+and ShellCommandResult = ShellCommandResult of workingDir: string * exePath: string * args: string
 
 let parseArgsCommandLine argv =
     try
@@ -44,22 +55,63 @@ let parseArgsCommandLine argv =
         | _ ->
             reraise ()
 
-open Medallion.Shell
 open Railway
 open System.IO
 
-let runCmd log exePath args =
+let runCmd log workingDir exePath args =
     log (sprintf "running '%s %s'" exePath (args |> String.concat " "))
-    let cmd = Command.Run(exePath, args |> List.map (fun s -> s.Trim('"')) |> Array.ofList |> Array.map box)
 
-    let result = cmd.Result
+    let logOut = System.Collections.Concurrent.ConcurrentQueue<string>()
+    let logErr = System.Collections.Concurrent.ConcurrentQueue<string>()
+
+    let runProcess (workingDir: string) (exePath: string) (args: string) =
+        let psi = System.Diagnostics.ProcessStartInfo()
+        psi.FileName <- exePath
+        psi.WorkingDirectory <- workingDir
+        psi.RedirectStandardOutput <- true
+        psi.RedirectStandardError <- true
+        psi.Arguments <- args
+        psi.CreateNoWindow <- true
+        psi.UseShellExecute <- false
+
+        //Some env var like `MSBUILD_EXE_PATH` override the msbuild used.
+        //The dotnet cli (`dotnet`) set these when calling child processes, and
+        //is wrong because these override some properties of the called msbuild
+        let msbuildEnvVars =
+            psi.Environment.Keys
+            |> Seq.filter (fun s -> s.StartsWith("msbuild", StringComparison.OrdinalIgnoreCase))
+            |> Seq.toList
+        for msbuildEnvVar in msbuildEnvVars do
+            psi.Environment.Remove(msbuildEnvVar) |> ignore
+
+
+        use p = new System.Diagnostics.Process()
+        p.StartInfo <- psi
+
+        p.OutputDataReceived.Add(fun ea -> logOut.Enqueue (ea.Data))
+
+        p.ErrorDataReceived.Add(fun ea -> logErr.Enqueue (ea.Data))
+
+        p.Start() |> ignore
+        p.BeginOutputReadLine()
+        p.BeginErrorReadLine()
+        p.WaitForExit()
+
+        let exitCode = p.ExitCode
+
+        exitCode, (workingDir, exePath, args)
+
+    let exitCode, result = runProcess workingDir exePath (args |> String.concat " ")
+
     log "output:"
-    cmd.StandardOutput.ReadToEnd() |> log
+    logOut.ToArray()
+    |> Array.iter log
 
     log "error:"
-    cmd.StandardError.ReadToEnd() |> log
+    logErr.ToArray()
+    |> Array.iter log
 
-    result.ExitCode, result
+    exitCode, (ShellCommandResult result)
 
 let realMain argv = attempt {
 
@@ -90,6 +142,24 @@ let realMain argv = attempt {
         then Error (ProjectFileNotFound projPath)
         else Ok ()
 
+    let! (isDotnetSdk, getProjectInfoBySdk, getFscArgsBySdk) =
+        match projPath with
+        | ProjectRecognizer.DotnetSdk ->
+            Ok (true, getProjectInfo, getFscArgs)
+        | ProjectRecognizer.OldSdk ->
+#if NETCOREAPP1_0
+            Errors.GenericError "unsupported project format on .net core 1.0, use at least .net core 2.0"
+            |> Result.Error
+#else
+            let asFscArgs props =
+                let fsc = Microsoft.FSharp.Build.Fsc()
+                Dotnet.ProjInfo.FakeMsbuildTasks.getResponseFileFromTask props fsc
+            Ok (false, getProjectInfoOldSdk, getFscArgsOldSdk (asFscArgs >> Ok))
+#endif
+        | ProjectRecognizer.Unsupported ->
+            Errors.GenericError "unsupported project format"
+            |> Result.Error
+
     let globalArgs =
         [ results.TryGetResult <@ Framework @>, "TargetFramework"
           results.TryGetResult <@ Runtime @>, "RuntimeIdentifier"
@@ -98,9 +168,13 @@ let realMain argv = attempt {
         |> List.map (MSBuild.MSbuildCli.Property)
 
     let allCmds =
-        [ results.TryGetResult <@ Fsc_Args @> |> Option.map (fun _ -> getFscArgs)
+        [ results.TryGetResult <@ Fsc_Args @> |> Option.map (fun _ -> getFscArgsBySdk)
           results.TryGetResult <@ Project_Refs @> |> Option.map (fun _ -> getP2PRefs)
           results.TryGetResult <@ Get_Property @> |> Option.map (fun p -> (fun () -> getProperties p)) ]
+
+    let msbuildPath = results.GetResult(<@ MSBuild @>, defaultValue = "msbuild")
+    let dotnetPath = results.GetResult(<@ DotnetCli @>, defaultValue = "dotnet")
+    let dotnetHostPicker = results.GetResult(<@ MSBuild_Host @>, defaultValue = MSBuildHostPicker.Auto)
 
     let cmds = allCmds |> List.choose id
 
@@ -111,11 +185,26 @@ let realMain argv = attempt {
         | _ -> Error (InvalidArgsState "specify only one get argument")
 
     let exec getArgs additionalArgs = attempt {
-        let msbuildExec = dotnetMsbuild (runCmd log)
+        let msbuildExec =
+            let projDir = Path.GetDirectoryName(projPath)
+            let rec msbuildHost host =
+                match host with
+                | MSBuildHostPicker.MSBuild ->
+                    MSBuildExePath.Path msbuildPath
+                | MSBuildHostPicker.DotnetMSBuild ->
+                    MSBuildExePath.DotnetMsbuild dotnetPath
+                | MSBuildHostPicker.Auto ->
+                    if isDotnetSdk then
+                        msbuildHost MSBuildHostPicker.DotnetMSBuild
+                    else
+                        msbuildHost MSBuildHostPicker.MSBuild
+                | x ->
+                    failwithf "Unexpected msbuild host '%A'" x
+            msbuild (msbuildHost dotnetHostPicker) (runCmd log projDir)
 
         let! r =
             projPath
-            |> getProjectInfo log msbuildExec getArgs additionalArgs
+            |> getProjectInfoBySdk log msbuildExec getArgs additionalArgs
             |> Result.mapError ExecutionError
 
         return r
@@ -128,6 +217,7 @@ let realMain argv = attempt {
         | FscArgs args -> args
         | P2PRefs args -> args
         | Properties args -> args |> List.map (fun (x,y) -> sprintf "%s=%s" x y)
+        | ResolvedP2PRefs _ -> []
 
     out |> List.iter (printfn "%s")
 
@@ -169,3 +259,6 @@ let main argv =
         | ExecutionError (UnexpectedMSBuildResult r) ->
             printfn "%A" r
             8
+        | ExecutionError (MSBuildSkippedTarget) ->
+            printfn "internal error, target was skipped"
+            9

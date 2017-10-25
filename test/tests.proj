@@ -1,0 +1,32 @@
+<Project ToolsVersion="15.0">
+
+  <Import Project="Directory.Build.props" />
+
+  <ItemGroup>
+    <TestProj Include="$(RepoRootDir)/test/sdk1/app c1/app c1.fsproj" />
+    <TestProj Include="$(RepoRootDir)/test/oldsdk/l1/l1.fsproj" />
+
+    <TestArgs Include="--fsc-args" />
+    <TestArgs Include="--project-refs" />
+    <TestArgs Include="--get-property AssemblyName" />
+  </ItemGroup>
+
+  <Target Name="Restore">
+    <Exec Command='dotnet restore "sdk1/app c1" ' />
+  </Target>
+
+  <Target Name="Bla">
+    <CreateItem Include="@(TestProj)" AdditionalMetadata="TestArgs=%(TestArgs.Identity)">
+        <Output ItemName="Test" TaskParameter="Include" />
+    </CreateItem>
+  </Target>
+
+  <Target Name="Test" Inputs="@(Test)" Outputs="%(Identity).Dummy" DependsOnTargets="Bla">
+    <Message Text="test proj: '%(Test.Identity)'" />
+    <Message Text="Running test with '%(Test.TestArgs)'" />
+    <Exec Command='dotnet run -p "$(RepoRootDir)/src/dotnet-proj-info/dotnet-proj-info.fsproj" -f netcoreapp2.0 -- "%(Test.Identity)" %(Test.TestArgs) -v' IgnoreStandardErrorWarningFormat="true" />
+  </Target>
+
+  <Target Name="VSTest" DependsOnTargets="Test" />
+
+</Project>

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net45</TargetFrameworks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\paket-files\mono\mono\mcs\class\Microsoft.Build.Utilities\Microsoft.Build.Utilities\CommandLineBuilder.cs" />
+    <Compile Include="..\..\paket-files\mono\mono\mcs\class\Microsoft.Build.Framework\Microsoft.Build.Framework\ITaskItem.cs" />
+    <Compile Include="..\..\paket-files\mono\mono\mcs\class\Microsoft.Build.Framework\Microsoft.Build.Framework\ITaskItem2.cs" />
+    <Compile Include="..\..\paket-files\mono\mono\mcs\class\Microsoft.Build.Utilities\Microsoft.Build.Utilities\TaskItem.cs" />
+    <Compile Include="..\..\paket-files\mono\mono\mcs\class\Microsoft.Build.Utilities\Mono.XBuild.Utilities\MSBuildUtils.cs" />
+    <Compile Include="..\..\paket-files\mono\mono\mcs\class\Microsoft.Build.Utilities\Mono.XBuild.Utilities\ReservedNameUtils.cs" />
+  </ItemGroup>
+
+</Project>
