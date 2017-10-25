@@ -64,3 +64,40 @@ let getReferencePaths props =
                                |> Inspect.bindSkipped Inspect.parsePropertiesOut
                                |> Result.map (List.map snd >> Inspect.GetResult.ResolvedNETRefs))
 
+
+let installedNETFrameworks () =
+    let prop = "FrameworkPathOverride"
+    let template, args, parser = Inspect.getProperties [prop]
+
+    let find frameworkPathOverride =
+
+      let isTFVersion (name: string) =
+        name
+        |> fun s -> s.TrimStart('v') // on windows is v4.5
+        |> fun s -> s.Replace("-api", "") // on mono is 4.6.1-api
+        |> fun s -> s.ToCharArray()
+        |> fun s ->
+            if s |> Array.except [ yield! ['0' .. '9']; yield '.' ] |> Array.isEmpty
+            then Some (String(s))
+            else None
+        |> Option.map (sprintf "v%s")
+
+      let dir = Path.GetDirectoryName(frameworkPathOverride)
+      Directory.GetDirectories(dir)
+      |> List.ofArray
+      |> List.map Path.GetFileName
+      |> List.choose isTFVersion //need to exclude 4.X and others invalid dirs
+      |> List.distinct
+      |> Inspect.GetResult.InstalledNETFw
+
+    let findInstalledNETFw () =
+        parser ()
+        |> Result.bind (fun p ->
+            match p with
+            | Inspect.GetResult.Properties props ->
+                match props |> Map.ofList |> Map.tryFind prop with
+                | None -> Error (Inspect.GetProjectInfoErrors.UnexpectedMSBuildResult (sprintf "expected Property '%s' not found, found: %A" prop props))
+                | Some fpo -> Ok (find fpo)
+            | r -> Error (Inspect.GetProjectInfoErrors.UnexpectedMSBuildResult (sprintf "expected Properties result, was %A" r)))
+
+    template, args, findInstalledNETFw

@@ -110,6 +110,7 @@ type GetResult =
      | ResolvedP2PRefs of ResolvedP2PRefsInfo list
      | Properties of (string * string) list
      | ResolvedNETRefs of string list
+     | InstalledNETFw of string list
 and ResolvedP2PRefsInfo = { ProjectReferenceFullPath: string; TargetFramework: string; Others: (string * string) list }
 
 let getNewTempFilePath suffix =
