@@ -6,6 +6,7 @@ type CLIArguments =
     | Fsc_Args
     | Project_Refs
     | [<AltCommandLine("-gp")>] Get_Property of string list
+    | NET_FW_References_Path of string list
     | [<AltCommandLine("-f")>] Framework of string
     | [<AltCommandLine("-r")>] Runtime of string
     | [<AltCommandLine("-c")>] Configuration of string
@@ -20,6 +21,7 @@ with
             | Project _ -> "the MSBuild project file"
             | Fsc_Args -> "get fsc arguments"
             | Project_Refs -> "get project references"
+            | NET_FW_References_Path _ -> "list the .NET Framework references"
             | Verbose -> "verbose log"
             | Framework _ -> "target framework, the TargetFramework msbuild property"
             | Runtime _ -> "target runtime, the RuntimeIdentifier msbuild property"
@@ -122,10 +124,20 @@ let realMain argv = attempt {
         | Some _ -> printfn "%s"
         | None -> ignore
 
+    let projArgRequired =
+        match results.TryGetResult <@ NET_FW_References_Path @> with
+        | Some _ -> false
+        | None -> true
+
     let! proj =
-        match results.TryGetResult <@ Project @> with
-        | Some p -> Ok p
-        | None ->
+        match results.TryGetResult <@ Project @>, projArgRequired with
+        | Some p, true -> Ok p
+        | Some _, false -> Error (InvalidArgsState "project argument not expected")
+        | None, false ->
+            //create the proj file
+            Ok (Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.createEnvInfoProj ())
+        | None, true ->
+            //scan current directory
             let workDir = Directory.GetCurrentDirectory()
             match Directory.GetFiles(workDir, "*.*proj") |> List.ofArray with
             | [] ->
@@ -170,7 +182,8 @@ let realMain argv = attempt {
     let allCmds =
         [ results.TryGetResult <@ Fsc_Args @> |> Option.map (fun _ -> getFscArgsBySdk)
           results.TryGetResult <@ Project_Refs @> |> Option.map (fun _ -> getP2PRefs)
-          results.TryGetResult <@ Get_Property @> |> Option.map (fun p -> (fun () -> getProperties p)) ]
+          results.TryGetResult <@ Get_Property @> |> Option.map (fun p -> (fun () -> getProperties p))
+          results.TryGetResult <@ NET_FW_References_Path @> |> Option.map (fun props -> (fun () -> Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.getReferencePaths props)) ]
 
     let msbuildPath = results.GetResult(<@ MSBuild @>, defaultValue = "msbuild")
     let dotnetPath = results.GetResult(<@ DotnetCli @>, defaultValue = "dotnet")
@@ -218,6 +231,7 @@ let realMain argv = attempt {
         | P2PRefs args -> args
         | Properties args -> args |> List.map (fun (x,y) -> sprintf "%s=%s" x y)
         | ResolvedP2PRefs _ -> []
+        | ResolvedNETRefs args -> args
 
     out |> List.iter (printfn "%s")
 
