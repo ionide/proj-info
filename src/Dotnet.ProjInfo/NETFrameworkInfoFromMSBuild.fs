@@ -17,7 +17,7 @@ let createEnvInfoProj () =
 
   let tempDir = createTempDir ()
   let proj = Path.Combine(tempDir, "EnvironmentInfo.proj")
-  let projContent = FakeMsbuildTasks.getResourceFileAsString "EnvironmentInfo.proj"
+  let projContent = Resources.getResourceFileAsString "EnvironmentInfo.proj"
   File.WriteAllText(proj, projContent)
   proj
 

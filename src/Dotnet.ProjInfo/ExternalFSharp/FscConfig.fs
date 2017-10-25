@@ -100,24 +100,9 @@ let inline getResponseFileFromTask props (fsc: ^a) =
     responseFileText.Split([| Environment.NewLine |], StringSplitOptions.RemoveEmptyEntries)
     |> List.ofArray
 
-type internal Dummy() = inherit Object()
-
-open System.Reflection
-
-let getResourceFileAsString resourceName =
-    let assembly = typeof<Dummy>.GetTypeInfo().Assembly
-
-    use stream = assembly.GetManifestResourceStream(resourceName)
-    match stream with
-    | null -> failwithf "Resource '%s' not found in assembly '%s'" resourceName (assembly.FullName)
-    | stream ->
-        use reader = new IO.StreamReader(stream)
-
-        reader.ReadToEnd()
-
 let getFscTaskProperties () =
 
-    let msFsharpTargetText = getResourceFileAsString "Microsoft.FSharp.Targets"
+    let msFsharpTargetText = Resources.getResourceFileAsString "Microsoft.FSharp.Targets"
 
     let doc =
         try

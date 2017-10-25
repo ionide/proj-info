@@ -4,17 +4,17 @@ open System
 open System.IO
 
 #if NET45
-let inline Ok x = Choice1Of2 x
-let inline Error x = Choice2Of2 x
+let inline internal Ok x = Choice1Of2 x
+let inline internal Error x = Choice2Of2 x
 
-let inline (|Ok|Error|) x =
+let inline internal (|Ok|Error|) x =
     match x with
     | Choice1Of2 x -> Ok x
     | Choice2Of2 e -> Error e
 
-type private Result<'Ok,'Err> = Choice<'Ok,'Err>
+type internal Result<'Ok,'Err> = Choice<'Ok,'Err>
 
-module private Result =
+module internal Result =
   let map f inp = match inp with Error e -> Error e | Ok x -> Ok (f x)
   let mapError f inp = match inp with Error e -> Error (f e) | Ok x -> Ok x
   let bind f inp = match inp with Error e -> Error e | Ok x -> f x        

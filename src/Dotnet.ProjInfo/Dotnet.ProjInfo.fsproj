@@ -5,6 +5,10 @@
     <Description>Get msbuild info</Description>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Include="Resources.fs" />
+  </ItemGroup>
+
   <ItemGroup Condition=" '$(TargetFramework)' != 'netstandard1.6' ">
     <!-- old fsproj is not supported on netstandard1.6 -->
     <Compile Include="ExternalFSharp\MissingApi.fs" />
@@ -17,9 +21,6 @@
 
   <ItemGroup>
     <Compile Include="..\dotnet-proj-info\Inspect.fs" />
-  </ItemGroup>
-
-  <ItemGroup Condition=" '$(TargetFramework)' != 'netstandard1.6' ">
     <Compile Include="NETFrameworkInfoFromMSBuild.fs" />
 
     <EmbeddedResource Include="Resources\EnvironmentInfo.proj" />
