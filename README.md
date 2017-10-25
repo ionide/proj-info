@@ -2,7 +2,7 @@
 
 dotnet cli tool: `dotnet proj-info`
 
-see `examples` directory
+see [examples](https://github.com/enricosada/dotnet-proj-info/tree/master/examples) directory
 
 ## Build
 
