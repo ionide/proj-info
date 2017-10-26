@@ -3,6 +3,10 @@ module Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild
 open System
 open System.IO
 
+#if NET45
+open Dotnet.ProjInfo.Inspect
+#endif
+
 open Dotnet.ProjInfo.Inspect.MSBuild
 
 type private FrameworkInfoFromMsbuild = {
