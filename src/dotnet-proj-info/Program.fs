@@ -175,7 +175,7 @@ let realMain argv = attempt {
             |> Result.Error
 
     let globalArgs =
-        [ results.TryGetResult <@ Framework @>, "TargetFramework"
+        [ results.TryGetResult <@ Framework @>, if isDotnetSdk then "TargetFramework" else "TargetFrameworkVersion"
           results.TryGetResult <@ Runtime @>, "RuntimeIdentifier"
           results.TryGetResult <@ Configuration @>, "Configuration" ]
         |> List.choose (fun (a,p) -> a |> Option.map (fun x -> (p,x)))
