@@ -8,7 +8,7 @@
 
     <RepoRootDir>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)\.."))</RepoRootDir>
     <NupkgsDir>$(RepoRootDir)/bin/nupkg</NupkgsDir>
-    <Version Condition=" '$(Version)' == '' ">0.8.0$(VersionSuffix)</Version>
+    <Version Condition=" '$(Version)' == '' ">0.9.0$(VersionSuffix)</Version>
     <MonoOrEmpty Condition=" '$(OS)' != 'Windows_NT' ">mono </MonoOrEmpty>
   </PropertyGroup>
 </Project>
