@@ -9,10 +9,6 @@ open Dotnet.ProjInfo.Inspect
 
 open Dotnet.ProjInfo.Inspect.MSBuild
 
-type private FrameworkInfoFromMsbuild = {
-    ReferencePath: string list
-  }
-
 let createEnvInfoProj () =
   let createTempDir () =
       let tempPath = Path.GetTempFileName()
