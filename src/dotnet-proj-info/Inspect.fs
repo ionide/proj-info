@@ -305,8 +305,10 @@ let parseResolvedP2PRefOut outFile =
                     match pathOpt, tfmOpt with
                     | Some path, Some tfm ->
                         { ProjectReferenceFullPath = path; TargetFramework = tfm; Others = lines |> List.ofArray }
-                    | _ ->
-                        failwithf "parsing resolved p2p refs, expected properties not found '%A'" allLines
+                    | Some _, None
+                    | None, Some _
+                    | None, None ->
+                        failwithf "parsing resolved p2p refs, expected properties 'ProjectReferenceFullPath'. 'TargetFramework' not found. Was '%A'" allLines
 
                 )
             |> List.ofArray
