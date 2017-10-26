@@ -233,7 +233,10 @@ let realMain argv = attempt {
         | FscArgs args -> args
         | P2PRefs args -> args
         | Properties args -> args |> List.map (fun (x,y) -> sprintf "%s=%s" x y)
-        | ResolvedP2PRefs _ -> []
+        | ResolvedP2PRefs args ->
+            let optionalTfm t =
+                t |> Option.map (sprintf " (%s)") |> Option.defaultValue ""
+            args |> List.map (fun r -> sprintf "%s%s" r.ProjectReferenceFullPath (optionalTfm r.TargetFramework))
         | ResolvedNETRefs args -> args
         | InstalledNETFw args -> args
 

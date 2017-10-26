@@ -111,7 +111,7 @@ type GetResult =
      | Properties of (string * string) list
      | ResolvedNETRefs of string list
      | InstalledNETFw of string list
-and ResolvedP2PRefsInfo = { ProjectReferenceFullPath: string; TargetFramework: string; Others: (string * string) list }
+and ResolvedP2PRefsInfo = { ProjectReferenceFullPath: string; TargetFramework: string option; Others: (string * string) list }
 
 let getNewTempFilePath suffix =
     let outFile = System.IO.Path.GetTempFileName()
@@ -302,13 +302,11 @@ let parseResolvedP2PRefOut outFile =
                     let props = lines |> Map.ofArray
                     let pathOpt = props |> Map.tryFind "ProjectReferenceFullPath"
                     let tfmOpt = props |> Map.tryFind "TargetFramework"
-                    match pathOpt, tfmOpt with
-                    | Some path, Some tfm ->
-                        { ProjectReferenceFullPath = path; TargetFramework = tfm; Others = lines |> List.ofArray }
-                    | Some _, None
-                    | None, Some _
-                    | None, None ->
-                        failwithf "parsing resolved p2p refs, expected properties 'ProjectReferenceFullPath'. 'TargetFramework' not found. Was '%A'" allLines
+                    match pathOpt with
+                    | Some path ->
+                        { ProjectReferenceFullPath = path; TargetFramework = tfmOpt; Others = lines |> List.ofArray }
+                    | None ->
+                        failwithf "parsing resolved p2p refs, expected property 'ProjectReferenceFullPath' not found. Was '%A'" allLines
 
                 )
             |> List.ofArray
