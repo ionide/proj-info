@@ -3,6 +3,11 @@ module Dotnet.ProjInfo.Inspect
 open System
 open System.IO
 
+let internal firstAndRest (delim: char) (s: string) =
+    match s.IndexOf(delim) with
+    | -1 -> None
+    | index -> Some(s.Substring(0, index), s.Substring(index + 1))
+
 #if NET45
 let inline internal Ok x = Choice1Of2 x
 let inline internal Error x = Choice2Of2 x
@@ -111,7 +116,9 @@ type GetResult =
      | Properties of (string * string) list
      | ResolvedNETRefs of string list
      | InstalledNETFw of string list
+     | TreeviewItems of TreeviewItemInfo
 and ResolvedP2PRefsInfo = { ProjectReferenceFullPath: string; TargetFramework: string option; Others: (string * string) list }
+and TreeviewItemInfo = { Compile: (string * string) list; None: (string * string) list }
 
 let getNewTempFilePath suffix =
     let outFile = System.IO.Path.GetTempFileName()
@@ -123,6 +130,12 @@ let bindSkipped f outFile =
         Error MSBuildSkippedTarget
     else
         f outFile
+
+let bindSkipped2 f outFile1 outFile2 =
+    if not(File.Exists outFile1) && not(File.Exists outFile2) then
+        Error MSBuildSkippedTarget
+    else
+        f outFile1 outFile2
 
 let parseFscArgsOut outFile =
     let lines =
@@ -191,10 +204,6 @@ let getP2PRefs () =
     template, args, (fun () -> bindSkipped parseP2PRefsOut outFile)
 
 let parsePropertiesOut outFile =
-    let firstAndRest (delim: char) (s: string) =
-        match s.IndexOf(delim) with
-        | -1 -> None
-        | index -> Some(s.Substring(0, index), s.Substring(index + 1))
 
     let lines =
         File.ReadAllLines(outFile)
@@ -437,6 +446,71 @@ let getProjectInfoOldSdk log msbuildExec getArgs additionalArgs projPath =
     |> Result.bind (fun _ -> parse ())
 
 #endif
+
+let parseTreeviewItemsOut outFileCompile outFileNone =
+
+    let f outFile =
+        let lines =
+            File.ReadAllLines(outFile)
+            |> List.ofArray
+        lines
+        |> List.choose (fun s ->
+            s
+            |> firstAndRest '='
+            |> Option.bind (fun (i,l_p) -> l_p |> firstAndRest '=' |> Option.map (fun (l,p) -> i,l,p))
+            )
+        |> List.map (fun (i,l,p) -> (if String.IsNullOrEmpty(l) then i else l), p)
+
+    let compileItems = f outFileCompile
+    let noneItems = f outFileNone
+
+    Ok (TreeviewItems ({ TreeviewItemInfo.Compile = compileItems; None = noneItems }))
+
+let getTreeviewItems () =
+    let template =
+        """
+  <Target Name="_Inspect_TreeviewItems"
+          Condition=" '$(IsCrossTargetingBuild)' != 'true' "
+          DependsOnTargets="ResolveReferences;CoreCompile">
+    <Message Text="%(Compile.Identity)=%(Compile.Link)=%(Compile.FullPath)" Importance="High" />
+    <!-- Compile items -->
+    <WriteLinesToFile
+            Condition=" '$(_Inspect_TreeviewItems_OutFile)' != '' "
+            File="$(_Inspect_TreeviewItems_OutFile)"
+            Lines="@(Compile -> '%(Identity)=%(Link)=%(FullPath)')"
+            Overwrite="true"
+            Encoding="UTF-8"/>
+    <!-- WriteLinesToFile doesnt create the file if @(Compile) is empty -->
+    <Touch
+        Condition=" '$(_Inspect_TreeviewItems_OutFile)' != '' "
+        Files="$(_Inspect_TreeviewItems_OutFile)"
+        AlwaysCreate="True" />
+    <!-- None items -->
+    <WriteLinesToFile
+            Condition=" '$(_Inspect_TreeviewItemsNone_OutFile)' != '' "
+            File="$(_Inspect_TreeviewItemsNone_OutFile)"
+            Lines="@(None -> '%(Identity)=%(Link)=%(FullPath)')"
+            Overwrite="true"
+            Encoding="UTF-8"/>
+    <!-- WriteLinesToFile doesnt create the file if @(None) is empty -->
+    <Touch
+        Condition=" '$(_Inspect_TreeviewItemsNone_OutFile)' != '' "
+        Files="$(_Inspect_TreeviewItemsNone_OutFile)"
+        AlwaysCreate="True" />
+  </Target>
+        """.Trim()
+    let outFileCompile = getNewTempFilePath "TreeviewItemsCompile.txt"
+    let outFileNone = getNewTempFilePath "TreeviewItemsNone.txt"
+    let args =
+        [ Property ("SkipCompilerExecution", "true")
+          Property ("ProvideCommandLineArgs" , "true")
+          Property ("CopyBuildOutputToOutputDirectory", "false")
+          Property ("UseCommonOutputDirectory", "true")
+          Target "_Inspect_TreeviewItems"
+          Property ("_Inspect_TreeviewItems_OutFile", outFileCompile)
+          Property ("_Inspect_TreeviewItemsNone_OutFile", outFileNone) ]
+    template, args, (fun () -> bindSkipped2 parseTreeviewItemsOut outFileCompile outFileNone)
+
 
 module ProjectRecognizer =
 

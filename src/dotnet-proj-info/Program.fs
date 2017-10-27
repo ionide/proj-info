@@ -6,6 +6,7 @@ type CLIArguments =
     | Fsc_Args
     | Project_Refs
     | [<AltCommandLine("-gp")>] Get_Property of string list
+    | TreeView
     | NET_FW_References_Path of string list
     | Installed_NET_Frameworks
     | [<AltCommandLine("-f")>] Framework of string
@@ -22,6 +23,7 @@ with
             | Project _ -> "the MSBuild project file"
             | Fsc_Args -> "get fsc arguments"
             | Project_Refs -> "get project references"
+            | TreeView -> "get project treeview (Compile items)"
             | NET_FW_References_Path _ -> "list the .NET Framework references"
             | Installed_NET_Frameworks -> "list of the installed .NET Frameworks"
             | Verbose -> "verbose log"
@@ -121,10 +123,10 @@ let realMain argv = attempt {
 
     let! results = parseArgsCommandLine argv
 
-    let log =
+    let verbose, log =
         match results.TryGetResult <@ Verbose @> with
-        | Some _ -> printfn "%s"
-        | None -> ignore
+        | Some _ -> true, printfn "%s"
+        | None -> false, ignore
 
     let projArgRequired =
         match (results.TryGetResult <@ NET_FW_References_Path @>), (results.TryGetResult<@ Installed_NET_Frameworks @>) with
@@ -184,6 +186,7 @@ let realMain argv = attempt {
     let allCmds =
         [ results.TryGetResult <@ Fsc_Args @> |> Option.map (fun _ -> getFscArgsBySdk)
           results.TryGetResult <@ Project_Refs @> |> Option.map (fun _ -> getP2PRefs)
+          results.TryGetResult <@ TreeView @> |> Option.map (fun _ -> getTreeviewItems)
           results.TryGetResult <@ Get_Property @> |> Option.map (fun p -> (fun () -> getProperties p))
           results.TryGetResult <@ NET_FW_References_Path @> |> Option.map (fun props -> (fun () -> Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.getReferencePaths props))
           results.TryGetResult <@ Installed_NET_Frameworks @> |> Option.map (fun _ -> Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.installedNETFrameworks) ]
@@ -233,6 +236,15 @@ let realMain argv = attempt {
         | FscArgs args -> args
         | P2PRefs args -> args
         | Properties args -> args |> List.map (fun (x,y) -> sprintf "%s=%s" x y)
+        | TreeviewItems args ->
+            let x = verbose
+            [ yield "+ [SourceFiles]"
+              yield! args.Compile
+                     |> List.map (fun (link,path) -> sprintf "|-- '%s'%s" link (if x then sprintf " => %s" path else ""))
+              yield "+ [None]"
+              yield! args.None
+                     |> List.map (fun (link,path) -> sprintf "|-- '%s'%s" link (if x then sprintf " => %s" path else ""))
+            ]
         | ResolvedP2PRefs args ->
             let optionalTfm t =
                 t |> Option.map (sprintf " (%s)") |> Option.defaultValue ""
