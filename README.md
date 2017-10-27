@@ -1,12 +1,13 @@
-# dotnet-proj-info
 
 [![Build status](https://ci.appveyor.com/api/projects/status/i7piggo87r7k31t2/branch/master?svg=true)](https://ci.appveyor.com/project/enricosada/dotnet-proj-info/branch/master)
 [![Build Status](https://travis-ci.org/enricosada/dotnet-proj-info.svg?branch=master)](https://travis-ci.org/enricosada/dotnet-proj-info)
 
-- dotnet cli tool: `dotnet proj-info` [![NuGet](https://img.shields.io/nuget/v/dotnet-proj-info.svg)](https://www.nuget.org/packages/dotnet-proj-info)
-- as library: `Dotnet.ProjInfo` [![NuGet](https://img.shields.io/nuget/v/Dotnet.ProjInfo.svg)](https://www.nuget.org/packages/Dotnet.ProjInfo)
+# dotnet-proj-info
 
-Features:
+- as library: `Dotnet.ProjInfo` [![NuGet](https://img.shields.io/nuget/v/Dotnet.ProjInfo.svg)](https://www.nuget.org/packages/Dotnet.ProjInfo)
+- dotnet cli tool: `dotnet proj-info` [![NuGet](https://img.shields.io/nuget/v/dotnet-proj-info.svg)](https://www.nuget.org/packages/dotnet-proj-info)
+
+## Features
 
 - get properties
 - get project to project references
@@ -14,20 +15,41 @@ Features:
 - list installed .NET Framework versions
 - get references path of .NET asseblies like `System`, `System.Data`
 
-Support:
+Support both project sdk:
 
 - dotnet/sdk style projects (slim proj, usually .net core)
 - old sdk projects (verbose proj, usually .NET)
 
-Runtimes:
 
 Works on mono and windows, and allow to specify the `dotnet` or `msbuild` to use
 
-Notes:
+## as Library
 
-Add usual args of .NET cli, like `-c` (`--configuration`), `-f` (`--framework`), `-r` (`--runtime`)
+Used by:
 
-See [examples](https://github.com/enricosada/dotnet-proj-info/tree/master/examples) directory
+- [Fable compiler](https://github.com/fable-compiler/fable) to parse fsproj projects with `dotnet fable`
+- [FsAutocomplete (FSAC)](https://github.com/fsharp/FsAutoComplete/) to parse projects. That's the language server that add F# support in:
+  - [Ionide in Visual Studio Code](https://github.com/ionide/ionide-vscode-fsharp)
+  - [F# vim binding](https://github.com/fsharp/vim-fsharp)
+  - [F# Emacs mode](https://github.com/fsharp/emacs-fsharp-mode)
+
+## as .NET Cli tool
+
+Add
+
+```xml
+<DotNetCliToolReference Include="dotnet-proj-info" Version="*" />
+```
+
+restore, and it use as `dotnet proj-info`
+
+Support args of .NET cli (`dotnet`), like:
+
+- `-c` or `--configuration`
+- `-f` or `--framework`
+- `-r` or `--runtime`
+
+See [examples](https://github.com/enricosada/dotnet-proj-info/tree/master/examples) directory for a quick tutorial
 
 ```
 USAGE: proj-info [--help] [--fsc-args] [--project-refs] [--get-property [<string>...]]
@@ -65,6 +87,8 @@ OPTIONS:
 ```
 
 ## Build
+
+Clone repo.
 
 Run:
 
