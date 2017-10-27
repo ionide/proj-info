@@ -4,17 +4,17 @@ open System
 open System.IO
 
 #if NET45
-let inline Ok x = Choice1Of2 x
-let inline Error x = Choice2Of2 x
+let inline internal Ok x = Choice1Of2 x
+let inline internal Error x = Choice2Of2 x
 
-let inline (|Ok|Error|) x =
+let inline internal (|Ok|Error|) x =
     match x with
     | Choice1Of2 x -> Ok x
     | Choice2Of2 e -> Error e
 
-type private Result<'Ok,'Err> = Choice<'Ok,'Err>
+type internal Result<'Ok,'Err> = Choice<'Ok,'Err>
 
-module private Result =
+module internal Result =
   let map f inp = match inp with Error e -> Error e | Ok x -> Ok (f x)
   let mapError f inp = match inp with Error e -> Error (f e) | Ok x -> Ok x
   let bind f inp = match inp with Error e -> Error e | Ok x -> f x        
@@ -109,7 +109,9 @@ type GetResult =
      | P2PRefs of string list
      | ResolvedP2PRefs of ResolvedP2PRefsInfo list
      | Properties of (string * string) list
-and ResolvedP2PRefsInfo = { ProjectReferenceFullPath: string; TargetFramework: string; Others: (string * string) list }
+     | ResolvedNETRefs of string list
+     | InstalledNETFw of string list
+and ResolvedP2PRefsInfo = { ProjectReferenceFullPath: string; TargetFramework: string option; Others: (string * string) list }
 
 let getNewTempFilePath suffix =
     let outFile = System.IO.Path.GetTempFileName()
@@ -300,11 +302,11 @@ let parseResolvedP2PRefOut outFile =
                     let props = lines |> Map.ofArray
                     let pathOpt = props |> Map.tryFind "ProjectReferenceFullPath"
                     let tfmOpt = props |> Map.tryFind "TargetFramework"
-                    match pathOpt, tfmOpt with
-                    | Some path, Some tfm ->
-                        { ProjectReferenceFullPath = path; TargetFramework = tfm; Others = lines |> List.ofArray }
-                    | _ ->
-                        failwithf "parsing resolved p2p refs, expected properties not found '%A'" allLines
+                    match pathOpt with
+                    | Some path ->
+                        { ProjectReferenceFullPath = path; TargetFramework = tfmOpt; Others = lines |> List.ofArray }
+                    | None ->
+                        failwithf "parsing resolved p2p refs, expected property 'ProjectReferenceFullPath' not found. Was '%A'" allLines
 
                 )
             |> List.ofArray
