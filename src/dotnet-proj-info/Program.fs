@@ -237,14 +237,12 @@ let realMain argv = attempt {
         | P2PRefs args -> args
         | Properties args -> args |> List.map (fun (x,y) -> sprintf "%s=%s" x y)
         | TreeviewItems args ->
-            let x = verbose
-            [ yield "+ [SourceFiles]"
-              yield! args.Compile
-                     |> List.map (fun (link,path) -> sprintf "|-- '%s'%s" link (if x then sprintf " => %s" path else ""))
-              yield "+ [None]"
-              yield! args.None
-                     |> List.map (fun (link,path) -> sprintf "|-- '%s'%s" link (if x then sprintf " => %s" path else ""))
-            ]
+            let nodes indent dir items =
+                [ yield (sprintf "├── %s" dir)
+                  yield! items
+                         |> List.map (fun (link,path) -> sprintf "%s├── %s%s" indent link (if verbose then sprintf " => %s" path else "")) ]
+            [ yield! (nodes "│   " "SourceFiles" args.Compile)
+              yield! (nodes "    " "None" args.None) ]
         | ResolvedP2PRefs args ->
             let optionalTfm t =
                 t |> Option.map (sprintf " (%s)") |> Option.defaultValue ""
