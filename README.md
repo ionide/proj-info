@@ -108,7 +108,7 @@ To create packages:
 dotnet pack
 ```
 
-will create packages in `artifacts\nupkgs`
+will create packages in `bin\nupkg`
 
 pass `/p:Version=1.2.3` to create a package with version `1.2.3`
 
