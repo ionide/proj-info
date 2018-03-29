@@ -92,8 +92,20 @@ let writeTargetFile log templates targetFileDestPath =
 </Project>
         """
 
-    log (sprintf "writing helper target file in '%s'" targetFileDestPath)
-    File.WriteAllText(targetFileDestPath, targetFileTemplate.Trim())
+    let targetFileOnDisk =
+        if File.Exists(targetFileDestPath) then
+            try
+                Some (File.ReadAllText targetFileDestPath)
+            with
+            | _ -> None
+        else
+            None
+
+    let newTargetFile = targetFileTemplate.Trim()
+
+    if targetFileOnDisk <> Some newTargetFile then
+        log (sprintf "writing helper target file in '%s'" targetFileDestPath)
+        File.WriteAllText(targetFileDestPath, newTargetFile)
 
     Ok targetFileDestPath
 
