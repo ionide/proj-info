@@ -6,6 +6,7 @@ type CLIArguments =
     | Fsc_Args
     | Project_Refs
     | [<AltCommandLine("-gp")>] Get_Property of string list
+    | [<AltCommandLine("-gi")>] Get_Items of string list
     | NET_FW_References_Path of string list
     | Installed_NET_Frameworks
     | [<AltCommandLine("-f")>] Framework of string
@@ -29,6 +30,7 @@ with
             | Runtime _ -> "target runtime, the RuntimeIdentifier msbuild property"
             | Configuration _ -> "configuration to use (like Debug), the Configuration msbuild property"
             | Get_Property _ -> "msbuild property to get (allow multiple)"
+            | Get_Items _ -> "msbuild items to get (allow multiple). For each item, the contents are seperated with a ';'."
             | MSBuild _ -> "MSBuild path (default \"msbuild\")"
             | DotnetCli _ -> "Dotnet CLI path (default \"dotnet\")"
             | MSBuild_Host _ -> "the Msbuild host, if auto then oldsdk=MSBuild dotnetSdk=DotnetCLI"
@@ -185,6 +187,7 @@ let realMain argv = attempt {
         [ results.TryGetResult <@ Fsc_Args @> |> Option.map (fun _ -> getFscArgsBySdk)
           results.TryGetResult <@ Project_Refs @> |> Option.map (fun _ -> getP2PRefs)
           results.TryGetResult <@ Get_Property @> |> Option.map (fun p -> (fun () -> getProperties p))
+          results.TryGetResult <@ Get_Items @> |> Option.map (fun i -> (fun () -> getItems i))
           results.TryGetResult <@ NET_FW_References_Path @> |> Option.map (fun props -> (fun () -> Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.getReferencePaths props))
           results.TryGetResult <@ Installed_NET_Frameworks @> |> Option.map (fun _ -> Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.installedNETFrameworks) ]
 

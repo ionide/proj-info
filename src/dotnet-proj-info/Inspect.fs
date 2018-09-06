@@ -213,7 +213,7 @@ let parsePropertiesOut outFile =
         |> sprintf "invalid temp file content '%A'"
         |> (fun x -> Error (UnexpectedMSBuildResult x))
 
-let getProperties props =
+let getObjects evaluationCharacter props =
     let templateF isCrossgen =
         """
   <Target Name="_Inspect_GetProperties_""" + (if isCrossgen then "CrossGen" else "NotCrossGen") + """"
@@ -226,9 +226,9 @@ let getProperties props =
             |> List.mapi (fun i p -> sprintf """
         <_Inspect_GetProperties_OutLines Include="P%i">
             <PropertyName>%s</PropertyName>
-            <PropertyValue>$(%s)</PropertyValue>
+            <PropertyValue>%c(%s)</PropertyValue>
         </_Inspect_GetProperties_OutLines>
-                                             """ i p p)
+                                             """ i p evaluationCharacter p)
             |> List.map (fun s -> s.TrimEnd())
             |> String.concat (System.Environment.NewLine) )
         +
@@ -266,6 +266,12 @@ let getProperties props =
     template, args, (fun () -> outFile
                                |> bindSkipped parsePropertiesOut
                                |> Result.map Properties)
+
+
+let getProperties props = getObjects '$' props
+
+let getItems items = getObjects '@' items
+
 
 let parseResolvedP2PRefOut outFile =
     /// Example:
