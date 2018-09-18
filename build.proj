@@ -3,7 +3,7 @@
   <Import Project="src\Directory.Build.props" />
 
   <Target Name="Build">
-    <Exec Command='dotnet build src/dotnet-proj-info' />
+    <Exec Command='dotnet build src/dotnet-proj-info -c Release' />
   </Target>
 
   <Target Name="Restore">
@@ -17,7 +17,7 @@
   </Target>
 
   <Target Name="Test">
-    <Exec Command='dotnet test -v n' WorkingDirectory="test" IgnoreStandardErrorWarningFormat="true" />
+    <Exec Command='dotnet test -v n -c Release' WorkingDirectory="test" IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
   <Target Name="VSTest" DependsOnTargets="Test" />
