@@ -7,7 +7,6 @@
   </Target>
 
   <Target Name="Restore">
-    <Exec Command="$(MonoOrEmpty)paket.bootstrapper.exe" WorkingDirectory=".paket" ConsoleToMSBuild="true" />
     <Exec Command="$(MonoOrEmpty)paket.exe restore" WorkingDirectory=".paket" ConsoleToMSBuild="true" />
   </Target>
 
