@@ -2,12 +2,12 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFrameworks>netcoreapp2.0;netcoreapp1.0</TargetFrameworks>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
     <Description>Get msbuild info as cli tool</Description>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Condition=" '$(TargetFramework)' != 'netcoreapp1.0' " Include="..\..\paket-files\Microsoft\visualfsharp\src\fsharp\FSharp.Build\Fsc.fs" />
+    <Compile Include="..\..\paket-files\Microsoft\visualfsharp\src\fsharp\FSharp.Build\Fsc.fs" />
     <Compile Include="Railway.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
@@ -19,7 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Dotnet.ProjInfo\Dotnet.ProjInfo.fsproj" />
 
-    <ProjectReference Condition=" '$(TargetFramework)' != 'netcoreapp1.0' " Include="..\Dotnet.ProjInfo.Helpers\Dotnet.ProjInfo.Helpers.csproj" PrivateAssets="All" />
+    <ProjectReference Include="..\Dotnet.ProjInfo.Helpers\Dotnet.ProjInfo.Helpers.csproj" PrivateAssets="All" />
   </ItemGroup>
 
 </Project>

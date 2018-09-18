@@ -1,33 +1,30 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;netstandard1.6;net45</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;net45</TargetFrameworks>
     <Description>Get msbuild info</Description>
+    <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="Resources.fs" />
-  </ItemGroup>
-
-  <ItemGroup Condition=" '$(TargetFramework)' != 'netstandard1.6' ">
-    <!-- old fsproj is not supported on netstandard1.6 -->
     <Compile Include="ExternalFSharp\MissingApi.fs" />
     <Compile Include="ExternalFSharp\FscConfig.fs" />
-
-    <ProjectReference Include="..\Dotnet.ProjInfo.Helpers\Dotnet.ProjInfo.Helpers.csproj" PrivateAssets="All" />
-
-    <EmbeddedResource Include="..\..\paket-files\Microsoft\visualfsharp\src\fsharp\FSharp.Build\Microsoft.FSharp.Targets" />
+    <Compile Include="..\dotnet-proj-info\Inspect.fs" />
+    <Compile Include="NETFrameworkInfoFromMSBuild.fs" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\dotnet-proj-info\Inspect.fs" />
-    <Compile Include="NETFrameworkInfoFromMSBuild.fs" />
+    <ProjectReference Include="..\Dotnet.ProjInfo.Helpers\Dotnet.ProjInfo.Helpers.csproj" PrivateAssets="All" />
+  </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\paket-files\Microsoft\visualfsharp\src\fsharp\FSharp.Build\Microsoft.FSharp.Targets" />
     <EmbeddedResource Include="Resources\EnvironmentInfo.proj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="FSharp.Core" Condition=" '$(TargetFramework)' == 'netstandard1.6' " Version="4.1.*" />
+    <PackageReference Include="FSharp.Core" Condition=" '$(TargetFramework)' == 'netstandard2.0' " Version="4.1.*" />
     <PackageReference Include="FSharp.Core" Condition=" '$(TargetFramework)' == 'net45' " Version="4.0.0.1" />
   </ItemGroup>
 
@@ -40,7 +37,7 @@
   <PropertyGroup>
     <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeP2POutput</TargetsForTfmSpecificBuildOutput>
   </PropertyGroup>
-  <Target Name="IncludeP2POutput" Condition=" '$(TargetFramework)' != 'netstandard1.6' ">
+  <Target Name="IncludeP2POutput">
     <ItemGroup>
       <BuildOutputInPackage Include="$(MSBuildProjectDirectory)/$(OutputPath)Dotnet.ProjInfo.Helpers.dll" />
     </ItemGroup>
