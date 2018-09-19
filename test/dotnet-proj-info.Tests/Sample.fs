@@ -106,8 +106,9 @@ let tests pkgUnderTestVersion =
 
         let projPath = testDir/ (``samples1 OldSdk library``.ProjectFile)
 
-        projInfo fs [projPath; "--get-property"; "AssemblyName"]
-        |> checkExitCodeZero
+        let result = projInfo fs [projPath; "--get-property"; "AssemblyName"]
+        result |> checkExitCodeZero
+        Expect.equal "AssemblyName=l1" (result.Result.StandardOutput.Trim()) "wrong output"
       )
     ]
 
