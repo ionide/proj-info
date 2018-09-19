@@ -122,5 +122,28 @@ let tests pkgUnderTestVersion =
       )
     ]
 
+    testList ".net sdk" [
+      testCase |> withLog "can read properties" (fun _ fs ->
+        let testDir = inDir fs "netsdk_props"
+        copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
+
+        let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
+
+        let result = projInfo fs [projPath; "--get-property"; "TargetFramework"]
+        result |> checkExitCodeZero
+        Expect.equal "TargetFramework=netstandard2.0" (result.Result.StandardOutput.Trim()) "wrong output"
+      )
+
+      testCase |> withLog "can read fsc args" (fun _ fs ->
+        let testDir = inDir fs "netsdk_fsc_args"
+        copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
+
+        let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
+
+        let result = projInfo fs [projPath; "--fsc-args"]
+        result |> checkExitCodeZero
+      )
+    ]
+
   ]
   |> testList "suite"
