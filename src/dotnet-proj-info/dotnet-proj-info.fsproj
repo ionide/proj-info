@@ -4,6 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.0</TargetFramework>
     <Description>Get msbuild info as cli tool</Description>
+    <Summary>Get info from msbuild projects</Summary>
   </PropertyGroup>
 
   <ItemGroup>
