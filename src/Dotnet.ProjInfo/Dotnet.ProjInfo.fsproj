@@ -19,8 +19,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="..\..\paket-files\Microsoft\visualfsharp\src\fsharp\FSharp.Build\Microsoft.FSharp.Targets" />
-    <EmbeddedResource Include="Resources\EnvironmentInfo.proj" />
+    <EmbeddedResource Include="..\..\paket-files\Microsoft\visualfsharp\src\fsharp\FSharp.Build\Microsoft.FSharp.Targets">
+      <LogicalName>Microsoft.FSharp.Targets</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\EnvironmentInfo.proj">
+      <LogicalName>EnvironmentInfo.proj</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>
