@@ -12,6 +12,7 @@ open System.Xml.Linq
 open DotnetProjInfo.TestAssets
 
 let RepoDir = (__SOURCE_DIRECTORY__ /".." /"..") |> Path.GetFullPath
+let ExamplesDir = RepoDir/"test"/"examples"
 let TestRunDir = RepoDir/"test"/"testrun"
 let NupkgsDir = RepoDir/"bin"/"nupkg"
 
@@ -43,17 +44,16 @@ let prepareTool (fs: FileUtils) pkgUnderTestVersion =
     fs.shellExecRun "dotnet" [ "restore"; "--packages"; "packages" ]
     |> checkExitCodeZero
 
-let projInfo (fs: FileUtils) () =
+let projInfo (fs: FileUtils) args =
     fs.cd (TestRunDir/"sdk2")
-    fs.shellExecRun "dotnet" [ "proj-info"; "--help" ]
+    fs.shellExecRun "dotnet" ("proj-info" :: args)
 
 let copyDirFromAssets (fs: FileUtils) source outDir =
     fs.mkdir_p outDir
 
-    // let path = nupkgReadonlyPath source
-    // let sourceNupkgPath = outDir/(Path.GetFileName path)
+    let path = ExamplesDir/source
 
-    // fs.cp path sourceNupkgPath
+    fs.cp_r path outDir
     ()
 
 let tests pkgUnderTestVersion =
@@ -92,20 +92,21 @@ let tests pkgUnderTestVersion =
   [ 
     testList "general" [
       testCase |> withLog "can show help" (fun _ fs ->
-        let testDir = inDir fs "args_help"
 
-        projInfo fs ()
+        projInfo fs ["--help"]
         |> checkExitCodeZero
 
       )
     ]
 
     testList "old sdk" [
-      testCase |> withLog "can read properties" (fun _ fs ->
+      ftestCase |> withLog "can read properties" (fun _ fs ->
         let testDir = inDir fs "oldsdk_props"
-        copyDirFromAssets fs ``samples1 OldSdk library`` testDir
+        copyDirFromAssets fs ``samples1 OldSdk library``.ProjDir testDir
 
-        projInfo fs ()
+        let projPath = testDir/ (``samples1 OldSdk library``.ProjectFile)
+
+        projInfo fs [projPath; "--get-property"; "AssemblyName"]
         |> checkExitCodeZero
       )
     ]

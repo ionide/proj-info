@@ -34,6 +34,27 @@ let cp (logger: Logger) (from: string) (toPath: string) =
             toPath
     File.Copy(from, toFilePath, true)
 
+let cp_r (logger: Logger) (from: string) (toPath: string) =
+    logger.info(
+      eventX "cp -r '{from}' '{toPath}'"
+      >> setField "from" from
+      >> setField "toPath" toPath)
+
+    for dirPath in Directory.GetDirectories(from, "*", SearchOption.AllDirectories) do
+        let newDir = dirPath.Replace(from, toPath)
+        logger.info(
+          eventX "-> create dir '{newDir}'"
+          >> setField "newDir" newDir)
+        Directory.CreateDirectory(dirPath.Replace(from, toPath)) |> ignore
+
+    for newPath in Directory.GetFiles(from, "*", SearchOption.AllDirectories) do
+        let toFilePath = newPath.Replace(from, toPath)
+        logger.info(
+          eventX "-> copy file '{from}' '{toPath}'"
+          >> setField "from" newPath
+          >> setField "toPath" toFilePath)
+        File.Copy(newPath, toFilePath, true)
+
 let shellExecRun (logger: Logger) workDir cmd (args: string list) =
     logger.info(
       eventX "executing: '{cmd}' '{args}'"
@@ -84,6 +105,7 @@ type FileUtils (logger: Logger) =
     member __.rm_rf = rm_rf logger
     member __.mkdir_p = mkdir_p logger
     member __.cp = cp logger
+    member __.cp_r = cp_r logger
     member __.shellExecRun = shellExecRun logger currentDirectory
     member __.createFile = createFile logger
     member __.unzip = unzip logger
