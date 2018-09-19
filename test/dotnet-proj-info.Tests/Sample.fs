@@ -100,7 +100,7 @@ let tests pkgUnderTestVersion =
     ]
 
     testList "old sdk" [
-      ftestCase |> withLog "can read properties" (fun _ fs ->
+      testCase |> withLog "can read properties" (fun _ fs ->
         let testDir = inDir fs "oldsdk_props"
         copyDirFromAssets fs ``samples1 OldSdk library``.ProjDir testDir
 
@@ -109,6 +109,16 @@ let tests pkgUnderTestVersion =
         let result = projInfo fs [projPath; "--get-property"; "AssemblyName"]
         result |> checkExitCodeZero
         Expect.equal "AssemblyName=l1" (result.Result.StandardOutput.Trim()) "wrong output"
+      )
+
+      ftestCase |> withLog "can read fsc args" (fun _ fs ->
+        let testDir = inDir fs "oldsdk_fsc_args"
+        copyDirFromAssets fs ``samples1 OldSdk library``.ProjDir testDir
+
+        let projPath = testDir/ (``samples1 OldSdk library``.ProjectFile)
+
+        let result = projInfo fs [projPath; "--fsc-args"]
+        result |> checkExitCodeZero
       )
     ]
 
