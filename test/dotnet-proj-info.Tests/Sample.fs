@@ -111,7 +111,7 @@ let tests pkgUnderTestVersion =
         Expect.equal "AssemblyName=l1" (result.Result.StandardOutput.Trim()) "wrong output"
       )
 
-      ftestCase |> withLog "can read fsc args" (fun _ fs ->
+      testCase |> withLog "can read fsc args" (fun _ fs ->
         let testDir = inDir fs "oldsdk_fsc_args"
         copyDirFromAssets fs ``samples1 OldSdk library``.ProjDir testDir
 
