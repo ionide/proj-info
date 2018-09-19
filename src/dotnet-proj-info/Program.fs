@@ -251,12 +251,22 @@ let wrapEx m f a =
     with ex ->
         Error (RaisedException (ex, m))
 
+let (|HelpRequested|_|) (ex: ArguParseException) =
+    match ex.ErrorCode with
+    | Argu.ErrorCode.HelpText -> Some ex.Message
+    | _ -> None
+
 [<EntryPoint>]
 let main argv =
     match wrapEx "uncaught exception" (realMain >> runAttempt) argv with
     | Ok _ -> 0
     | Error err ->
         match err with
+        | InvalidArgs (HelpRequested helpText) ->
+            printfn "proj-info."
+            printfn " "
+            printfn "%s" helpText
+            0
         | InvalidArgs ex ->
             printfn "%s" (ex.Message)
             1
