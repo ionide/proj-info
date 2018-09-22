@@ -8,7 +8,7 @@
     <ProjectGuid>07c5431b-f5e0-41c4-b7b3-05fb0d2d4b8b</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>l1</RootNamespace>
-    <AssemblyName>l1</AssemblyName>
+    <AssemblyName>Lib1</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <TargetFSharpCoreVersion>4.4.1.0</TargetFSharpCoreVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>

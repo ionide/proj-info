@@ -1,15 +1,19 @@
-<?xml version="1.0" encoding="utf-8" standalone="no"?>
-<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="15.0">
+
   <PropertyGroup>
     <Authors>Enrico Sada</Authors>
     <PackageProjectUrl>https://github.com/enricosada/dotnet-proj-info/</PackageProjectUrl>
     <PackageTags>mbuild;dotnet;sdk;csproj;fsproj</PackageTags>
+    <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/enricosada/dotnet-proj-info.git</RepositoryUrl>
     <PackageLicenseUrl>https://github.com/enricosada/dotnet-proj-info/blob/master/LICENSE</PackageLicenseUrl>
+  </PropertyGroup>
 
-    <RepoRootDir>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)\.."))</RepoRootDir>
-    <NupkgsDir>$(RepoRootDir)/bin/nupkg</NupkgsDir>
-    <Version Condition=" '$(Version)' == '' ">0.10.0$(VersionSuffix)</Version>
+  <PropertyGroup>
+    <RepoRootDir>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)"))</RepoRootDir>
+    <NupkgsDir>$([System.IO.Path]::GetFullPath("$(RepoRootDir)/bin/nupkg"))</NupkgsDir>
+    <Version Condition=" '$(Version)' == '' ">0.11.0$(VersionSuffix)</Version>
     <MonoOrEmpty Condition=" '$(OS)' != 'Windows_NT' ">mono </MonoOrEmpty>
   </PropertyGroup>
+
 </Project>

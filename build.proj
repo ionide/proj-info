@@ -1,13 +1,12 @@
 <Project ToolsVersion="15.0">
 
-  <Import Project="src\Directory.Build.props" />
+  <Import Project="Directory.Build.props" />
 
   <Target Name="Build">
-    <Exec Command='dotnet build src/dotnet-proj-info' />
+    <Exec Command='dotnet build src/dotnet-proj-info -c Release' />
   </Target>
 
   <Target Name="Restore">
-    <Exec Command="$(MonoOrEmpty)paket.bootstrapper.exe" WorkingDirectory=".paket" ConsoleToMSBuild="true" />
     <Exec Command="$(MonoOrEmpty)paket.exe restore" WorkingDirectory=".paket" ConsoleToMSBuild="true" />
   </Target>
 
@@ -18,7 +17,7 @@
   </Target>
 
   <Target Name="Test">
-    <Exec Command='dotnet test -v n' WorkingDirectory="test" IgnoreStandardErrorWarningFormat="true" />
+    <Exec Command='dotnet run -- "$(Version)" --fail-on-focused-tests' WorkingDirectory="$(RepoRootDir)/test/dotnet-proj-info.Tests" IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
   <Target Name="VSTest" DependsOnTargets="Test" />
