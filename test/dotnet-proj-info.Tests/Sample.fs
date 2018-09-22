@@ -48,6 +48,10 @@ let projInfo (fs: FileUtils) args =
     fs.cd (TestRunDir/"sdk2")
     fs.shellExecRun "dotnet" ("proj-info" :: args)
 
+let dotnet (fs: FileUtils) args =
+    fs.cd (TestRunDir/"sdk2")
+    fs.shellExecRun "dotnet" args
+
 let copyDirFromAssets (fs: FileUtils) source outDir =
     fs.mkdir_p outDir
 
@@ -108,7 +112,7 @@ let tests pkgUnderTestVersion =
 
         let result = projInfo fs [projPath; "--get-property"; "AssemblyName"]
         result |> checkExitCodeZero
-        Expect.equal "AssemblyName=l1" (result.Result.StandardOutput.Trim()) "wrong output"
+        Expect.equal (sprintf "AssemblyName=%s" ``samples1 OldSdk library``.AssemblyName) (result.Result.StandardOutput.Trim()) "wrong output"
       )
 
       testCase |> withLog "can read fsc args" (fun _ fs ->
@@ -129,6 +133,9 @@ let tests pkgUnderTestVersion =
 
         let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
 
+        dotnet fs ["restore"; projPath]
+        |> checkExitCodeZero
+
         let result = projInfo fs [projPath; "--get-property"; "TargetFramework"]
         result |> checkExitCodeZero
         Expect.equal "TargetFramework=netstandard2.0" (result.Result.StandardOutput.Trim()) "wrong output"
@@ -139,6 +146,9 @@ let tests pkgUnderTestVersion =
         copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
 
         let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
+
+        dotnet fs ["restore"; projPath]
+        |> checkExitCodeZero
 
         let result = projInfo fs [projPath; "--fsc-args"]
         result |> checkExitCodeZero
