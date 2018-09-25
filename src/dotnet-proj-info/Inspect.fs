@@ -34,6 +34,7 @@ module MSBuild =
             else s
 
         match a with
+         | Property (k,"") -> sprintf "\"/p:%s=\"" k
          | Property (k,v) -> sprintf "/p:%s=%s" k v |> quote
          | Target t -> sprintf "/t:%s" t |> quote
          | Switch w -> sprintf "/%s" w
