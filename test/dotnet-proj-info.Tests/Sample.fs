@@ -93,6 +93,14 @@ let tests pkgUnderTestVersion =
     fs.cd outDir
     outDir
 
+  let asLines (s: string) =
+    s.Split(Environment.NewLine) |> List.ofArray
+
+  let stdOutLines (cmd: Command) =
+    cmd.Result.StandardOutput
+    |> fun s -> s.Trim()
+    |> asLines
+
   [ 
     testList "general" [
       testCase |> withLog "can show help" (fun _ fs ->
@@ -100,6 +108,21 @@ let tests pkgUnderTestVersion =
         projInfo fs ["--help"]
         |> checkExitCodeZero
 
+      )
+    ]
+
+    testList ".net" [
+      testCase |> withLog "can show installed .net frameworks" (fun _ fs ->
+
+        let result = projInfo fs ["--installed-net-frameworks"]
+        result |> checkExitCodeZero
+        let out = stdOutLines result
+
+        let isNETVersion (v: string) =
+          v.StartsWith("v")
+          && v.ToCharArray() |> Array.exists (fun c -> c <> 'v' && c <> '.' <> not (Char.IsNumber c))
+
+        Expect.all out isNETVersion (sprintf "expected a list of .net versions, but was '%A'" out)
       )
     ]
 
