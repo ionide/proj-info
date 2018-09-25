@@ -124,6 +124,19 @@ let tests pkgUnderTestVersion =
 
         Expect.all out isNETVersion (sprintf "expected a list of .net versions, but was '%A'" out)
       )
+
+      testCase |> withLog "can get .net references path" (fun _ fs ->
+
+        let result = projInfo fs ["--installed-net-frameworks"]
+        result |> checkExitCodeZero
+        let netFws = stdOutLines result
+
+        for netfw in netFws do
+          let result = projInfo fs ["--net-fw-references-path"; "System.Core"; "-f"; netfw]
+          result |> checkExitCodeZero
+          let out = stdOutLines result
+          Expect.exists out (fun s -> s.EndsWith("System.Core.dll")) (sprintf "should resolve System.Core.dll but was '%A'" out)
+      )
     ]
 
     testList "old sdk" [
