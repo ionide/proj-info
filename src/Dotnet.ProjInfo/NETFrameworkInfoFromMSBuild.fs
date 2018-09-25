@@ -65,9 +65,10 @@ let getReferencePaths props =
                                |> Result.map (List.map snd >> Inspect.GetResult.ResolvedNETRefs))
 
 
+let [<Literal>] private FrameworkPathOverride = "FrameworkPathOverride"
+
 let installedNETFrameworks () =
-    let prop = "FrameworkPathOverride"
-    let template, args, parser = Inspect.getProperties [prop]
+    let template, args, parser = Inspect.getProperties [FrameworkPathOverride]
 
     let find frameworkPathOverride =
 
@@ -95,8 +96,8 @@ let installedNETFrameworks () =
         |> Result.bind (fun p ->
             match p with
             | Inspect.GetResult.Properties props ->
-                match props |> Map.ofList |> Map.tryFind prop with
-                | None -> Error (Inspect.GetProjectInfoErrors.UnexpectedMSBuildResult (sprintf "expected Property '%s' not found, found: %A" prop props))
+                match props |> Map.ofList |> Map.tryFind FrameworkPathOverride with
+                | None -> Error (Inspect.GetProjectInfoErrors.UnexpectedMSBuildResult (sprintf "expected Property '%s' not found, found: %A" FrameworkPathOverride props))
                 | Some fpo -> Ok (find fpo)
             | r -> Error (Inspect.GetProjectInfoErrors.UnexpectedMSBuildResult (sprintf "expected Properties result, was %A" r)))
 
