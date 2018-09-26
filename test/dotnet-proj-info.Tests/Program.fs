@@ -13,5 +13,6 @@ let main argv =
         printfn "testing package: %s" pkgUnderTestVersion
 
         Environment.SetEnvironmentVariable("DOTNET_PROJ_INFO_MSBUILD_BL", "1")
+        Environment.SetEnvironmentVariable("MSBuildExtensionsPath", null)
 
         Tests.runTestsWithArgs defaultConfig (args |> Array.ofList) (DotnetProjInfo.Tests.tests pkgUnderTestVersion)
