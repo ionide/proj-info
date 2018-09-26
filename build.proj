@@ -17,7 +17,7 @@
   </Target>
 
   <Target Name="Test">
-    <Exec Command='dotnet run -- "$(Version)" --fail-on-focused-tests' WorkingDirectory="$(RepoRootDir)/test/dotnet-proj-info.Tests" IgnoreStandardErrorWarningFormat="true" />
+    <Exec Command='dotnet run -- "$(Version)" --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/dotnet-proj-info.Tests" IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
   <Target Name="VSTest" DependsOnTargets="Test" />
