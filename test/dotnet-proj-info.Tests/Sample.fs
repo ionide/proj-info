@@ -56,6 +56,9 @@ let msbuild (fs: FileUtils) args =
     fs.cd (TestRunDir/"sdk2")
     fs.shellExecRun "msbuild" args
 
+let nuget (fs: FileUtils) args =
+    fs.shellExecRunNET (TestRunDir/"nuget"/"nuget.exe") args
+
 let copyDirFromAssets (fs: FileUtils) source outDir =
     fs.mkdir_p outDir
 
@@ -64,14 +67,33 @@ let copyDirFromAssets (fs: FileUtils) source outDir =
     fs.cp_r path outDir
     ()
 
-let tests pkgUnderTestVersion =
+let downloadNugetClient (logger: Logger) (nugetUrl: string) nugetPath =
+    if not(File.Exists(nugetPath)) then
+      logger.info(
+        eventX "download of nuget.exe from {url} to '{path}'"
+        >> setField "url" nugetUrl
+        >> setField "path" nugetPath)
+      let wc = new System.Net.WebClient()
+      mkdir_p logger (Path.GetDirectoryName(nugetPath))
+      wc.DownloadFile(nugetUrl, nugetPath)
+    else
+      logger.info(
+        eventX "nuget.exe already found in '{path}'"
+        >> setField "path" nugetPath)
 
+let tests pkgUnderTestVersion =
+ 
   let prepareTestsAssets = lazy(
       let logger = Log.create "Tests Assets"
       let fs = FileUtils(logger)
 
       // restore tool
       prepareTool fs pkgUnderTestVersion
+
+      // download nuget client
+      let nugetUrl = "https://dist.nuget.org/win-x86-commandline/v4.7.1/nuget.exe"
+      let nugetPath = TestRunDir/"nuget"/"nuget.exe"
+      downloadNugetClient logger nugetUrl nugetPath
     )
 
   let withLog name f test =
@@ -124,8 +146,13 @@ let tests pkgUnderTestVersion =
         let projPath = testDir/ (``samples1 OldSdk library``.ProjectFile)
         let projDir = Path.GetDirectoryName projPath
 
-        let result = msbuild fs [projPath; "/t:Build"]
-        result |> checkExitCodeZero
+        fs.cd projDir
+        nuget fs ["restore"; "-PackagesDirectory"; "packages"]
+        |> checkExitCodeZero
+
+        fs.cd testDir
+        msbuild fs [projPath; "/t:Build"]
+        |> checkExitCodeZero
 
         let outputPath = projDir/"bin"/"Debug"/ ``samples1 OldSdk library``.AssemblyName + ".dll"
         Expect.isTrue (File.Exists outputPath) (sprintf "output assembly '%s' not found" outputPath)
