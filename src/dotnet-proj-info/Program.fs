@@ -181,6 +181,11 @@ let realMain argv = attempt {
         |> List.choose (fun (a,p) -> a |> Option.map (fun x -> (p,x)))
         |> List.map (MSBuild.MSbuildCli.Property)
 
+    let globalArgs =
+        match Environment.GetEnvironmentVariable("DOTNET_PROJ_INFO_MSBUILD_BL") with
+        | "1" -> MSBuild.MSbuildCli.Switch("bl") :: globalArgs
+        | _ -> globalArgs
+
     let allCmds =
         [ results.TryGetResult <@ Fsc_Args @> |> Option.map (fun _ -> getFscArgsBySdk)
           results.TryGetResult <@ Project_Refs @> |> Option.map (fun _ -> getP2PRefs)
