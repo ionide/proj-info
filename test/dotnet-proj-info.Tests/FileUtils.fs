@@ -5,6 +5,7 @@ open Expecto.Logging
 open Expecto.Logging.Message
 open Expecto.Impl
 open System
+open System.Runtime.InteropServices
 
 let (/) a b = Path.Combine(a, b)
 
@@ -73,6 +74,13 @@ let shellExecRun (logger: Logger) workDir cmd (args: string list) =
         >> setField "error" cmd.Result.StandardError)
     cmd
 
+let shellExecRunNET (logger: Logger) workDir cmd (args: string list) =
+    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) then
+      shellExecRun logger workDir cmd args
+    else
+      shellExecRun logger workDir "mono" (cmd :: args)
+
+
 let createFile (logger: Logger) path setContent =
     logger.info(
       eventX "create file '{path}'"
@@ -107,6 +115,7 @@ type FileUtils (logger: Logger) =
     member __.cp = cp logger
     member __.cp_r = cp_r logger
     member __.shellExecRun = shellExecRun logger currentDirectory
+    member __.shellExecRunNET = shellExecRunNET logger currentDirectory
     member __.createFile = createFile logger
     member __.unzip = unzip logger
     member __.readFile = readFile logger
