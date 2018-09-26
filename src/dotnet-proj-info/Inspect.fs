@@ -61,6 +61,19 @@ type MSBuildExePath =
     | Path of string
     | DotnetMsbuild of dotnetExePath: string 
 
+let disableEnvVar envVarName =
+    let oldEnv =
+        match Environment.GetEnvironmentVariable(envVarName) with
+        | null -> None
+        | s ->
+            Environment.SetEnvironmentVariable(envVarName, null)
+            Some s
+    { new IDisposable with 
+        member x.Dispose() =
+            match oldEnv with
+            | None -> ()
+            | Some s -> Environment.SetEnvironmentVariable(envVarName, s) }
+
 let msbuild msbuildExe run project args =
     let exe, beforeArgs =
         match msbuildExe with
@@ -69,6 +82,14 @@ let msbuild msbuildExe run project args =
     let msbuildArgs =
         Project(project) :: args @ [ Switch "nologo"; Switch "verbosity:quiet"]
         |> List.map (MSBuild.sprintfMsbuildArg)
+    
+    //HACK disable FrameworkPathOverride on msbuild, to make installedNETFrameworks work.
+    //     That env var is used only in .net sdk to workaround missing gac assemblies on unix
+    use disableFrameworkOverrideOnMsbuild =
+        match msbuildExe with
+        | MSBuildExePath.Path _ -> disableEnvVar "FrameworkPathOverride"
+        | MSBuildExePath.DotnetMsbuild _ -> { new IDisposable with member x.Dispose() = () }
+
     match run exe (beforeArgs @ msbuildArgs) with
     | 0, x -> Ok x
     | n, x -> Error (MSBuildFailed (n,x))
