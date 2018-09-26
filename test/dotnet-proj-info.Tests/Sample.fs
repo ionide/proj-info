@@ -52,6 +52,10 @@ let dotnet (fs: FileUtils) args =
     fs.cd (TestRunDir/"sdk2")
     fs.shellExecRun "dotnet" args
 
+let msbuild (fs: FileUtils) args =
+    fs.cd (TestRunDir/"sdk2")
+    fs.shellExecRun "msbuild" args
+
 let copyDirFromAssets (fs: FileUtils) source outDir =
     fs.mkdir_p outDir
 
@@ -109,6 +113,38 @@ let tests pkgUnderTestVersion =
         |> checkExitCodeZero
 
       )
+    ]
+
+    testList "sanity check of projects" [
+
+      testCase |> withLog "can build sample1" (fun _ fs ->
+        let testDir = inDir fs "sanity_check_sample1"
+        copyDirFromAssets fs ``samples1 OldSdk library``.ProjDir testDir
+
+        let projPath = testDir/ (``samples1 OldSdk library``.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
+
+        let result = msbuild fs [projPath; "/t:Build"]
+        result |> checkExitCodeZero
+
+        let outputPath = projDir/"bin"/"Debug"/ ``samples1 OldSdk library``.AssemblyName + ".dll"
+        Expect.isTrue (File.Exists outputPath) (sprintf "output assembly '%s' not found" outputPath)
+      )
+
+      testCase |> withLog "can build sample2" (fun _ fs ->
+        let testDir = inDir fs "sanity_check_sample2"
+        copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
+
+        let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
+
+        let result = dotnet fs ["build"; projPath]
+        result |> checkExitCodeZero
+
+        let outputPath = projDir/"bin"/"Debug"/"netstandard2.0"/ ``samples2 NetSdk library``.AssemblyName + ".dll"
+        Expect.isTrue (File.Exists outputPath) (sprintf "output assembly '%s' not found" outputPath)
+      )
+
     ]
 
     testList ".net" [
