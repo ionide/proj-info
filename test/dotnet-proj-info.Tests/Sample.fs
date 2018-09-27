@@ -169,7 +169,7 @@ let tests pkgUnderTestVersion =
         dotnet fs ["build"; projPath]
         |> checkExitCodeZero
 
-        let tfm = ``samples2 NetSdk library``.TargetFrameworks |> List.head
+        let tfm = ``samples2 NetSdk library``.TargetFrameworks |> Map.toList |> List.map fst |> List.head
         let outputPath = projDir/"bin"/"Debug"/tfm/ ``samples2 NetSdk library``.AssemblyName + ".dll"
         Expect.isTrue (File.Exists outputPath) (sprintf "output assembly '%s' not found" outputPath)
       )
@@ -203,7 +203,7 @@ let tests pkgUnderTestVersion =
         dotnet fs ["build"; projPath]
         |> checkExitCodeZero
 
-        for tfm in ``samples4 NetSdk multi tfm``.TargetFrameworks do
+        for (tfm, _) in ``samples4 NetSdk multi tfm``.TargetFrameworks |> Map.toList do
           let outputPath = projDir/"bin"/"Debug"/tfm/ ``samples4 NetSdk multi tfm``.AssemblyName + ".dll"
           Expect.isTrue (File.Exists outputPath) (sprintf "output assembly '%s' not found" outputPath)
       )
@@ -276,7 +276,7 @@ let tests pkgUnderTestVersion =
 
         let result = projInfo fs [projPath; "--get-property"; "TargetFramework"]
         result |> checkExitCodeZero
-        let tfm = ``samples2 NetSdk library``.TargetFrameworks |> List.head
+        let tfm = ``samples2 NetSdk library``.TargetFrameworks |> Map.toList |> List.map fst |> List.head
         let out = result.Result.StandardOutput.Trim()
         Expect.equal out (sprintf "TargetFramework=%s" tfm) "wrong output"
       )
@@ -295,7 +295,7 @@ let tests pkgUnderTestVersion =
       )
 
       for conf in [ "Debug"; "Release" ] do
-        yield testCase |> withLog (sprintf "can read properties for conf %s" conf) (fun _ fs ->
+        yield testCase |> withLog (sprintf "can read properties for conf (%s)" conf) (fun _ fs ->
           let testDir = inDir fs (sprintf "netsdk_props_%s" (conf.ToLower()))
           copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
 
@@ -308,7 +308,7 @@ let tests pkgUnderTestVersion =
           result |> checkExitCodeZero
           let out = result.Result.StandardOutput.Trim()
 
-          let tfm = ``samples2 NetSdk library``.TargetFrameworks |> List.head
+          let tfm = ``samples2 NetSdk library``.TargetFrameworks |> Map.toList |> List.map fst |> List.head
           let expectedPath = "bin"/conf/tfm + Path.DirectorySeparatorChar.ToString()
           Expect.equal out (sprintf "OutputPath=%s" expectedPath) "wrong output"
         )
@@ -334,7 +334,7 @@ let tests pkgUnderTestVersion =
         Expect.equal out p2ps "p2ps"
       )
 
-      for tfm in ``samples4 NetSdk multi tfm``.TargetFrameworks do
+      for (tfm, infoOfTfm) in ``samples4 NetSdk multi tfm``.TargetFrameworks |> Map.toList do
         yield testCase |> withLog (sprintf "can read fsc args of multitarget (%s)" tfm) (fun _ fs ->
           let testDir = inDir fs (sprintf "netsdk_fsc_args_multi_%s" tfm)
           copyDirFromAssets fs ``samples4 NetSdk multi tfm``.ProjDir testDir
@@ -346,6 +346,22 @@ let tests pkgUnderTestVersion =
 
           let result = projInfo fs [projPath; "--fsc-args"; "-f"; tfm]
           result |> checkExitCodeZero
+        )
+
+        yield testCase |> withLog (sprintf "can read properties of multitarget (%s)" tfm) (fun _ fs ->
+          let testDir = inDir fs (sprintf "netsdk_props_multi_%s" tfm)
+          copyDirFromAssets fs ``samples4 NetSdk multi tfm``.ProjDir testDir
+
+          let projPath = testDir/ (``samples4 NetSdk multi tfm``.ProjectFile)
+
+          dotnet fs ["restore"; projPath]
+          |> checkExitCodeZero
+
+          let result = projInfo fs [projPath; "-f"; tfm; "--get-property"; "MyProperty"]
+          result |> checkExitCodeZero
+          let out = result.Result.StandardOutput.Trim()
+          let prop = infoOfTfm.Props |> Map.find "MyProperty"
+          Expect.equal out (sprintf "MyProperty=%s" prop) "wrong output"
         )
 
     ]
