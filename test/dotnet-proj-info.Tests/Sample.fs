@@ -165,11 +165,30 @@ let tests pkgUnderTestVersion =
         let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
         let projDir = Path.GetDirectoryName projPath
 
-        let result = dotnet fs ["build"; projPath]
-        result |> checkExitCodeZero
+        dotnet fs ["build"; projPath]
+        |> checkExitCodeZero
 
         let outputPath = projDir/"bin"/"Debug"/"netstandard2.0"/ ``samples2 NetSdk library``.AssemblyName + ".dll"
         Expect.isTrue (File.Exists outputPath) (sprintf "output assembly '%s' not found" outputPath)
+      )
+
+      testCase |> withLog "can build sample3" (fun _ fs ->
+        let testDir = inDir fs "sanity_check_sample2"
+        copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
+
+        let projPath = testDir/ (``sample3 Netsdk projs``.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
+
+        dotnet fs ["build"; projPath]
+        |> checkExitCodeZero
+
+        let outputPath = projDir/"bin"/"Debug"/"netcoreapp2.1"/ ``sample3 Netsdk projs``.AssemblyName + ".dll"
+        Expect.isTrue (File.Exists outputPath) (sprintf "output assembly '%s' not found" outputPath)
+
+        let result = dotnet fs ["run"; "-p"; projPath; "--no-build"]
+        result |> checkExitCodeZero
+
+        Expect.equal "Hello World from F#!" (result.Result.StandardOutput.Trim()) "check console out"
       )
 
     ]
@@ -251,6 +270,27 @@ let tests pkgUnderTestVersion =
 
         let result = projInfo fs [projPath; "--fsc-args"]
         result |> checkExitCodeZero
+      )
+
+      testCase |> withLog "can read project references" (fun _ fs ->
+        let testDir = inDir fs "netsdk_proj_refs"
+        copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
+
+        let projPath = testDir/ (``sample3 Netsdk projs``.ProjectFile)
+
+        dotnet fs ["restore"; projPath]
+        |> checkExitCodeZero
+
+        let result = projInfo fs [projPath; "--project-refs"]
+        result |> checkExitCodeZero
+
+        let out = stdOutLines result
+
+        let p2ps =
+          ``sample3 Netsdk projs``.ProjectReferences
+          |> List.map (fun p2p -> testDir/p2p.ProjectFile)
+
+        Expect.equal out p2ps "p2ps"
       )
     ]
 
