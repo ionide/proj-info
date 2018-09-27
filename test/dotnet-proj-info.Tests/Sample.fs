@@ -169,7 +169,8 @@ let tests pkgUnderTestVersion =
         dotnet fs ["build"; projPath]
         |> checkExitCodeZero
 
-        let outputPath = projDir/"bin"/"Debug"/"netstandard2.0"/ ``samples2 NetSdk library``.AssemblyName + ".dll"
+        let tfm = ``samples2 NetSdk library``.TargetFrameworks |> List.head
+        let outputPath = projDir/"bin"/"Debug"/tfm/ ``samples2 NetSdk library``.AssemblyName + ".dll"
         Expect.isTrue (File.Exists outputPath) (sprintf "output assembly '%s' not found" outputPath)
       )
 
@@ -202,11 +203,9 @@ let tests pkgUnderTestVersion =
         dotnet fs ["build"; projPath]
         |> checkExitCodeZero
 
-        let outputPath = projDir/"bin"/"Debug"/"netstandard2.0"/ ``samples4 NetSdk multi tfm``.AssemblyName + ".dll"
-        Expect.isTrue (File.Exists outputPath) (sprintf "output assembly '%s' not found" outputPath)
-
-        let outputPath = projDir/"bin"/"Debug"/"net461"/ ``samples4 NetSdk multi tfm``.AssemblyName + ".dll"
-        Expect.isTrue (File.Exists outputPath) (sprintf "output assembly '%s' not found" outputPath)
+        for tfm in ``samples4 NetSdk multi tfm``.TargetFrameworks do
+          let outputPath = projDir/"bin"/"Debug"/tfm/ ``samples4 NetSdk multi tfm``.AssemblyName + ".dll"
+          Expect.isTrue (File.Exists outputPath) (sprintf "output assembly '%s' not found" outputPath)
       )
 
     ]
@@ -277,7 +276,9 @@ let tests pkgUnderTestVersion =
 
         let result = projInfo fs [projPath; "--get-property"; "TargetFramework"]
         result |> checkExitCodeZero
-        Expect.equal "TargetFramework=netstandard2.0" (result.Result.StandardOutput.Trim()) "wrong output"
+        let tfm = ``samples2 NetSdk library``.TargetFrameworks |> List.head
+        let out = result.Result.StandardOutput.Trim()
+        Expect.equal out (sprintf "TargetFramework=%s" tfm) "wrong output"
       )
 
       yield testCase |> withLog "can read fsc args" (fun _ fs ->
@@ -306,7 +307,9 @@ let tests pkgUnderTestVersion =
           let result = projInfo fs [projPath; "-gp"; "OutputPath"; "-c"; conf]
           result |> checkExitCodeZero
           let out = result.Result.StandardOutput.Trim()
-          let expectedPath = "bin"/conf/"netstandard2.0" + Path.DirectorySeparatorChar.ToString()
+
+          let tfm = ``samples2 NetSdk library``.TargetFrameworks |> List.head
+          let expectedPath = "bin"/conf/tfm + Path.DirectorySeparatorChar.ToString()
           Expect.equal out (sprintf "OutputPath=%s" expectedPath) "wrong output"
         )
 
@@ -330,6 +333,21 @@ let tests pkgUnderTestVersion =
 
         Expect.equal out p2ps "p2ps"
       )
+
+      for tfm in ``samples4 NetSdk multi tfm``.TargetFrameworks do
+        yield testCase |> withLog (sprintf "can read fsc args of multitarget (%s)" tfm) (fun _ fs ->
+          let testDir = inDir fs (sprintf "netsdk_fsc_args_multi_%s" tfm)
+          copyDirFromAssets fs ``samples4 NetSdk multi tfm``.ProjDir testDir
+
+          let projPath = testDir/ (``samples4 NetSdk multi tfm``.ProjectFile)
+
+          dotnet fs ["restore"; projPath]
+          |> checkExitCodeZero
+
+          let result = projInfo fs [projPath; "--fsc-args"; "-f"; tfm]
+          result |> checkExitCodeZero
+        )
+
     ]
 
   [ generalTests
