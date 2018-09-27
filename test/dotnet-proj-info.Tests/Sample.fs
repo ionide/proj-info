@@ -245,7 +245,7 @@ let tests pkgUnderTestVersion =
     ]
 
     testList ".net sdk" [
-      testCase |> withLog "can read properties" (fun _ fs ->
+      yield testCase |> withLog "can read properties" (fun _ fs ->
         let testDir = inDir fs "netsdk_props"
         copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
 
@@ -259,7 +259,7 @@ let tests pkgUnderTestVersion =
         Expect.equal "TargetFramework=netstandard2.0" (result.Result.StandardOutput.Trim()) "wrong output"
       )
 
-      testCase |> withLog "can read fsc args" (fun _ fs ->
+      yield testCase |> withLog "can read fsc args" (fun _ fs ->
         let testDir = inDir fs "netsdk_fsc_args"
         copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
 
@@ -272,7 +272,24 @@ let tests pkgUnderTestVersion =
         result |> checkExitCodeZero
       )
 
-      testCase |> withLog "can read project references" (fun _ fs ->
+      for conf in [ "Debug"; "Release" ] do
+        yield testCase |> withLog (sprintf "can read properties for conf %s" conf) (fun _ fs ->
+          let testDir = inDir fs (sprintf "netsdk_props_%s" (conf.ToLower()))
+          copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
+
+          let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
+
+          dotnet fs ["restore"; projPath]
+          |> checkExitCodeZero
+
+          let result = projInfo fs [projPath; "-gp"; "OutputPath"; "-c"; conf]
+          result |> checkExitCodeZero
+          let out = result.Result.StandardOutput.Trim()
+          let expectedPath = "bin"/conf/"netstandard2.0" + Path.DirectorySeparatorChar.ToString()
+          Expect.equal out (sprintf "OutputPath=%s" expectedPath) "wrong output"
+        )
+
+      yield testCase |> withLog "can read project references" (fun _ fs ->
         let testDir = inDir fs "netsdk_proj_refs"
         copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
 
