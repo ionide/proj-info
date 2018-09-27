@@ -127,7 +127,7 @@ let tests pkgUnderTestVersion =
     |> fun s -> s.Trim()
     |> asLines
 
-  [ 
+  let generalTests =
     testList "general" [
       testCase |> withLog "can show help" (fun _ fs ->
 
@@ -137,6 +137,7 @@ let tests pkgUnderTestVersion =
       )
     ]
 
+  let sanityChecks =
     testList "sanity check of projects" [
 
       testCase |> withLog "can build sample1" (fun _ fs ->
@@ -210,6 +211,7 @@ let tests pkgUnderTestVersion =
 
     ]
 
+  let netFwTests =
     testList ".net" [
       testCase |> withLog "can show installed .net frameworks" (fun _ fs ->
 
@@ -238,6 +240,7 @@ let tests pkgUnderTestVersion =
       )
     ]
 
+  let oldSdkTests =
     testList "old sdk" [
       testCase |> withLog "can read properties" (fun _ fs ->
         let testDir = inDir fs "oldsdk_props"
@@ -261,6 +264,7 @@ let tests pkgUnderTestVersion =
       )
     ]
 
+  let netSdkTests =
     testList ".net sdk" [
       yield testCase |> withLog "can read properties" (fun _ fs ->
         let testDir = inDir fs "netsdk_props"
@@ -328,5 +332,10 @@ let tests pkgUnderTestVersion =
       )
     ]
 
-  ]
+  [ generalTests
+    sanityChecks
+    netFwTests
+    oldSdkTests
+    netSdkTests ]
   |> testList "suite"
+  |> testSequenced
