@@ -13,7 +13,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Expecto" Version="5.*" />
+    <PackageReference Include="Expecto" Version="8.4.*" />
+    <PackageReference Include="Expecto.TestResults" Version="8.4.*" />
     <PackageReference Include="MedallionShell" Version="1.5.0" />
   </ItemGroup>
 
