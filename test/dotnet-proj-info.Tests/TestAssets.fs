@@ -34,3 +34,9 @@ let ``sample3 Netsdk projs`` =
           ProjectFile = "l2"/"l2.fsproj";
           ProjectReferences = [] }
       ] }
+
+let ``samples4 NetSdk multi tfm`` =
+  { ProjDir = "sample4-netsdk-multitfm";
+    AssemblyName = "m1";
+    ProjectFile = "m1"/"m1.fsproj";
+    ProjectReferences = [] }

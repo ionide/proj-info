@@ -191,6 +191,23 @@ let tests pkgUnderTestVersion =
         Expect.equal "Hello World from F#!" (result.Result.StandardOutput.Trim()) "check console out"
       )
 
+      testCase |> withLog "can build sample4" (fun _ fs ->
+        let testDir = inDir fs "sanity_check_sample4"
+        copyDirFromAssets fs ``samples4 NetSdk multi tfm``.ProjDir testDir
+
+        let projPath = testDir/ (``samples4 NetSdk multi tfm``.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
+
+        dotnet fs ["build"; projPath]
+        |> checkExitCodeZero
+
+        let outputPath = projDir/"bin"/"Debug"/"netstandard2.0"/ ``samples4 NetSdk multi tfm``.AssemblyName + ".dll"
+        Expect.isTrue (File.Exists outputPath) (sprintf "output assembly '%s' not found" outputPath)
+
+        let outputPath = projDir/"bin"/"Debug"/"net461"/ ``samples4 NetSdk multi tfm``.AssemblyName + ".dll"
+        Expect.isTrue (File.Exists outputPath) (sprintf "output assembly '%s' not found" outputPath)
+      )
+
     ]
 
     testList ".net" [

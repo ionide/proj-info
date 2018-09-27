@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net461</TargetFrameworks>
+    <MyProperty Condition=" '$(TargetFramework)' == 'netstandard2.0' ">AAA</MyProperty>
+    <MyProperty Condition=" '$(TargetFramework)' == 'net461' ">BBB</MyProperty>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Condition=" '$(TargetFramework)' == 'netstandard2.0' " Include="LibraryA.fs" />
+    <Compile Condition=" '$(TargetFramework)' == 'net461' " Include="LibraryB.fs" />
+  </ItemGroup>
+
+</Project>
