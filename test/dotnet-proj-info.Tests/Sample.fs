@@ -294,6 +294,19 @@ let tests pkgUnderTestVersion =
         result |> checkExitCodeZero
       )
 
+      yield testCase |> withLog "can read csc args" (fun _ fs ->
+        let testDir = inDir fs "netsdk_csc_args"
+        copyDirFromAssets fs ``samples5 NetSdk CSharp library``.ProjDir testDir
+
+        let projPath = testDir/ (``samples5 NetSdk CSharp library``.ProjectFile)
+
+        dotnet fs ["restore"; projPath]
+        |> checkExitCodeZero
+
+        let result = projInfo fs [projPath; "--csc-args"]
+        result |> checkExitCodeZero
+      )
+
       for conf in [ "Debug"; "Release" ] do
         yield testCase |> withLog (sprintf "can read properties for conf (%s)" conf) (fun _ fs ->
           let testDir = inDir fs (sprintf "netsdk_props_%s" (conf.ToLower()))
