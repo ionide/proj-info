@@ -294,7 +294,7 @@ let tests pkgUnderTestVersion =
         result |> checkExitCodeZero
       )
 
-      yield ftestCase |> withLog "can read csc args" (fun _ fs ->
+      yield testCase |> withLog "can read csc args" (fun _ fs ->
         let testDir = inDir fs "netsdk_csc_args"
         copyDirFromAssets fs ``samples5 NetSdk CSharp library``.ProjDir testDir
 

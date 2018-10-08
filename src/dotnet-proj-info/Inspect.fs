@@ -140,6 +140,7 @@ let install_target_file log templates projPath =
 
 type GetResult =
      | FscArgs of string list
+     | CscArgs of string list
      | P2PRefs of string list
      | ResolvedP2PRefs of ResolvedP2PRefsInfo list
      | Properties of (string * string) list
@@ -193,6 +194,42 @@ let getFscArgs () =
           Target "_Inspect_FscArgs"
           Property ("_Inspect_FscArgs_OutFile", outFile) ]
     template, args, (fun () -> bindSkipped parseFscArgsOut outFile)
+
+let parseCscArgsOut outFile =
+    let lines =
+        File.ReadAllLines(outFile)
+        |> List.ofArray
+    Ok (CscArgs lines)
+
+let getCscArgs () =
+    let template =
+        """
+  <Target Name="_Inspect_CscArgs"
+          Condition=" '$(IsCrossTargetingBuild)' != 'true' "
+          DependsOnTargets="ResolveReferences;CoreCompile">
+    <Message Text="%(CscCommandLineArgs.Identity)" Importance="High" />
+    <WriteLinesToFile
+            Condition=" '$(_Inspect_CscArgs_OutFile)' != '' "
+            File="$(_Inspect_CscArgs_OutFile)"
+            Lines="@(CscCommandLineArgs -> '%(Identity)')"
+            Overwrite="true" 
+            Encoding="UTF-8"/>
+    <!-- WriteLinesToFile doesnt create the file if @(CscCommandLineArgs) is empty -->
+    <Touch
+        Condition=" '$(_Inspect_CscArgs_OutFile)' != '' "
+        Files="$(_Inspect_CscArgs_OutFile)"
+        AlwaysCreate="True" />
+  </Target>
+        """.Trim()
+    let outFile = getNewTempFilePath "CscArgs.txt"
+    let args =
+        [ Property ("SkipCompilerExecution", "true")
+          Property ("ProvideCommandLineArgs" , "true")
+          Property ("CopyBuildOutputToOutputDirectory", "false")
+          Property ("UseCommonOutputDirectory", "true")
+          Target "_Inspect_CscArgs"
+          Property ("_Inspect_CscArgs_OutFile", outFile) ]
+    template, args, (fun () -> bindSkipped parseCscArgsOut outFile)
 
 let parseP2PRefsOut outFile =
     let lines =
@@ -474,6 +511,19 @@ let getProjectInfoOldSdk log msbuildExec getArgs additionalArgs projPath =
 
 module ProjectRecognizer =
 
+    type ProjectRecognizedInfo =
+        { Language: ProjectLanguage }
+    and ProjectLanguage =
+        | CSharp
+        | FSharp
+        | Unknown of string
+
+    let languageOfProject file =
+        match Path.GetExtension(file) with
+        | ".csproj" -> ProjectLanguage.CSharp
+        | ".fsproj" -> ProjectLanguage.FSharp
+        | ext -> ProjectLanguage.Unknown ext
+
     let (|DotnetSdk|OldSdk|Unsupported|) file =
         //Easy way to detect new fsproj is to check the msbuild version of .fsproj
         //Post 1.0 has Sdk attribute (like `Sdk="FSharp.NET.Sdk;Microsoft.NET.Sdk"`), use that
@@ -488,6 +538,7 @@ module ProjectRecognizer =
                 if not <| line.Contains("ToolsVersion") && not <| line.Contains("Sdk=") then
                     getProjectType sr (limit-1)
                 else
-                    if isNetCore line then DotnetSdk else OldSdk
+                    let projInfo = { Language = languageOfProject file }
+                    if isNetCore line then DotnetSdk projInfo else OldSdk projInfo
         use sr = File.OpenText(file)
         getProjectType sr 3

@@ -4,6 +4,7 @@ open Argu
 type CLIArguments =
     | [<MainCommand; Unique>] Project of string
     | Fsc_Args
+    | Csc_Args
     | Project_Refs
     | [<AltCommandLine("-gp")>] Get_Property of string list
     | NET_FW_References_Path of string list
@@ -21,6 +22,7 @@ with
             match s with
             | Project _ -> "the MSBuild project file"
             | Fsc_Args -> "get fsc arguments"
+            | Csc_Args -> "get csc arguments"
             | Project_Refs -> "get project references"
             | NET_FW_References_Path _ -> "list the .NET Framework references"
             | Installed_NET_Frameworks -> "list of the installed .NET Frameworks"
@@ -156,22 +158,43 @@ let realMain argv = attempt {
         then Error (ProjectFileNotFound projPath)
         else Ok ()
 
-    let! (isDotnetSdk, getProjectInfoBySdk, getFscArgsBySdk) =
+    let! (isDotnetSdk, pi) =
         match projPath with
-        | ProjectRecognizer.DotnetSdk ->
-            Ok (true, getProjectInfo, getFscArgs)
-        | ProjectRecognizer.OldSdk ->
+        | ProjectRecognizer.DotnetSdk pi ->
+            Ok (true, pi)
+        | ProjectRecognizer.OldSdk pi ->
 #if NETCOREAPP1_0
             Errors.GenericError "unsupported project format on .net core 1.0, use at least .net core 2.0"
             |> Result.Error
 #else
-            let asFscArgs props =
-                let fsc = Microsoft.FSharp.Build.Fsc()
-                Dotnet.ProjInfo.FakeMsbuildTasks.getResponseFileFromTask props fsc
-            Ok (false, getProjectInfoOldSdk, getFscArgsOldSdk (asFscArgs >> Ok))
+            Ok (false, pi)
 #endif
         | ProjectRecognizer.Unsupported ->
             Errors.GenericError "unsupported project format"
+            |> Result.Error
+
+    let getProjectInfoBySdk =
+        if isDotnetSdk then
+            getProjectInfo
+        else
+            getProjectInfoOldSdk
+
+    let getCompilerArgsBySdk () =
+        match isDotnetSdk, pi.Language with
+        | true, ProjectRecognizer.ProjectLanguage.FSharp ->
+            Ok getFscArgs
+        | true, ProjectRecognizer.ProjectLanguage.CSharp ->
+            Ok getCscArgs
+        | false, ProjectRecognizer.ProjectLanguage.FSharp ->
+            let asFscArgs props =
+                let fsc = Microsoft.FSharp.Build.Fsc()
+                Dotnet.ProjInfo.FakeMsbuildTasks.getResponseFileFromTask props fsc
+            Ok (getFscArgsOldSdk (asFscArgs >> Ok))
+        | false, ProjectRecognizer.ProjectLanguage.CSharp ->
+            Errors.GenericError "csc args not supported on old sdk"
+            |> Result.Error
+        | _, ProjectRecognizer.ProjectLanguage.Unknown ext ->
+            Errors.GenericError (sprintf "compiler args not supported on project with extension %s" ext)
             |> Result.Error
 
     let globalArgs =
@@ -187,11 +210,12 @@ let realMain argv = attempt {
         | _ -> globalArgs
 
     let allCmds =
-        [ results.TryGetResult <@ Fsc_Args @> |> Option.map (fun _ -> getFscArgsBySdk)
-          results.TryGetResult <@ Project_Refs @> |> Option.map (fun _ -> getP2PRefs)
-          results.TryGetResult <@ Get_Property @> |> Option.map (fun p -> (fun () -> getProperties p))
-          results.TryGetResult <@ NET_FW_References_Path @> |> Option.map (fun props -> (fun () -> Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.getReferencePaths props))
-          results.TryGetResult <@ Installed_NET_Frameworks @> |> Option.map (fun _ -> Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.installedNETFrameworks) ]
+        [ results.TryGetResult <@ Fsc_Args @> |> Option.map (fun _ -> getCompilerArgsBySdk ())
+          results.TryGetResult <@ Csc_Args @> |> Option.map (fun _ -> getCompilerArgsBySdk ())
+          results.TryGetResult <@ Project_Refs @> |> Option.map (fun _ -> Ok getP2PRefs)
+          results.TryGetResult <@ Get_Property @> |> Option.map (fun p -> Ok (fun () -> getProperties p))
+          results.TryGetResult <@ NET_FW_References_Path @> |> Option.map (fun props -> Ok (fun () -> Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.getReferencePaths props))
+          results.TryGetResult <@ Installed_NET_Frameworks @> |> Option.map (fun _ -> Ok (Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.installedNETFrameworks)) ]
 
     let msbuildPath = results.GetResult(<@ MSBuild @>, defaultValue = "msbuild")
     let dotnetPath = results.GetResult(<@ DotnetCli @>, defaultValue = "dotnet")
@@ -202,7 +226,7 @@ let realMain argv = attempt {
     let! cmd =
         match cmds with
         | [] -> Error (InvalidArgsState "specify one get argument")
-        | [x] -> Ok x
+        | [x] -> x
         | _ -> Error (InvalidArgsState "specify only one get argument")
 
     let exec getArgs additionalArgs = attempt {
@@ -236,6 +260,7 @@ let realMain argv = attempt {
     let out =
         match r with
         | FscArgs args -> args
+        | CscArgs args -> args
         | P2PRefs args -> args
         | Properties args -> args |> List.map (fun (x,y) -> sprintf "%s=%s" x y)
         | ResolvedP2PRefs args ->
