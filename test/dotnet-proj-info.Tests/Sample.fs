@@ -214,7 +214,7 @@ let tests pkgUnderTestVersion =
     testList ".net" [
       testCase |> withLog "can show installed .net frameworks" (fun _ fs ->
 
-        let result = projInfo fs ["--installed-net-frameworks"]
+        let result = projInfo fs ["net-fw"; "--list"]
         result |> checkExitCodeZero
         let out = stdOutLines result
 
@@ -227,12 +227,12 @@ let tests pkgUnderTestVersion =
 
       testCase |> withLog "can get .net references path" (fun _ fs ->
 
-        let result = projInfo fs ["--installed-net-frameworks"]
+        let result = projInfo fs ["net-fw"; "--list"]
         result |> checkExitCodeZero
         let netFws = stdOutLines result
 
         for netfw in netFws do
-          let result = projInfo fs ["--net-fw-references-path"; "System.Core"; "-f"; netfw]
+          let result = projInfo fs ["net-fw"; "--path"; "System.Core"; "-f"; netfw]
           result |> checkExitCodeZero
           let out = stdOutLines result
           Expect.exists out (fun s -> s.EndsWith("System.Core.dll")) (sprintf "should resolve System.Core.dll but was '%A'" out)
@@ -247,7 +247,7 @@ let tests pkgUnderTestVersion =
 
         let projPath = testDir/ (``samples1 OldSdk library``.ProjectFile)
 
-        let result = projInfo fs [projPath; "--get-property"; "AssemblyName"]
+        let result = projInfo fs ["get"; projPath; "--property"; "AssemblyName"]
         result |> checkExitCodeZero
         Expect.equal (sprintf "AssemblyName=%s" ``samples1 OldSdk library``.AssemblyName) (result.Result.StandardOutput.Trim()) "wrong output"
       )
@@ -258,7 +258,7 @@ let tests pkgUnderTestVersion =
 
         let projPath = testDir/ (``samples1 OldSdk library``.ProjectFile)
 
-        let result = projInfo fs [projPath; "--fsc-args"]
+        let result = projInfo fs ["get"; projPath; "--fsc-args"]
         result |> checkExitCodeZero
       )
     ]
@@ -274,7 +274,7 @@ let tests pkgUnderTestVersion =
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
 
-        let result = projInfo fs [projPath; "--get-property"; "TargetFramework"]
+        let result = projInfo fs ["get"; projPath; "--property"; "TargetFramework"]
         result |> checkExitCodeZero
         let tfm = ``samples2 NetSdk library``.TargetFrameworks |> Map.toList |> List.map fst |> List.head
         let out = result.Result.StandardOutput.Trim()
@@ -290,7 +290,7 @@ let tests pkgUnderTestVersion =
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
 
-        let result = projInfo fs [projPath; "--fsc-args"]
+        let result = projInfo fs ["get"; projPath; "--fsc-args"]
         result |> checkExitCodeZero
       )
 
@@ -303,7 +303,7 @@ let tests pkgUnderTestVersion =
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
 
-        let result = projInfo fs [projPath; "--csc-args"]
+        let result = projInfo fs ["get"; projPath; "--csc-args"]
         result |> checkExitCodeZero
       )
 
@@ -317,7 +317,7 @@ let tests pkgUnderTestVersion =
           dotnet fs ["restore"; projPath]
           |> checkExitCodeZero
 
-          let result = projInfo fs [projPath; "-gp"; "OutputPath"; "-c"; conf]
+          let result = projInfo fs ["get"; projPath; "-p"; "OutputPath"; "-c"; conf]
           result |> checkExitCodeZero
           let out = result.Result.StandardOutput.Trim()
 
@@ -335,7 +335,7 @@ let tests pkgUnderTestVersion =
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
 
-        let result = projInfo fs [projPath; "--project-refs"]
+        let result = projInfo fs ["get"; projPath; "--project-refs"]
         result |> checkExitCodeZero
 
         let out = stdOutLines result
@@ -357,7 +357,7 @@ let tests pkgUnderTestVersion =
           dotnet fs ["restore"; projPath]
           |> checkExitCodeZero
 
-          let result = projInfo fs [projPath; "--fsc-args"; "-f"; tfm]
+          let result = projInfo fs ["get"; projPath; "--fsc-args"; "-f"; tfm]
           result |> checkExitCodeZero
         )
 
@@ -370,7 +370,7 @@ let tests pkgUnderTestVersion =
           dotnet fs ["restore"; projPath]
           |> checkExitCodeZero
 
-          let result = projInfo fs [projPath; "-f"; tfm; "--get-property"; "MyProperty"]
+          let result = projInfo fs ["get"; projPath; "-f"; tfm; "--property"; "MyProperty"]
           result |> checkExitCodeZero
           let out = result.Result.StandardOutput.Trim()
           let prop = infoOfTfm.Props |> Map.find "MyProperty"
