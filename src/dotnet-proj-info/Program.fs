@@ -2,17 +2,29 @@
 open Argu
 
 type CLIArguments =
+    | [<AltCommandLine("-v")>] Verbose
+    | [<CliPrefix(CliPrefix.None)>] Get of ParseResults<GetCLIArguments>
+    | [<CliPrefix(CliPrefix.None)>] Net_Fw of ParseResults<NetFwCLIArguments>
+with
+    interface IArgParserTemplate with
+        member s.Usage =
+            match s with
+            | Verbose -> "verbose log"
+            | Get _ -> "get project info"
+            | Net_Fw _ -> ".NET Framework info"
+and MSBuildHostPicker =
+    | Auto = 1
+    | MSBuild  = 2
+    | DotnetMSBuild = 3
+and GetCLIArguments =
     | [<MainCommand; Unique>] Project of string
     | Fsc_Args
     | Csc_Args
-    | Project_Refs
-    | [<AltCommandLine("-gp")>] Get_Property of string list
-    | NET_FW_References_Path of string list
-    | Installed_NET_Frameworks
+    | [<AltCommandLine("-p2p")>] Project_Refs
+    | [<AltCommandLine("-p")>] Property of string list
     | [<AltCommandLine("-f")>] Framework of string
     | [<AltCommandLine("-r")>] Runtime of string
     | [<AltCommandLine("-c")>] Configuration of string
-    | [<AltCommandLine("-v")>] Verbose
     | MSBuild of string
     | DotnetCli of string
     | MSBuild_Host of MSBuildHostPicker
@@ -24,20 +36,24 @@ with
             | Fsc_Args -> "get fsc arguments"
             | Csc_Args -> "get csc arguments"
             | Project_Refs -> "get project references"
-            | NET_FW_References_Path _ -> "list the .NET Framework references"
-            | Installed_NET_Frameworks -> "list of the installed .NET Frameworks"
-            | Verbose -> "verbose log"
             | Framework _ -> "target framework, the TargetFramework msbuild property"
             | Runtime _ -> "target runtime, the RuntimeIdentifier msbuild property"
             | Configuration _ -> "configuration to use (like Debug), the Configuration msbuild property"
-            | Get_Property _ -> "msbuild property to get (allow multiple)"
-            | MSBuild _ -> "MSBuild path (default \"msbuild\")"
-            | DotnetCli _ -> "Dotnet CLI path (default \"dotnet\")"
+            | Property _ -> "msbuild property to get (allow multiple)"
+            | MSBuild _ -> """MSBuild path (default "msbuild")"""
+            | DotnetCli _ -> """Dotnet CLI path (default "dotnet")"""
             | MSBuild_Host _ -> "the Msbuild host, if auto then oldsdk=MSBuild dotnetSdk=DotnetCLI"
-and MSBuildHostPicker =
-    | Auto = 1
-    | MSBuild  = 2
-    | DotnetMSBuild = 3
+and NetFwCLIArguments =
+    | Path of string list
+    | List
+    | MSBuild of string
+with
+    interface IArgParserTemplate with
+        member s.Usage =
+            match s with
+            | Path _ -> "get the reference path of given assembly"
+            | List -> "list of the installed .NET Frameworks"
+            | MSBuild _ -> """MSBuild path (default "msbuild")"""
 
 open Dotnet.ProjInfo.Inspect
 
@@ -119,28 +135,12 @@ let runCmd log workingDir exePath args =
 
     exitCode, (ShellCommandResult result)
 
-let realMain argv = attempt {
-
-    let! results = parseArgsCommandLine argv
-
-    let log =
-        match results.TryGetResult <@ Verbose @> with
-        | Some _ -> printfn "%s"
-        | None -> ignore
-
-    let projArgRequired =
-        match (results.TryGetResult <@ NET_FW_References_Path @>), (results.TryGetResult<@ Installed_NET_Frameworks @>) with
-        | None, None -> true
-        | _ -> false
+let getMain log (results: ParseResults<GetCLIArguments>) = attempt {
 
     let! proj =
-        match results.TryGetResult <@ Project @>, projArgRequired with
-        | Some p, true -> Ok p
-        | Some _, false -> Error (InvalidArgsState "project argument not expected")
-        | None, false ->
-            //create the proj file
-            Ok (Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.createEnvInfoProj ())
-        | None, true ->
+        match results.TryGetResult <@ Project @> with
+        | Some p -> Ok p
+        | None ->
             //scan current directory
             let workDir = Directory.GetCurrentDirectory()
             match Directory.GetFiles(workDir, "*.*proj") |> List.ofArray with
@@ -149,6 +149,7 @@ let realMain argv = attempt {
             | [x] -> Ok x
             | xs ->
                 Error (InvalidArgsState "multiple .*proj found in current directory, use --project argument to specify path")
+
 
     let projPath = Path.GetFullPath(proj)
 
@@ -204,24 +205,81 @@ let realMain argv = attempt {
         |> List.choose (fun (a,p) -> a |> Option.map (fun x -> (p,x)))
         |> List.map (MSBuild.MSbuildCli.Property)
 
-    let globalArgs =
-        match Environment.GetEnvironmentVariable("DOTNET_PROJ_INFO_MSBUILD_BL") with
-        | "1" -> MSBuild.MSbuildCli.Switch("bl") :: globalArgs
-        | _ -> globalArgs
 
     let allCmds =
         [ results.TryGetResult <@ Fsc_Args @> |> Option.map (fun _ -> getCompilerArgsBySdk ())
           results.TryGetResult <@ Csc_Args @> |> Option.map (fun _ -> getCompilerArgsBySdk ())
           results.TryGetResult <@ Project_Refs @> |> Option.map (fun _ -> Ok getP2PRefs)
-          results.TryGetResult <@ Get_Property @> |> Option.map (fun p -> Ok (fun () -> getProperties p))
-          results.TryGetResult <@ NET_FW_References_Path @> |> Option.map (fun props -> Ok (fun () -> Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.getReferencePaths props))
-          results.TryGetResult <@ Installed_NET_Frameworks @> |> Option.map (fun _ -> Ok (Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.installedNETFrameworks)) ]
+          results.TryGetResult <@ Property @> |> Option.map (fun p -> Ok (fun () -> getProperties p)) ]
 
-    let msbuildPath = results.GetResult(<@ MSBuild @>, defaultValue = "msbuild")
+    let msbuildPath = results.GetResult(<@ GetCLIArguments.MSBuild @>, defaultValue = "msbuild")
     let dotnetPath = results.GetResult(<@ DotnetCli @>, defaultValue = "dotnet")
     let dotnetHostPicker = results.GetResult(<@ MSBuild_Host @>, defaultValue = MSBuildHostPicker.Auto)
 
     let cmds = allCmds |> List.choose id
+
+    let rec msbuildHost host =
+        match host with
+        | MSBuildHostPicker.MSBuild ->
+            MSBuildExePath.Path msbuildPath
+        | MSBuildHostPicker.DotnetMSBuild ->
+            MSBuildExePath.DotnetMsbuild dotnetPath
+        | MSBuildHostPicker.Auto ->
+            if isDotnetSdk then
+                msbuildHost MSBuildHostPicker.DotnetMSBuild
+            else
+                msbuildHost MSBuildHostPicker.MSBuild
+        | x ->
+            failwithf "Unexpected msbuild host '%A'" x
+
+    return projPath, getProjectInfoBySdk, cmds, (msbuildHost dotnetHostPicker), globalArgs
+    }
+
+let netFwMain (results: ParseResults<NetFwCLIArguments>) = attempt {
+
+    let! proj =
+        //create the proj file
+        Ok (Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.createEnvInfoProj ())
+
+    let projPath = Path.GetFullPath(proj)
+
+    let allCmds =
+        [ results.TryGetResult <@ NetFwCLIArguments.Path @> |> Option.map (fun props -> Ok (fun () -> Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.getReferencePaths props))
+          results.TryGetResult <@ List @> |> Option.map (fun _ -> Ok (Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.installedNETFrameworks)) ]
+
+    let msbuildPath = results.GetResult(<@ MSBuild @>, defaultValue = "msbuild")
+
+    let cmds = allCmds |> List.choose id
+
+    let msbuildHost = MSBuildExePath.Path msbuildPath
+
+    return projPath, getProjectInfoOldSdk, cmds, msbuildHost, []
+    }
+
+let realMain argv = attempt {
+
+    let! results = parseArgsCommandLine argv
+
+    let log =
+        match results.TryGetResult <@ Verbose @> with
+        | Some _ -> printfn "%s"
+        | None -> ignore
+
+    let! (projPath, getProjectInfoBySdk, cmds, msbuildHost, globalArgs) =
+        match results.TryGetSubCommand () with
+        | Some (Get subCmd) ->
+            getMain log subCmd
+        | Some (Net_Fw subCmd) ->
+            netFwMain subCmd
+        | Some _ ->
+            fun _ -> Error (InvalidArgsState "unknown sub command")
+        | None ->
+            fun _ ->  Error (InvalidArgsState "specify one command")
+
+    let globalArgs =
+        match Environment.GetEnvironmentVariable("DOTNET_PROJ_INFO_MSBUILD_BL") with
+        | "1" -> MSBuild.MSbuildCli.Switch("bl") :: globalArgs
+        | _ -> globalArgs
 
     let! cmd =
         match cmds with
@@ -232,20 +290,7 @@ let realMain argv = attempt {
     let exec getArgs additionalArgs = attempt {
         let msbuildExec =
             let projDir = Path.GetDirectoryName(projPath)
-            let rec msbuildHost host =
-                match host with
-                | MSBuildHostPicker.MSBuild ->
-                    MSBuildExePath.Path msbuildPath
-                | MSBuildHostPicker.DotnetMSBuild ->
-                    MSBuildExePath.DotnetMsbuild dotnetPath
-                | MSBuildHostPicker.Auto ->
-                    if isDotnetSdk then
-                        msbuildHost MSBuildHostPicker.DotnetMSBuild
-                    else
-                        msbuildHost MSBuildHostPicker.MSBuild
-                | x ->
-                    failwithf "Unexpected msbuild host '%A'" x
-            msbuild (msbuildHost dotnetHostPicker) (runCmd log projDir)
+            msbuild msbuildHost (runCmd log projDir)
 
         let! r =
             projPath
