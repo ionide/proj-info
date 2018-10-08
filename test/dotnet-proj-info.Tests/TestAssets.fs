@@ -73,3 +73,12 @@ let ``samples4 NetSdk multi tfm`` =
       "net461", (sourceFiles ["LibraryB.fs"] |> andProps ["MyProperty", "BBB"])
     ]
     ProjectReferences = [] }
+
+let ``samples5 NetSdk CSharp library`` =
+  { ProjDir = "sample5-netsdk-lib-cs"
+    AssemblyName = "l2"
+    ProjectFile = "l2"/"l2.csproj"
+    TargetFrameworks =  Map.ofList [
+      "netstandard2.0", sourceFiles ["Class1.cs"]
+    ]
+    ProjectReferences = [] }
