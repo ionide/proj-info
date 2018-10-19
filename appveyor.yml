@@ -31,3 +31,9 @@ on_finish:
           $wc.UploadFile("https://ci.appveyor.com/api/testresults/nunit3/$($env:APPVEYOR_JOB_ID)", (Resolve-Path $path))
         }
       }
+
+deploy:
+  provider: NuGet
+  server: https://www.myget.org/F/dotnet-proj-info/api/v2/package
+  api_key:
+    secure: 0FlVmxXeqNWXknPWU1OcfpYq3JhkyhlWGrTN0WOSzFhOX3bMwe5L+OXv+fbnfa67
