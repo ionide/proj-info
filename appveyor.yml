@@ -23,8 +23,8 @@ on_finish:
   - ps: >-
       $wc = New-Object 'System.Net.WebClient';
       $testResults = @(
-        # '.\bin\test_results\TestResults.xml'
-      )
+         '.\bin\test_results\TestResults.xml'
+      );
   - ps: >-
       Foreach ($path in $testResults) {
         If (Test-Path $path) {
