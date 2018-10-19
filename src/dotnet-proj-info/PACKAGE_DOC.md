@@ -1,13 +1,4 @@
-
-[![Build status](https://ci.appveyor.com/api/projects/status/i7piggo87r7k31t2/branch/master?svg=true)](https://ci.appveyor.com/project/enricosada/dotnet-proj-info/branch/master)
-[![Build Status](https://travis-ci.org/enricosada/dotnet-proj-info.svg?branch=master)](https://travis-ci.org/enricosada/dotnet-proj-info)
-
-# dotnet-proj-info
-
-- as library: `Dotnet.ProjInfo` [![NuGet](https://img.shields.io/nuget/v/Dotnet.ProjInfo.svg)](https://www.nuget.org/packages/Dotnet.ProjInfo)
-- dotnet cli tool: `dotnet proj-info` [![NuGet](https://img.shields.io/nuget/v/dotnet-proj-info.svg)](https://www.nuget.org/packages/dotnet-proj-info)
-
-## Features
+# Features
 
 - get properties
 - get project to project references
@@ -22,16 +13,6 @@ Support both project sdk:
 
 
 Works on mono and windows, and allow to specify the `dotnet` or `msbuild` to use
-
-## as Library
-
-Used by:
-
-- [Fable compiler](https://github.com/fable-compiler/fable) to parse fsproj projects with `dotnet fable`
-- [FsAutocomplete (FSAC)](https://github.com/fsharp/FsAutoComplete/) to parse projects. That's the language server that add F# support in:
-  - [Ionide in Visual Studio Code](https://github.com/ionide/ionide-vscode-fsharp)
-  - [F# vim binding](https://github.com/fsharp/vim-fsharp)
-  - [F# Emacs mode](https://github.com/fsharp/emacs-fsharp-mode)
 
 ## as .NET Cli tool
 
@@ -86,29 +67,10 @@ OPTIONS:
 
 ```
 
-## Build
+## Used by
 
-Clone repo.
-
-Run:
-
-```bash
-dotnet build
-```
-
-To run tests:
-
-```bash
-dotnet test -v n
-```
-
-To create packages:
-
-```bash
-dotnet pack
-```
-
-will create packages in `artifacts\nupkgs`
-
-pass `/p:Version=1.2.3` to create a package with version `1.2.3`
-
+- [Fable compiler](https://github.com/fable-compiler/fable) to parse fsproj projects with `dotnet fable`
+- [FsAutocomplete (FSAC)](https://github.com/fsharp/FsAutoComplete/) to parse projects. That's the language server that add F# support in:
+  - [Ionide in Visual Studio Code](https://github.com/ionide/ionide-vscode-fsharp)
+  - [F# vim binding](https://github.com/fsharp/vim-fsharp)
+  - [F# Emacs mode](https://github.com/fsharp/emacs-fsharp-mode)
