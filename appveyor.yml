@@ -33,18 +33,17 @@ on_finish:
       }
 
 deploy:
-  provider: NuGet
-  server: https://www.myget.org/F/dotnet-proj-info/api/v2/package
-  api_key:
-    secure: 0FlVmxXeqNWXknPWU1OcfpYq3JhkyhlWGrTN0WOSzFhOX3bMwe5L+OXv+fbnfa67
+  - provider: NuGet
+    server: https://www.myget.org/F/dotnet-proj-info/api/v2/package
+    api_key:
+      secure: 0FlVmxXeqNWXknPWU1OcfpYq3JhkyhlWGrTN0WOSzFhOX3bMwe5L+OXv+fbnfa67
 
-deploy:
-  release: $(appveyor_repo_tag_name)
-  description: '$(appveyor_repo_tag_name)'
-  provider: GitHub
-  auth_token:
-    secure: 9hUHxeECpKQbd2Hou+HGoMOBVgfUkFw/ObBfEdgrqjNh7+Wh5Nm1k7oWrBeVx5q/
-  artifact: /.*\.nupkg/
-  draft: true
-  on:
-    appveyor_repo_tag: true
+  - provider: GitHub
+    release: $(appveyor_repo_tag_name)
+    description: '$(appveyor_repo_tag_name)'
+    auth_token:
+      secure: 9hUHxeECpKQbd2Hou+HGoMOBVgfUkFw/ObBfEdgrqjNh7+Wh5Nm1k7oWrBeVx5q/
+    artifact: /.*\.nupkg/
+    draft: true
+    on:
+      APPVEYOR_REPO_TAG: true
