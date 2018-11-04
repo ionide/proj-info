@@ -4,6 +4,7 @@
 
   <Target Name="Build">
     <Exec Command='dotnet build src/dotnet-proj-info -c Release' />
+    <Exec Command='dotnet build test/dotnet-proj-info.Tests -c Release' />
   </Target>
 
   <Target Name="Restore">
