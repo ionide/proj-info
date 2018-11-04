@@ -11,7 +11,7 @@
   <PropertyGroup>
     <RepoRootDir>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)"))</RepoRootDir>
     <NupkgsDir>$([System.IO.Path]::GetFullPath("$(RepoRootDir)/bin/nupkg"))</NupkgsDir>
-    <Version Condition=" '$(Version)' == '' ">0.13.0$(VersionSuffix)</Version>
+    <Version Condition=" '$(Version)' == '' ">0.20.0$(VersionSuffix)</Version>
     <MonoOrEmpty Condition=" '$(OS)' != 'Windows_NT' ">mono </MonoOrEmpty>
   </PropertyGroup>
 
