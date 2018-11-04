@@ -18,8 +18,8 @@ let main argv =
             nupkgsDir
             |> Directory.EnumerateFiles
             |> Seq.map Path.GetFileNameWithoutExtension
-            |> Seq.tryFind (fun p -> p.StartsWith("dotnet-proj-info"))
-            |> Option.map (fun p -> p.Replace("dotnet-proj-info.",""))
+            |> Seq.tryFind (fun p -> p.StartsWith("dotnet-proj"))
+            |> Option.map (fun p -> p.Replace("dotnet-proj.",""))
 
     let info =
         match argv |> List.ofArray with
@@ -30,15 +30,15 @@ let main argv =
             printfn "Package version not passed as first argument, searching in nupks dir"
             match findPackedVersion () with
             | Some v ->
-                printfn "found version '%s' of dotnet-proj-info" v
+                printfn "found version '%s' of dotnet-proj" v
                 Ok (v, args)
             | None ->
-                printfn "dotnet-proj-info nupkg not found in '%s'" nupkgsDir
+                printfn "dotnet-proj nupkg not found in '%s'" nupkgsDir
                 Error 1
 
     match info with
     | Error exitCode ->
-        printfn "expected package version as first argument, or dotnet-proj-info nupkg in dir '%s'" nupkgsDir
+        printfn "expected package version as first argument, or dotnet-proj nupkg in dir '%s'" nupkgsDir
         exitCode
     | Ok (pkgUnderTestVersion, args) ->
         printfn "testing package: %s" pkgUnderTestVersion
@@ -48,7 +48,7 @@ let main argv =
 
         let resultsPath = IO.Path.Combine(__SOURCE_DIRECTORY__,"..","..","bin","test_results","TestResults.xml")
 
-        let writeResults = TestResults.writeNUnitSummary (resultsPath, "dotnet-proj-info.Tests")
+        let writeResults = TestResults.writeNUnitSummary (resultsPath, "dotnet-proj.Tests")
         let config = defaultConfig.appendSummaryHandler writeResults
 
         Tests.runTestsWithArgs config (args |> Array.ofList) (DotnetProjInfo.Tests.tests pkgUnderTestVersion)

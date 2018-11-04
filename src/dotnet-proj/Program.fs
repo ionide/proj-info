@@ -140,7 +140,7 @@ and ShellCommandResult = ShellCommandResult of workingDir: string * exePath: str
 
 let parseArgsCommandLine argv =
     try
-        let parser = ArgumentParser.Create<CLIArguments>(programName = "proj-info")
+        let parser = ArgumentParser.Create<CLIArguments>(programName = "dotnet-proj")
         let results = parser.Parse argv
         Ok results
     with
@@ -586,7 +586,7 @@ let main argv =
     | Error err ->
         match err with
         | InvalidArgs (HelpRequested helpText) ->
-            printfn "proj-info."
+            printfn "dotnet-proj."
             printfn " "
             printfn "%s" helpText
             0
