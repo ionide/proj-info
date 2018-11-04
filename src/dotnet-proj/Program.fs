@@ -459,11 +459,10 @@ let p2pMain log (results: ParseResults<P2pCLIArguments>) = attempt {
 
 let netFwMain log (results: ParseResults<NetFwCLIArguments>) = attempt {
 
-    let! proj =
+    let projPath =
         //create the proj file
-        Ok (Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.createEnvInfoProj ())
-
-    let projPath = Path.GetFullPath(proj)
+        Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.createEnvInfoProj ()
+        |> Path.GetFullPath
 
     let msbuildPath = results.GetResult(<@ NetFwCLIArguments.MSBuild @>, defaultValue = "msbuild")
 
@@ -481,11 +480,10 @@ let netFwRefMain log (results: ParseResults<NetFwRefCLIArguments>) = attempt {
         | [] -> Error (InvalidArgsState "multiple .*proj found in current directory, use --project argument to specify path")
         | props -> Ok props
 
-    let! proj =
+    let projPath =
         //create the proj file
-        Ok (Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.createEnvInfoProj ())
-
-    let projPath = Path.GetFullPath(proj)
+        Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.createEnvInfoProj ()
+        |> Path.GetFullPath
 
     let msbuildPath = results.GetResult(<@ NetFwRefCLIArguments.MSBuild @>, defaultValue = "msbuild")
 
