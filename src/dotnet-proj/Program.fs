@@ -252,13 +252,7 @@ let analizeProj projPath = attempt {
             Errors.GenericError "unsupported project format"
             |> Result.Error
 
-    let getProjectInfoBySdk =
-        if isDotnetSdk then
-            getProjectInfo
-        else
-            getProjectInfoOldSdk
-
-    return isDotnetSdk, pi, getProjectInfoBySdk
+    return isDotnetSdk, pi, getProjectInfo
     }
 
 let propMain log (results: ParseResults<PropCLIArguments>) = attempt {
@@ -477,7 +471,7 @@ let netFwMain log (results: ParseResults<NetFwCLIArguments>) = attempt {
 
     let msbuildHost = MSBuildExePath.Path msbuildPath
 
-    return projPath, getProjectInfoOldSdk, cmd, msbuildHost, []
+    return projPath, getProjectInfo, cmd, msbuildHost, []
     }
 
 let netFwRefMain log (results: ParseResults<NetFwRefCLIArguments>) = attempt {
@@ -499,7 +493,7 @@ let netFwRefMain log (results: ParseResults<NetFwRefCLIArguments>) = attempt {
 
     let msbuildHost = MSBuildExePath.Path msbuildPath
 
-    return projPath, getProjectInfoOldSdk, cmd, msbuildHost, []
+    return projPath, getProjectInfo, cmd, msbuildHost, []
     }
 
 let realMain argv = attempt {
