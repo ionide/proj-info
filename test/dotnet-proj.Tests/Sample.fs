@@ -25,18 +25,25 @@ let SamplePkgDir = TestRunDir/"pkgs"/"SamplePkgDir"
 let checkExitCodeZero (cmd: Command) =
     Expect.equal 0 cmd.Result.ExitCode "command finished with exit code non-zero."
 
+let renderNugetConfig clear feeds =
+    [ yield "<configuration>"
+      yield "  <packageSources>"
+      if clear then
+        yield "    <clear />"
+      for (name, url) in feeds do
+        yield sprintf """    <add key="%s" value="%s" />""" name url
+      yield "  </packageSources>"
+      yield "</configuration>" ]
+
 let prepareTool (fs: FileUtils) pkgUnderTestVersion =
 
     for dir in [TestRunToolCfgDir; TestRunToolDir; TestRunInvariantDir] do
       fs.rm_rf dir
       fs.mkdir_p dir
 
-    fs.createFile (TestRunToolCfgDir/"nuget.config") (writeLines 
-      [ "<configuration>"
-        "  <packageSources>"
-        sprintf """    <add key="local" value="%s" />""" NupkgsDir
-        "  </packageSources>"
-        "</configuration>" ])
+    renderNugetConfig true ["local", NupkgsDir]
+    |> writeLines
+    |> fs.createFile (TestRunToolCfgDir/"nuget.config")
 
     fs.cd TestRunInvariantDir
     fs.shellExecRun "dotnet" ["tool"; "install"; "dotnet-proj"; "--version"; pkgUnderTestVersion; "--tool-path"; TestRunToolDir; "--configfile"; (TestRunToolCfgDir/"nuget.config")]
@@ -371,6 +378,36 @@ let tests pkgUnderTestVersion =
           let prop = infoOfTfm.Props |> Map.find "MyProperty"
           Expect.equal out (sprintf "MyProperty=%s" prop) "wrong output"
         )
+
+      yield testCase |> withLog "delete deprecated target file" (fun _ fs ->
+        let testDir = inDir fs "netsdk_delete_depr_target"
+        copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
+
+        let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
+
+        dotnet fs ["restore"; projPath]
+        |> checkExitCodeZero
+
+        let projDir, projName = Path.GetDirectoryName(projPath), Path.GetFileName(projPath)
+        let deprecatedTargetFilePath = projDir/"obj"/sprintf "%s.proj-info.targets" projName
+
+        // create the deprecated target file
+        fs.createFile deprecatedTargetFilePath (writeLines 
+          [ """<Project ToolsVersion="15.0">"""
+            "  <PropertyGroup>"
+            "  </PropertyGroup>"
+            "</Project>" ])
+
+        "before exists"
+        |> Expect.isTrue (File.Exists deprecatedTargetFilePath)
+
+        projInfo fs ["--verbose"; "prop"; projPath; "-get"; "AssemblyName"]
+        |> checkExitCodeZero
+
+        "after doesnt exists"
+        |> Expect.isFalse (File.Exists deprecatedTargetFilePath)
+      )
+
 
     ]
 

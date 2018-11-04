@@ -131,13 +131,6 @@ let writeTargetFile log templates targetFileDestPath =
 
     Ok targetFileDestPath
 
-let install_target_file log templates projPath =
-    let projDir, projName = Path.GetDirectoryName(projPath), Path.GetFileName(projPath)
-    let objDir = Path.Combine(projDir, "obj")
-    let targetFileDestPath = Path.Combine(objDir, (sprintf "%s.proj-info.targets" projName))
-
-    writeTargetFile log templates targetFileDestPath
-
 type GetResult =
      | FscArgs of string list
      | CscArgs of string list
@@ -412,6 +405,15 @@ let getResolvedP2PRefs () =
           Property ("_Inspect_GetResolvedProjectReferences_OutFile", outFile) ]
     template, args, (fun () -> bindSkipped parseResolvedP2PRefOut outFile)
 
+let uninstall_old_target_file log projPath =
+    let projDir, projName = Path.GetDirectoryName(projPath), Path.GetFileName(projPath)
+    let objDir = Path.Combine(projDir, "obj")
+    let targetFileDestPath = Path.Combine(objDir, (sprintf "%s.proj-info.targets" projName))
+
+    log (sprintf "searching deprecated target file in '%s'." targetFileDestPath)
+    if File.Exists targetFileDestPath then
+        log (sprintf "found deprecated target file in '%s', deleting." targetFileDestPath)
+        File.Delete targetFileDestPath
 
 let getProjectInfos log msbuildExec getters additionalArgs projPath =
 
@@ -422,18 +424,26 @@ let getProjectInfos log msbuildExec getters additionalArgs projPath =
 
     let args = argsList |> List.concat
 
+    // remove deprecated target file, if exists
     projPath
-    |> install_target_file log templates
-    |> Result.bind (fun _ -> msbuildExec projPath (args @ additionalArgs))
+    |> uninstall_old_target_file log
+
+    getNewTempFilePath "proj-info.hook.targets"
+    |> writeTargetFile log templates
+    |> Result.bind (fun targetPath -> msbuildExec projPath (args @ additionalArgs @ [ Property("CustomAfterMicrosoftCommonTargets", targetPath) ]))
     |> Result.map (fun _ -> parsers |> List.map (fun parse -> parse ()))
 
-let getProjectInfo log msbuildExec getArgs additionalArgs projPath =
-    //TODO refactor to use getProjectInfos
+let getProjectInfo log msbuildExec getArgs additionalArgs (projPath: string) =
+    //TODO refactor to use getProjectInfosOldSdk
     let template, args, parse =  getArgs ()
 
+    // remove deprecated target file, if exists
     projPath
-    |> install_target_file log [template]
-    |> Result.bind (fun _ -> msbuildExec projPath (args @ additionalArgs))
+    |> uninstall_old_target_file log
+
+    getNewTempFilePath "proj-info.hook.targets"
+    |> writeTargetFile log [template]
+    |> Result.bind (fun targetPath -> msbuildExec projPath (args @ additionalArgs @ [ Property("CustomAfterMicrosoftCommonTargets", targetPath) ]))
     |> Result.bind (fun _ -> parse ())
 
 #if !NETSTANDARD1_6
@@ -482,30 +492,6 @@ let getFscArgsOldSdk propsToFscArgs () =
                                |> bindSkipped parsePropertiesOut
                                |> Result.bind propsToFscArgs
                                |> Result.map FscArgs)
-
-
-let getProjectInfosOldSdk log msbuildExec getters additionalArgs (projPath: string) =
-
-    let templates, argsList, parsers = 
-        getters
-        |> List.map (fun getArgs -> getArgs ())
-        |> List.unzip3
-
-    let args = argsList |> List.concat
-
-    getNewTempFilePath "proj-info.oldsdk-hook.targets"
-    |> writeTargetFile log templates
-    |> Result.bind (fun targetPath -> msbuildExec projPath (args @ additionalArgs @ [ Property("CustomAfterMicrosoftCommonTargets", targetPath) ]))
-    |> Result.map (fun _ -> parsers |> List.map (fun parse -> parse ()))
-
-let getProjectInfoOldSdk log msbuildExec getArgs additionalArgs projPath =
-    //TODO refactor to use getProjectInfosOldSdk
-    let template, args, parse =  getArgs ()
-
-    getNewTempFilePath "proj-info.oldsdk-hook.targets"
-    |> writeTargetFile log [template]
-    |> Result.bind (fun targetPath -> msbuildExec projPath (args @ additionalArgs @ [ Property("CustomAfterMicrosoftCommonTargets", targetPath) ]))
-    |> Result.bind (fun _ -> parse ())
 
 #endif
 
