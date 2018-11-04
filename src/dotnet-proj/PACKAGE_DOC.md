@@ -1,8 +1,11 @@
 # Features
 
 - get properties
-- get project to project references
 - get fsc/csc command line arguments
+- get project to project references
+
+Not project specific
+
 - list installed .NET Framework versions
 - get references path of .NET asseblies like `System`, `System.Data`
 
@@ -14,58 +17,66 @@ Support both project sdk:
 
 Works on mono and windows, and allow to specify the `dotnet` or `msbuild` to use
 
-## as .NET Cli tool
+## as .NET Tool
 
-Add
+Install it globally with
 
-```xml
-<DotNetCliToolReference Include="dotnet-proj-info" Version="*" />
+```
+dotnet tool install dotnet-proj -g
 ```
 
-restore, and it use as `dotnet proj-info`
+See help with
 
-Support args of .NET cli (`dotnet`), like:
+```
+dotnet proj --help
+```
+
+to show
+
+```
+dotnet-proj.
+ 
+USAGE: dotnet-proj [--help] [--verbose] [<subcommand> [<options>]]
+
+SUBCOMMANDS:
+
+    prop <options>        get properties
+    fsc-args <options>    get fsc arguments
+    csc-args <options>    get csc arguments
+    p2p <options>         get project references
+    net-fw <options>      list the installed .NET Frameworks
+    net-fw-ref <options>  get the reference path of given .NET Framework assembly
+
+    Use 'dotnet-proj <subcommand> --help' for additional information.
+
+OPTIONS:
+
+    --verbose, -v         verbose log
+    --help                display this list of options.
+```
+
+To get subcommands help, run it like `dotnet proj fsc-args --help`
+
+Some subcommands support args of .NET Core Sdk (`dotnet`), like:
 
 - `-c` or `--configuration`
 - `-f` or `--framework`
 - `-r` or `--runtime`
 
+like
+
+```
+dotnet fsc-args -c Release -f netcoreapp2.1
+```
+
+And to specify the project
+
+```
+dotnet proj fsc-args # will search fsproj in current dir
+dotnet proj fsc-args path/to/my.fsproj
+```
+
 See [examples](https://github.com/enricosada/dotnet-proj-info/tree/master/examples) directory for a quick tutorial
-
-```
-USAGE: proj-info [--help] [--fsc-args] [--project-refs] [--get-property [<string>...]]
-                 [--net-fw-references-path [<string>...]] [--installed-net-frameworks] [--framework <string>]
-                 [--runtime <string>] [--configuration <string>] [--verbose] [--msbuild <string>]
-                 [--dotnetcli <string>] [--msbuild-host <auto|msbuild|dotnetmsbuild>] [<string>]
-
-PROJECT:
-
-    <string>              the MSBuild project file
-
-OPTIONS:
-
-    --fsc-args            get fsc arguments
-    --project-refs        get project references
-    --get-property, -gp [<string>...]
-                          msbuild property to get (allow multiple)
-    --net-fw-references-path [<string>...]
-                          list the .NET Framework references
-    --installed-net-frameworks
-                          list of the installed .NET Frameworks
-    --framework, -f <string>
-                          target framework, the TargetFramework msbuild property
-    --runtime, -r <string>
-                          target runtime, the RuntimeIdentifier msbuild property
-    --configuration, -c <string>
-                          configuration to use (like Debug), the Configuration msbuild property
-    --verbose, -v         verbose log
-    --msbuild <string>    MSBuild path (default "msbuild")
-    --dotnetcli <string>  Dotnet CLI path (default "dotnet")
-    --msbuild-host <auto|msbuild|dotnetmsbuild>
-                          the Msbuild host, if auto then oldsdk=MSBuild dotnetSdk=DotnetCLI
-    --help                display this list of options.
-
-```
 
 ## Used by
 
