@@ -46,7 +46,7 @@ let prepareTool (fs: FileUtils) pkgUnderTestVersion =
 
 let projInfo (fs: FileUtils) args =
     fs.cd (TestRunDir/"sdk2")
-    fs.shellExecRun "dotnet" ("proj-info" :: args)
+    fs.shellExecRun "dotnet" ("proj" :: args)
 
 let dotnet (fs: FileUtils) args =
     fs.cd (TestRunDir/"sdk2")
