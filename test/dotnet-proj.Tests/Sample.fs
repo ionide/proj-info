@@ -15,6 +15,9 @@ let RepoDir = (__SOURCE_DIRECTORY__ /".." /"..") |> Path.GetFullPath
 let ExamplesDir = RepoDir/"test"/"examples"
 let TestRunDir = RepoDir/"test"/"testrun"
 let NupkgsDir = RepoDir/"bin"/"nupkg"
+let TestRunInvariantDir = TestRunDir/"invariant"
+let TestRunToolDir = TestRunDir/"the_tool"
+let TestRunToolCfgDir = TestRunDir/"the_tool_cfg"
 
 let SamplePkgVersion = "1.0.0"
 let SamplePkgDir = TestRunDir/"pkgs"/"SamplePkgDir"
@@ -23,37 +26,29 @@ let checkExitCodeZero (cmd: Command) =
     Expect.equal 0 cmd.Result.ExitCode "command finished with exit code non-zero."
 
 let prepareTool (fs: FileUtils) pkgUnderTestVersion =
-    fs.rm_rf (TestRunDir/"sdk2")
-    fs.mkdir_p (TestRunDir/"sdk2")
 
-    fs.cp (RepoDir/"test"/"usetool"/"tools.proj") (TestRunDir/"sdk2")
-    fs.createFile (TestRunDir/"sdk2"/"nuget.config") (writeLines 
+    for dir in [TestRunToolCfgDir; TestRunToolDir; TestRunInvariantDir] do
+      fs.rm_rf dir
+      fs.mkdir_p dir
+
+    fs.createFile (TestRunToolCfgDir/"nuget.config") (writeLines 
       [ "<configuration>"
         "  <packageSources>"
         sprintf """    <add key="local" value="%s" />""" NupkgsDir
         "  </packageSources>"
         "</configuration>" ])
-    fs.createFile (TestRunDir/"sdk2"/"Directory.Build.props") (writeLines 
-      [ """<Project ToolsVersion="15.0">"""
-        "  <PropertyGroup>"
-        sprintf """    <PkgUnderTestVersion>%s</PkgUnderTestVersion>""" pkgUnderTestVersion
-        "  </PropertyGroup>"
-        "</Project>" ])
 
-    fs.cd (TestRunDir/"sdk2")
-    fs.shellExecRun "dotnet" [ "restore"; "--packages"; "packages" ]
+    fs.cd TestRunInvariantDir
+    fs.shellExecRun "dotnet" ["tool"; "install"; "dotnet-proj"; "--version"; pkgUnderTestVersion; "--tool-path"; TestRunToolDir; "--configfile"; (TestRunToolCfgDir/"nuget.config")]
     |> checkExitCodeZero
 
 let projInfo (fs: FileUtils) args =
-    fs.cd (TestRunDir/"sdk2")
-    fs.shellExecRun "dotnet" ("proj" :: args)
+    fs.shellExecRun (TestRunToolDir/"dotnet-proj") args
 
 let dotnet (fs: FileUtils) args =
-    fs.cd (TestRunDir/"sdk2")
     fs.shellExecRun "dotnet" args
 
 let msbuild (fs: FileUtils) args =
-    fs.cd (TestRunDir/"sdk2")
     fs.shellExecRun "msbuild" args
 
 let nuget (fs: FileUtils) args =
