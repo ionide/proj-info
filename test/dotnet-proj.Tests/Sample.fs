@@ -25,19 +25,25 @@ let SamplePkgDir = TestRunDir/"pkgs"/"SamplePkgDir"
 let checkExitCodeZero (cmd: Command) =
     Expect.equal 0 cmd.Result.ExitCode "command finished with exit code non-zero."
 
+let renderNugetConfig clear feeds =
+    [ yield "<configuration>"
+      yield "  <packageSources>"
+      if clear then
+        yield "    <clear />"
+      for (name, url) in feeds do
+        yield sprintf """    <add key="%s" value="%s" />""" name url
+      yield "  </packageSources>"
+      yield "</configuration>" ]
+
 let prepareTool (fs: FileUtils) pkgUnderTestVersion =
 
     for dir in [TestRunToolCfgDir; TestRunToolDir; TestRunInvariantDir] do
       fs.rm_rf dir
       fs.mkdir_p dir
 
-    fs.createFile (TestRunToolCfgDir/"nuget.config") (writeLines 
-      [ "<configuration>"
-        "  <packageSources>"
-        "    <clear />"
-        sprintf """    <add key="local" value="%s" />""" NupkgsDir
-        "  </packageSources>"
-        "</configuration>" ])
+    renderNugetConfig true ["local", NupkgsDir]
+    |> writeLines
+    |> fs.createFile (TestRunToolCfgDir/"nuget.config")
 
     fs.cd TestRunInvariantDir
     fs.shellExecRun "dotnet" ["tool"; "install"; "dotnet-proj"; "--version"; pkgUnderTestVersion; "--tool-path"; TestRunToolDir; "--configfile"; (TestRunToolCfgDir/"nuget.config")]
