@@ -102,6 +102,14 @@ let readFile (logger: Logger) path =
       >> setField "path" path)
     File.OpenRead(path)
 
+let touch (logger: Logger) path =
+    logger.info(
+      eventX "touch '{path}'"
+      >> setField "path" path)
+    //TODO create if not exists
+    //TODO works if already in
+    System.IO.File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
+
 type FileUtils (logger: Logger) =
     let mutable currentDirectory = Environment.CurrentDirectory
 
@@ -119,6 +127,7 @@ type FileUtils (logger: Logger) =
     member __.createFile = createFile logger
     member __.unzip = unzip logger
     member __.readFile = readFile logger
+    member __.touch = touch logger
 
 let writeLines (lines: string list) (stream: StreamWriter) =
     lines |> List.iter stream.WriteLine
