@@ -9,12 +9,14 @@ open System.Runtime.InteropServices
 
 let (/) a b = Path.Combine(a, b)
 
-let rm_rf (logger: Logger) dir =
+let rm_rf (logger: Logger) path =
     logger.info(
-      eventX "rm -rf '{directory}'"
-      >> setField "directory" dir)
-    if Directory.Exists dir then
-      Directory.Delete(dir, true)
+      eventX "rm -rf '{path}'"
+      >> setField "path" path)
+    if Directory.Exists path then
+      Directory.Delete(path, true)
+    if File.Exists path then
+      File.Delete(path)
 
 let mkdir_p (logger: Logger) dir =
     if not(Directory.Exists dir) then
