@@ -2,6 +2,6 @@
 
 [<EntryPoint>]
 let main argv =
-    l2.Say.hello "F#!"
+    l2.Printer.Hello "F#!"
     l1.Say.jsonstuff()
     0

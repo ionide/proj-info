@@ -1,61 +1,91 @@
 # Examples usage of tool
 
-First restore the sample the packages and the tool
+First install the tool
 
 ```bash
-dotnet restore tools
-dotnet restore sdk1/c1
+dotnet tool install -g dotnet-proj
 ```
 
-**NOTE** Because is a dotnet cli command, must be executed from same directory of project
-     where is declared. The project can be passed, if not it search the working directory
-     for a project (single .*proj)
+See help with
 
-```bash
-cd tools
+```
+dotnet proj --help
 ```
 
+## .NET Sdk projects
 
-Some examples of commands:
+In
+
+```
+cd sdk2
+```
+
+Some examples of commands i, like
 
 ```bash
-dotnet proj-info ../sdk1/c1/c1.fsproj --project-refs
+dotnet proj p2p c1/c1.fsproj
 ```
 
 or
 
 ```bash
-dotnet proj-info ../sdk1/c1/c1.fsproj --fsc-args
+dotnet proj fsc-args c1/c1.fsproj
+dotnet proj csc-args l2/l2.csproj
 ```
 
 or
 
 ```bash
-dotnet proj-info ../sdk1/c1/c1.fsproj --get-property OutputType Version Configuration
+dotnet proj prop c1/c1.fsproj -get OutputType -get Version -get Configuration
 ```
 
 It's possibile to pass usual .NET Core Tools arguments (like `-c`, `-f`, `-r`).
 
-See `--help` for more info
-
 ```bash
-dotnet proj-info ../sdk1/l1/l1.fsproj -gp MyCustomProp OutputType Version Configuration -c Release
+dotnet proj prop c1/c1.fsproj -get OutputType -c Release
 ```
 
-### old sdk (verbose fsproj)
+And by default search for projects in current directory
 
-These are supported too from version 0.8
+```
+cd l1
+dotnet proj fsc-args -c Release
+```
 
-NOTE: require `msbuild` in PATH, or pass `--msbuild` with full path to msbuild
+## Old Sdk projects (verbose fsproj)
+
+**NOTE** require `msbuild` in PATH (like in VS Command Prompt), or pass `--msbuild` with full path to msbuild
+
+In
+
+```
+cd oldsdk
+```
 
 Like before
 
 ```
-dotnet proj-info ../oldsdk/l1/l1.fsproj --fsc-args
+dotnet proj fsc-args l1/l1.fsproj
 ```
 
-Or to get properties passing the msbuild to use
+You can specify the msbuild to use
 
 ```
-dotnet proj-info ../oldsdk/l1/l1.fsproj -gp MyCustomProp OutputType Version Configuration --msbuild "C:\Program Files (x86)\MSBuild\14.0\Bin\MSBuild.exe"
+dotnet proj prop l1/l1.fsproj -get DocumentationFile --msbuild "C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\MSBuild\15.0\Bin\MSBuild.exe"
+```
+
+## .NET info
+
+**NOTE** require `msbuild` in PATH (like in VS Command Prompt), or pass `--msbuild` with full path to msbuild
+
+Run
+
+```
+dotnet proj net-fw
+```
+
+You can specify the msbuild to use
+
+```
+dotnet proj net-fw-ref System.Xml -f v3.5 --msbuild "C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\MSBuild\15.0\Bin\MSBuild.exe"
 ```

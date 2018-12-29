@@ -1,9 +1,14 @@
 namespace l1
 
 open Newtonsoft.Json
-open l2
 
 module Say =
+
+    type Movie = {
+        Name : string
+        Year: int
+    }
+
     let jsonstuff () =
 
         let movies = [
