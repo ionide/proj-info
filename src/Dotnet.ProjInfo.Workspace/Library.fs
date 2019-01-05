@@ -1,5 +1,12 @@
 namespace Dotnet.ProjInfo.Workspace
 
-module Say =
-    let hello name =
-        printfn "Hello %s" name
+type Loader () =
+
+    member x.LoadSln(sln: string) =
+        ()
+
+    member x.LoadProjects(projects: string list) =
+        ()
+
+    member x.LoadFsx(fsx: string, tfm: string) =
+        ()

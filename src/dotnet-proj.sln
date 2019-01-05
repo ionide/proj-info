@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dotnet.ProjInfo.Helpers", "
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "dotnet-proj.Tests", "..\test\dotnet-proj.Tests\dotnet-proj.Tests.fsproj", "{48C692CB-AADC-44FC-9D69-3FAAB12FABB1}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Dotnet.ProjInfo.Workspace", "Dotnet.ProjInfo.Workspace\Dotnet.ProjInfo.Workspace.fsproj", "{4D486082-E20F-404A-8A8E-F2F398F5BC0C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -74,6 +76,18 @@ Global
 		{48C692CB-AADC-44FC-9D69-3FAAB12FABB1}.Release|x64.Build.0 = Release|Any CPU
 		{48C692CB-AADC-44FC-9D69-3FAAB12FABB1}.Release|x86.ActiveCfg = Release|Any CPU
 		{48C692CB-AADC-44FC-9D69-3FAAB12FABB1}.Release|x86.Build.0 = Release|Any CPU
+		{4D486082-E20F-404A-8A8E-F2F398F5BC0C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4D486082-E20F-404A-8A8E-F2F398F5BC0C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4D486082-E20F-404A-8A8E-F2F398F5BC0C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4D486082-E20F-404A-8A8E-F2F398F5BC0C}.Debug|x64.Build.0 = Debug|Any CPU
+		{4D486082-E20F-404A-8A8E-F2F398F5BC0C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4D486082-E20F-404A-8A8E-F2F398F5BC0C}.Debug|x86.Build.0 = Debug|Any CPU
+		{4D486082-E20F-404A-8A8E-F2F398F5BC0C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4D486082-E20F-404A-8A8E-F2F398F5BC0C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4D486082-E20F-404A-8A8E-F2F398F5BC0C}.Release|x64.ActiveCfg = Release|Any CPU
+		{4D486082-E20F-404A-8A8E-F2F398F5BC0C}.Release|x64.Build.0 = Release|Any CPU
+		{4D486082-E20F-404A-8A8E-F2F398F5BC0C}.Release|x86.ActiveCfg = Release|Any CPU
+		{4D486082-E20F-404A-8A8E-F2F398F5BC0C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{93CBD93B-3FA8-40BE-8C86-2E2A7B748545} = {B72D6D81-119E-482E-9306-E5E2189D1CB7}

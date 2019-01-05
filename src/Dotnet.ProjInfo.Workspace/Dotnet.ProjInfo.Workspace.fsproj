@@ -5,6 +5,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="ProjectCrackerTypes.fs" />
+    <Compile Include="ProjectCrackerDotnetSdk.fs" />
     <Compile Include="Library.fs" />
   </ItemGroup>
 
