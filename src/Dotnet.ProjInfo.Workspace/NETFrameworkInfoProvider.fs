@@ -1,4 +1,4 @@
-namespace FsAutoComplete
+namespace Dotnet.ProjInfo.Workspace
 
 module DotnetProjInfoInspectHelpers =
 
@@ -23,6 +23,8 @@ module DotnetProjInfoInspectHelpers =
     | "" -> []
     | Dotnet.ProjInfo.Inspect.MSBuild.StringList list  -> list
     | _ -> []
+
+(*
 
 module NETFrameworkInfoProvider =
 
@@ -154,3 +156,4 @@ module NETFrameworkInfoProvider =
     let key = match targetFramework with Some x -> x | None -> ""
     additionalArgsByTfm.GetOrAdd(key, f)
 
+*)

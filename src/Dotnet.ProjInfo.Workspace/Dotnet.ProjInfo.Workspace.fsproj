@@ -1,13 +1,17 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
-
   <ItemGroup>
+    <ProjectReference Include="..\Dotnet.ProjInfo\Dotnet.ProjInfo.fsproj" />
+    <ProjectReference Include="..\Dotnet.ProjInfo.Helpers\Dotnet.ProjInfo.Helpers.csproj" PrivateAssets="All" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Common.fs" />
+    <Compile Include="NETFrameworkInfoProvider.fs" />
     <Compile Include="ProjectCrackerTypes.fs" />
+    <Compile Include="..\..\paket-files\Microsoft\visualfsharp\src\fsharp\FSharp.Build\Fsc.fs" />
     <Compile Include="ProjectCrackerDotnetSdk.fs" />
     <Compile Include="Library.fs" />
   </ItemGroup>
-
 </Project>

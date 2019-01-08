@@ -1,7 +1,9 @@
-namespace FsAutoComplete
+namespace Dotnet.ProjInfo.Workspace
 
 open System
 open System.IO
+
+type FilePath = string
 
 [<RequireQualifiedAccess>]
 type ProjectSdkType =
@@ -57,9 +59,18 @@ type GetProjectOptionsErrors =
      | GenericError of string * string
 
 
+type ProjectOptions =
+    {
+        ProjectId: string option
+        ProjectFileName: string
+        OtherOptions: string list
+        LoadTime: DateTime
+        ExtraProjectInfo: ExtraProjectInfoData
+    }
+
 type [<RequireQualifiedAccess>] WorkspaceProjectState =
     | Loading of string
-    | Loaded of Microsoft.FSharp.Compiler.SourceCodeServices.FSharpProjectOptions * ExtraProjectInfoData * string list * Map<string,string>
+    | Loaded of ProjectOptions * string list * Map<string,string>
     | Failed of string * GetProjectOptionsErrors
 
 module ProjectRecognizer =

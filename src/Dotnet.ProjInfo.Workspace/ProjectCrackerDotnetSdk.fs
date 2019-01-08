@@ -1,9 +1,7 @@
-namespace FsAutoComplete
+namespace Dotnet.ProjInfo.Workspace
 
 open System
 open System.IO
-
-open Microsoft.FSharp.Compiler.SourceCodeServices
 
 module MSBuildPrj = Dotnet.ProjInfo.Inspect
 
@@ -59,7 +57,7 @@ module ProjectCrackerDotnetSdk =
 
   type private ProjectParsingSdk = DotnetSdk | VerboseSdk
 
-  type ParsedProject = string * FSharpProjectOptions * ((string * string) list)
+  type ParsedProject = string * ProjectOptions * ((string * string) list)
   type ParsedProjectCache = Collections.Concurrent.ConcurrentDictionary<string, ParsedProject>
 
   let private getProjectOptionsFromProjectFile notifyState (cache: ParsedProjectCache) parseAsSdk (file : string) =
@@ -85,13 +83,7 @@ module ProjectCrackerDotnetSdk =
                 let asFscArgs props =
                     let fsc = Microsoft.FSharp.Build.Fsc()
                     Dotnet.ProjInfo.FakeMsbuildTasks.getResponseFileFromTask props fsc
-                let ok =
-#if NETSTANDARD2_0
-                    Ok
-#else
-                    Choice1Of2
-#endif
-                Dotnet.ProjInfo.Inspect.getFscArgsOldSdk (asFscArgs >> ok)
+                Dotnet.ProjInfo.Inspect.getFscArgsOldSdk (asFscArgs >> Ok)
 
         let getP2PRefs = Dotnet.ProjInfo.Inspect.getResolvedP2PRefs
         let additionalInfo = //needed for extra
@@ -226,20 +218,14 @@ module ProjectCrackerDotnetSdk =
                 {
                     ProjectId = Some file
                     ProjectFileName = file
-                    SourceFiles = [||]
                     OtherOptions = rspNormalized |> Array.ofList
                     ReferencedProjects = p2pProjects |> List.map (fun (x,y,_) -> (x,y)) |> Array.ofList
-                    IsIncompleteTypeCheckEnvironment = false
-                    UseScriptResolutionRules = false
                     LoadTime = DateTime.Now
-                    UnresolvedReferences = None
-                    OriginalLoadReferences = []
-                    Stamp = None
                     ExtraProjectInfo =
-                        Some (box {
+                        {
                             ExtraProjectInfoData.ProjectSdkType = sdkTypeData
                             ExtraProjectInfoData.ProjectOutputType = FscArguments.outType rspNormalized
-                        })
+                        }
                 }
 
             tar, po, log
@@ -258,13 +244,7 @@ module ProjectCrackerDotnetSdk =
     po, log
 
   let private (|ProjectExtraInfoBySdk|_|) po =
-      match po.ExtraProjectInfo with
-      | None -> None
-      | Some x ->
-          match x with
-          | :? ExtraProjectInfoData as extraInfo ->
-              Some extraInfo
-          | _ -> None
+      Some po.ExtraProjectInfo
 
   let private loadBySdk notifyState (cache: ParsedProjectCache) parseAsSdk file =
       try
