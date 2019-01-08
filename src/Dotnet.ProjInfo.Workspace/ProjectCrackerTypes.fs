@@ -64,6 +64,7 @@ type ProjectOptions =
         ProjectId: string option
         ProjectFileName: string
         OtherOptions: string list
+        ReferencedProjects: (string * ProjectOptions) list
         LoadTime: DateTime
         ExtraProjectInfo: ExtraProjectInfoData
     }

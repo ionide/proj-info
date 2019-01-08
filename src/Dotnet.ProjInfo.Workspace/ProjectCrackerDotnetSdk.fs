@@ -126,7 +126,7 @@ module ProjectCrackerDotnetSdk =
                 | ProjectParsingSdk.DotnetSdk ->
                     Dotnet.ProjInfo.Inspect.getProjectInfos
                 | ProjectParsingSdk.VerboseSdk ->
-                    Dotnet.ProjInfo.Inspect.getProjectInfosOldSdk
+                    Dotnet.ProjInfo.Inspect.getProjectInfos // getProjectInfosOldSdk
 
             let infoResult =
                 file
@@ -218,8 +218,8 @@ module ProjectCrackerDotnetSdk =
                 {
                     ProjectId = Some file
                     ProjectFileName = file
-                    OtherOptions = rspNormalized |> Array.ofList
-                    ReferencedProjects = p2pProjects |> List.map (fun (x,y,_) -> (x,y)) |> Array.ofList
+                    OtherOptions = rspNormalized
+                    ReferencedProjects = p2pProjects |> List.map (fun (x,y,_) -> (x,y))
                     LoadTime = DateTime.Now
                     ExtraProjectInfo =
                         {
@@ -251,7 +251,7 @@ module ProjectCrackerDotnetSdk =
         let po, log = getProjectOptionsFromProjectFile notifyState cache parseAsSdk file
 
         let compileFiles =
-            let sources = FscArguments.compileFiles (po.OtherOptions |> List.ofArray)
+            let sources = FscArguments.compileFiles po.OtherOptions
             match po with
             | ProjectExtraInfoBySdk extraInfo ->
                 match extraInfo.ProjectSdkType with
