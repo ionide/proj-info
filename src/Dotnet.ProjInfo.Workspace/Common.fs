@@ -1,5 +1,23 @@
 namespace Dotnet.ProjInfo.Workspace
 
+module CommonHelpers =
+
+  let chooseByPrefix prefix (s: string) =
+      if s.StartsWith(prefix) then Some (s.Substring(prefix.Length))
+      else None
+
+  let chooseByPrefix2 prefixes (s: string) =
+      prefixes
+      |> List.tryPick (fun prefix -> chooseByPrefix prefix s)
+
+  let splitByPrefix prefix (s: string) =
+      if s.StartsWith(prefix) then Some (prefix, s.Substring(prefix.Length))
+      else None
+
+  let splitByPrefix2 prefixes (s: string) =
+      prefixes
+      |> List.tryPick (fun prefix -> splitByPrefix prefix s)
+
 [<RequireQualifiedAccess>]
 module Option =
 
@@ -37,3 +55,4 @@ module Utils =
       let exitCode = p.ExitCode
 
       exitCode, (workingDir, exePath, args)
+
