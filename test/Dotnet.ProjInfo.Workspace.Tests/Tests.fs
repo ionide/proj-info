@@ -142,6 +142,9 @@ let tests () =
 
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
+
+        let loader = Dotnet.ProjInfo.Workspace.Loader()
+        ()
       )
 
       testCase |> withLog "can load sample3" (fun _ fs ->
