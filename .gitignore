@@ -237,3 +237,4 @@ _Pvt_Extensions
 .dotnetsdk
 /paket-files/
 /test/testrun/
+/test/testrun_ws/
