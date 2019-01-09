@@ -114,10 +114,10 @@ let tests () =
     |> fun s -> s.Trim()
     |> asLines
 
-  let sanityChecks =
-    testList "sanity check of projects" [
+  let valid =
+    testList "valid" [
 
-      testCase |> withLog "can build sample1" (fun _ fs ->
+      testCase |> withLog "can load sample1" (fun _ fs ->
         let testDir = inDir fs "sanity_check_sample1"
         copyDirFromAssets fs ``samples1 OldSdk library``.ProjDir testDir
 
@@ -133,36 +133,36 @@ let tests () =
         |> checkExitCodeZero
       )
 
-      testCase |> withLog "can build sample2" (fun _ fs ->
+      testCase |> withLog "can load sample2" (fun _ fs ->
         let testDir = inDir fs "sanity_check_sample2"
         copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
 
         let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
         let projDir = Path.GetDirectoryName projPath
 
-        dotnet fs ["build"; projPath]
+        dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
       )
 
-      testCase |> withLog "can build sample3" (fun _ fs ->
+      testCase |> withLog "can load sample3" (fun _ fs ->
         let testDir = inDir fs "sanity_check_sample2"
         copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
 
         let projPath = testDir/ (``sample3 Netsdk projs``.ProjectFile)
         let projDir = Path.GetDirectoryName projPath
 
-        dotnet fs ["build"; projPath]
+        dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
       )
 
-      testCase |> withLog "can build sample4" (fun _ fs ->
+      testCase |> withLog "can load sample4" (fun _ fs ->
         let testDir = inDir fs "sanity_check_sample4"
         copyDirFromAssets fs ``samples4 NetSdk multi tfm``.ProjDir testDir
 
         let projPath = testDir/ (``samples4 NetSdk multi tfm``.ProjectFile)
         let projDir = Path.GetDirectoryName projPath
 
-        dotnet fs ["build"; projPath]
+        dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
 
         for (tfm, _) in ``samples4 NetSdk multi tfm``.TargetFrameworks |> Map.toList do
@@ -171,6 +171,6 @@ let tests () =
 
     ]
 
-  [ sanityChecks ]
+  [ valid ]
   |> testList "workspace"
   |> testSequenced
