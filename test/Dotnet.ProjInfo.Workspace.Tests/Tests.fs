@@ -10,6 +10,7 @@ open Medallion.Shell
 open System.IO.Compression
 open System.Xml.Linq
 open DotnetProjInfo.TestAssets
+open System.Collections.Generic
 
 let RepoDir = (__SOURCE_DIRECTORY__ /".." /"..") |> Path.GetFullPath
 let ExamplesDir = RepoDir/"test"/"examples"
@@ -114,6 +115,11 @@ let tests () =
     |> fun s -> s.Trim()
     |> asLines
 
+  let logNotification (logger: Logger) arg =
+    logger.info(
+      eventX "notified: {notification}'"
+      >> setField "notification" arg)
+
   let valid =
     testList "valid" [
 
@@ -135,7 +141,7 @@ let tests () =
         |> checkExitCodeZero
       )
 
-      testCase |> withLog "can load sample2" (fun _ fs ->
+      testCase |> withLog "can load sample2" (fun logger fs ->
         let testDir = inDir fs "sanity_check_sample2"
         copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
 
@@ -147,25 +153,32 @@ let tests () =
 
         let loader = Dotnet.ProjInfo.Workspace.Loader()
 
-        loader.Event1.Add(fun (_, arg) ->
-                logger.info(
-                  eventX "notified: {notification}'"
-                  >> setField "notification" arg) )
+        loader.Event1.Add(fun (_, arg) -> logNotification logger arg)
 
         loader.LoadProjects [projPath]
       )
 
-      testCase |> withLog "can load sample3" (fun _ fs ->
+      ftestCase |> withLog "can load sample3" (fun logger fs ->
         let testDir = inDir fs "sanity_check_sample2"
         copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
-
-        Tests.skiptest "not yet implemented"
 
         let projPath = testDir/ (``sample3 Netsdk projs``.ProjectFile)
         let projDir = Path.GetDirectoryName projPath
 
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
+
+        let loader = Dotnet.ProjInfo.Workspace.Loader()
+
+        let notifications = List<_>()
+
+        loader.Event1.Add(fun (_, arg) ->
+          notifications.Add(arg)
+          logNotification logger arg)
+
+        loader.LoadProjects [projPath]
+
+        Expect.equal (notifications.Count) 3 "notifications: [loading; loading; loaded]"
       )
 
       testCase |> withLog "can load sample4" (fun _ fs ->
