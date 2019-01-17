@@ -121,6 +121,8 @@ let tests () =
         let testDir = inDir fs "sanity_check_sample1"
         copyDirFromAssets fs ``samples1 OldSdk library``.ProjDir testDir
 
+        Tests.skiptest "not yet implemented"
+
         let projPath = testDir/ (``samples1 OldSdk library``.ProjectFile)
         let projDir = Path.GetDirectoryName projPath
 
@@ -144,12 +146,20 @@ let tests () =
         |> checkExitCodeZero
 
         let loader = Dotnet.ProjInfo.Workspace.Loader()
-        ()
+
+        loader.Event1.Add(fun (_, arg) ->
+                logger.info(
+                  eventX "notified: {notification}'"
+                  >> setField "notification" arg) )
+
+        loader.LoadProjects [projPath]
       )
 
       testCase |> withLog "can load sample3" (fun _ fs ->
         let testDir = inDir fs "sanity_check_sample2"
         copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
+
+        Tests.skiptest "not yet implemented"
 
         let projPath = testDir/ (``sample3 Netsdk projs``.ProjectFile)
         let projDir = Path.GetDirectoryName projPath
@@ -161,6 +171,8 @@ let tests () =
       testCase |> withLog "can load sample4" (fun _ fs ->
         let testDir = inDir fs "sanity_check_sample4"
         copyDirFromAssets fs ``samples4 NetSdk multi tfm``.ProjDir testDir
+
+        Tests.skiptest "not yet implemented"
 
         let projPath = testDir/ (``samples4 NetSdk multi tfm``.ProjectFile)
         let projDir = Path.GetDirectoryName projPath
