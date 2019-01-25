@@ -192,6 +192,14 @@ let tests () =
 
         [ loading; loaded ]
         |> expectNotifications (watcher.Notifications)
+
+        let parsed = loader.Projects.ToArray()
+
+        Expect.equal parsed.Length 1 "lib"
+        
+        //TODO Configuration should be Debug
+        //TODO TargetFramework should be v4.6.1 or `net461`
+        Expect.equal (parsed.[0].Key) { ProjectKey.ProjectPath = projPath; Configuration = "unknown"; TargetFramework = "unknown" } "a lib"
       )
 
       testCase |> withLog "can load sample2" (fun logger fs ->
