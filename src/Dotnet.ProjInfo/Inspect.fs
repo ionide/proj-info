@@ -430,7 +430,7 @@ let getProjectInfos log msbuildExec getters additionalArgs projPath =
 
     getNewTempFilePath "proj-info.hook.targets"
     |> writeTargetFile log templates
-    |> Result.bind (fun targetPath -> msbuildExec projPath (args @ additionalArgs @ [ Property("CustomAfterMicrosoftCommonTargets", targetPath) ]))
+    |> Result.bind (fun targetPath -> msbuildExec projPath (args @ additionalArgs @ [ Property("CustomAfterMicrosoftCommonTargets", targetPath); Property("CustomAfterMicrosoftCommonCrossTargetingTargets", targetPath) ]))
     |> Result.map (fun _ -> parsers |> List.map (fun parse -> parse ()))
 
 let getProjectInfo log msbuildExec getArgs additionalArgs (projPath: string) =
