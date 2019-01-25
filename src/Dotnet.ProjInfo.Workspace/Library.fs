@@ -1,5 +1,7 @@
 namespace Dotnet.ProjInfo.Workspace
+
 open System.Collections.Concurrent
+open ProjectRecognizer
 
 type ProjectKey =
     { ProjectPath: string
@@ -42,7 +44,17 @@ type Loader () =
             event1.Trigger(this, arg)
 
         for project in projects do
-            match ProjectCrackerDotnetSdk.load notify cache project with
+
+            let loader =
+                match project with
+                | NetCoreSdk ->
+                    ProjectCrackerDotnetSdk.load
+                | Net45 ->
+                    ProjectCrackerDotnetSdk.loadVerboseSdk
+                | NetCoreProjectJson | Unsupported ->
+                    failwithf "unsupported project %s" project
+
+            match loader notify cache project with
             | Ok (po, sources, props) ->
                 let loaded = WorkspaceProjectState.Loaded (po, sources, props)
                 parsedProjects.AddOrUpdate(getKey po, po, fun _ _ -> po) |> ignore

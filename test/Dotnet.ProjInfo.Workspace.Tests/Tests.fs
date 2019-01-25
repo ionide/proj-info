@@ -168,11 +168,9 @@ let tests () =
   let valid =
     testList "valid" [
 
-      testCase |> withLog "can load sample1" (fun _ fs ->
+      testCase |> withLog "can load sample1" (fun logger fs ->
         let testDir = inDir fs "load_sample1"
         copyDirFromAssets fs ``samples1 OldSdk library``.ProjDir testDir
-
-        Tests.skiptest "not yet implemented"
 
         let projPath = testDir/ (``samples1 OldSdk library``.ProjectFile)
         let projDir = Path.GetDirectoryName projPath
@@ -182,11 +180,18 @@ let tests () =
         |> checkExitCodeZero
 
         fs.cd testDir
-        msbuild fs [projPath; "/t:Build"]
-        |> checkExitCodeZero
 
-        // [ loading; loaded ]
-        // |> expectNotifications (notifications |> List.ofSeq)
+        // msbuild fs [projPath; "/t:Build"]
+        // |> checkExitCodeZero
+
+        let loader = Dotnet.ProjInfo.Workspace.Loader()
+
+        let watcher = watchNotifications logger loader
+
+        loader.LoadProjects [projPath]
+
+        [ loading; loaded ]
+        |> expectNotifications (watcher.Notifications)
       )
 
       testCase |> withLog "can load sample2" (fun logger fs ->
