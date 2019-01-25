@@ -20,7 +20,7 @@ type Loader () =
             | ProjectSdkType.DotnetSdk t ->
                 t.Configuration
             | ProjectSdkType.Verbose v ->
-                "unknown"
+                v.Configuration
           TargetFramework =
             match po.ExtraProjectInfo.ProjectSdkType with
             | ProjectSdkType.DotnetSdk t ->

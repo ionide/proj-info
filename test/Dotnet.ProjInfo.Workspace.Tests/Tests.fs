@@ -208,9 +208,8 @@ let tests () =
 
         Expect.equal parsed.Length 1 "lib"
         
-        //TODO Configuration should be Debug
         //TODO TargetFramework should be `net461`
-        Expect.equal (parsed |> findKey projPath) { ProjectKey.ProjectPath = projPath; Configuration = "unknown"; TargetFramework = "v4.6.1" } "a lib"
+        Expect.equal (parsed |> findKey projPath) { ProjectKey.ProjectPath = projPath; Configuration = "Debug"; TargetFramework = "v4.6.1" } "a lib"
       )
 
       testCase |> withLog "can load sample2" (fun logger fs ->
