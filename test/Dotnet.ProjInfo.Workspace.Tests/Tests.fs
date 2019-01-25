@@ -291,6 +291,12 @@ let tests () =
 
         [ loading; loading; loaded ]
         |> expectNotifications (watcher.Notifications)
+
+        let parsed = loader.Projects
+
+        Expect.equal parsed.Length 1 (sprintf "multi-tfm lib (F#), but was %A" (parsed |> Array.map (fun x -> x.Key)))
+
+        Expect.equal (parsed |> findKey projPath) { ProjectKey.ProjectPath = projPath; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "the F# console"
       )
 
       testCase |> withLog "can load sample5" (fun logger fs ->
@@ -298,7 +304,6 @@ let tests () =
         copyDirFromAssets fs ``samples5 NetSdk CSharp library``.ProjDir testDir
 
         let projPath = testDir/ (``samples5 NetSdk CSharp library``.ProjectFile)
-        let projDir = Path.GetDirectoryName projPath
 
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
@@ -314,9 +319,9 @@ let tests () =
 
         let parsed = loader.Projects
 
-        Expect.equal parsed.Length 1 "console and lib"
+        Expect.equal parsed.Length 1 "lib"
         
-        Expect.equal (parsed.[0].Key) { ProjectKey.ProjectPath = projPath; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "first is a lib"
+        Expect.equal (parsed |> findKey projPath) { ProjectKey.ProjectPath = projPath; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "a C# lib"
       )
 
     ]
