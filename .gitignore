@@ -238,3 +238,4 @@ _Pvt_Extensions
 /paket-files/
 /test/testrun/
 /test/testrun_ws/
+msbuild.binlog
