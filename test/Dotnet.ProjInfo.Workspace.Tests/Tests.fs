@@ -193,13 +193,13 @@ let tests () =
         [ loading; loaded ]
         |> expectNotifications (watcher.Notifications)
 
-        let parsed = loader.Projects.ToArray()
+        let parsed = loader.Projects
 
         Expect.equal parsed.Length 1 "lib"
         
         //TODO Configuration should be Debug
-        //TODO TargetFramework should be v4.6.1 or `net461`
-        Expect.equal (parsed.[0].Key) { ProjectKey.ProjectPath = projPath; Configuration = "unknown"; TargetFramework = "unknown" } "a lib"
+        //TODO TargetFramework should be `net461`
+        Expect.equal (parsed.[0].Key) { ProjectKey.ProjectPath = projPath; Configuration = "unknown"; TargetFramework = "v4.6.1" } "a lib"
       )
 
       testCase |> withLog "can load sample2" (fun logger fs ->
@@ -207,7 +207,6 @@ let tests () =
         copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
 
         let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
-        let projDir = Path.GetDirectoryName projPath
 
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
@@ -221,19 +220,18 @@ let tests () =
         [ loading; loaded ]
         |> expectNotifications (watcher.Notifications)
 
-        let parsed = loader.Projects.ToArray()
+        let parsed = loader.Projects
 
         Expect.equal parsed.Length 1 "console and lib"
         
         Expect.equal (parsed.[0].Key) { ProjectKey.ProjectPath = projPath; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "first is a lib"
       )
 
-      testCase |> withLog "can load sample3" (fun logger fs ->
+      ftestCase |> withLog "can load sample3" (fun logger fs ->
         let testDir = inDir fs "load_sample3"
         copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
 
         let projPath = testDir/ (``sample3 Netsdk projs``.ProjectFile)
-        let projDir = Path.GetDirectoryName projPath
 
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
@@ -250,6 +248,11 @@ let tests () =
         [ loading; loading; loaded ]
         |> expectNotifications (watcher.Notifications)
 
+        let parsed = loader.Projects
+
+        Expect.equal parsed.Length 3 "console and lib (F#) and lib (C#)"
+        
+        Expect.equal (parsed.[0].Key) { ProjectKey.ProjectPath = projPath; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "first is a lib"
       )
 
       testCase |> withLog "can load sample4" (fun logger fs ->
@@ -297,7 +300,7 @@ let tests () =
         [ loading; loaded ]
         |> expectNotifications (watcher.Notifications)
 
-        let parsed = loader.Projects.ToArray()
+        let parsed = loader.Projects
 
         Expect.equal parsed.Length 1 "console and lib"
         

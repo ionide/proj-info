@@ -12,6 +12,8 @@ type ProjectSdkType =
 and ProjectSdkTypeVerbose =
     {
       TargetPath: string
+      TargetFrameworkVersion: string
+      Configuration: string
     }
 and ProjectSdkTypeDotnetSdk =
     {

@@ -26,13 +26,14 @@ type Loader () =
             | ProjectSdkType.DotnetSdk t ->
                 t.TargetFramework
             | ProjectSdkType.Verbose v ->
-                "unknown"
+                v.TargetFrameworkVersion
         }
 
     [<CLIEvent>]
-    member this.Event1 = event1.Publish
+    member __.Event1 = event1.Publish
 
-    member this.Projects = parsedProjects
+    member __.Projects
+        with get () = parsedProjects.ToArray()
 
     member x.LoadSln(sln: string) =
         ()
@@ -57,7 +58,14 @@ type Loader () =
             match loader notify cache project with
             | Ok (po, sources, props) ->
                 let loaded = WorkspaceProjectState.Loaded (po, sources, props)
-                parsedProjects.AddOrUpdate(getKey po, po, fun _ _ -> po) |> ignore
+
+                let rec visit (p: ProjectOptions) = seq {
+                    yield p
+                    for (_, p2p) in p.ReferencedProjects do
+                        yield! visit p2p }
+
+                for proj in visit po do
+                    parsedProjects.AddOrUpdate(getKey proj, proj, fun _ _ -> proj) |> ignore
                 notify loaded
             | Error e ->
                 let failed = WorkspaceProjectState.Failed (project, e)

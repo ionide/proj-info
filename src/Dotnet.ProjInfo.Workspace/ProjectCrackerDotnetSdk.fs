@@ -55,6 +55,18 @@ module ProjectCrackerDotnetSdk =
 
       IsPublishable = msbuildPropBool "IsPublishable" }
 
+  let getExtraInfoVerboseSdk targetPath props =
+    let msbuildPropBool prop =
+        props |> Map.tryFind prop |> Option.bind msbuildPropBool
+    let msbuildPropStringList prop =
+        props |> Map.tryFind prop |> Option.map msbuildPropStringList
+    let msbuildPropString prop =
+        props |> Map.tryFind prop
+
+    { ProjectSdkTypeVerbose.TargetPath = targetPath
+      Configuration = msbuildPropString "Configuration" |> Option.getOrElse ""
+      TargetFrameworkVersion = msbuildPropString "TargetFrameworkVersion" |> Option.getOrElse "" }
+
   type private ProjectParsingSdk = DotnetSdk | VerboseSdk
 
   type ParsedProject = string * ProjectOptions * ((string * string) list)
@@ -217,7 +229,9 @@ module ProjectCrackerDotnetSdk =
                     let mergedLog =
                         [ yield (file, "")
                           yield! p2pProjects |> List.collect (fun (_,_,x) -> x) ]
-                    ProjectSdkType.Verbose { TargetPath = tar }, mergedLog
+                    
+                    let extraInfo = getExtraInfoVerboseSdk tar props
+                    ProjectSdkType.Verbose(extraInfo), mergedLog
 
             let po =
                 {
