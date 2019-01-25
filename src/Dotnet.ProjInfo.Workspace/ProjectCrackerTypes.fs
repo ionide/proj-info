@@ -71,7 +71,7 @@ type ProjectOptions =
     }
 
 type [<RequireQualifiedAccess>] WorkspaceProjectState =
-    | Loading of string
+    | Loading of string * ((string * string) list)
     | Loaded of ProjectOptions * string list * Map<string,string>
     | Failed of string * GetProjectOptionsErrors
 

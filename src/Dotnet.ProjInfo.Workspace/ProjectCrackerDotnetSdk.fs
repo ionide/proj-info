@@ -77,7 +77,7 @@ module ProjectCrackerDotnetSdk =
     let rec projInfoOf additionalMSBuildProps file : ParsedProject =
         let projDir = Path.GetDirectoryName file
 
-        notifyState (WorkspaceProjectState.Loading file)
+        notifyState (WorkspaceProjectState.Loading (file, additionalMSBuildProps))
 
         match parseAsSdk with
         | ProjectParsingSdk.DotnetSdk ->
