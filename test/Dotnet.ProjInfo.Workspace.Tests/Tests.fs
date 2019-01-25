@@ -325,7 +325,7 @@ let tests () =
   let invalid =
     testList "invalid" [
 
-      ftestCase |> withLog "project not found" (fun logger fs ->
+      testCase |> withLog "project not found" (fun logger fs ->
         let testDir = inDir fs "proj_not_found"
         copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
 

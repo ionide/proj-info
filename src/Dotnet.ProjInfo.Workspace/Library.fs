@@ -2,6 +2,7 @@ namespace Dotnet.ProjInfo.Workspace
 
 open System.Collections.Concurrent
 open ProjectRecognizer
+open System.IO
 
 type ProjectKey =
     { ProjectPath: string
@@ -47,13 +48,17 @@ type Loader () =
         for project in projects do
 
             let loader =
-                match project with
-                | NetCoreSdk ->
-                    ProjectCrackerDotnetSdk.load
-                | Net45 ->
-                    ProjectCrackerDotnetSdk.loadVerboseSdk
-                | NetCoreProjectJson | Unsupported ->
-                    failwithf "unsupported project %s" project
+                if File.Exists project then
+                    match project with
+                    | NetCoreSdk ->
+                        ProjectCrackerDotnetSdk.load
+                    | Net45 ->
+                        ProjectCrackerDotnetSdk.loadVerboseSdk
+                    | NetCoreProjectJson | Unsupported ->
+                        failwithf "unsupported project %s" project
+                 else
+                    fun _ _ proj ->
+                        Error (GetProjectOptionsErrors.GenericError(proj, "not found"))
 
             match loader notify cache project with
             | Ok (po, sources, props) ->
