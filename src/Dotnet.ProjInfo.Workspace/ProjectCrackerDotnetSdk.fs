@@ -201,8 +201,9 @@ module ProjectCrackerDotnetSdk =
             //TODO cache projects info of p2p ref
             let p2pProjects =
                 p2ps
+                // TODO before was no follow. now follow other projects too
                 // do not follow others lang project, is not supported by FCS anyway
-                |> List.filter (fun p2p -> p2p.ProjectReferenceFullPath.ToLower().EndsWith(".fsproj"))
+                // |> List.filter (fun p2p -> p2p.ProjectReferenceFullPath.ToLower().EndsWith(".fsproj"))
                 |> List.map (fun p2p ->
                     let followP2pArgs =
                         p2p.TargetFramework

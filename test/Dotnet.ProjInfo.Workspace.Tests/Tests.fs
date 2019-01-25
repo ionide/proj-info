@@ -12,6 +12,7 @@ open System.Xml.Linq
 open DotnetProjInfo.TestAssets
 open System.Collections.Generic
 open Dotnet.ProjInfo.Workspace
+open System.Collections.Generic
 
 let RepoDir = (__SOURCE_DIRECTORY__ /".." /"..") |> Path.GetFullPath
 let ExamplesDir = RepoDir/"test"/"examples"
@@ -232,6 +233,9 @@ let tests () =
         copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
 
         let projPath = testDir/ (``sample3 Netsdk projs``.ProjectFile)
+        let l1 :: l2 :: [] =
+          ``sample3 Netsdk projs``.ProjectReferences
+          |> List.map (fun p2p -> testDir/ p2p.ProjectFile )
 
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
@@ -242,17 +246,24 @@ let tests () =
 
         loader.LoadProjects [projPath]
 
-        //TODO should notify the loading of the c# project
-        //     so should be [ loading; loading; loading; loaded ]
-
-        [ loading; loading; loaded ]
+        [ loading; loading; loading; loaded ]
         |> expectNotifications (watcher.Notifications)
 
         let parsed = loader.Projects
 
-        Expect.equal parsed.Length 3 "console and lib (F#) and lib (C#)"
+        Expect.equal parsed.Length 3 (sprintf "console (F#) and lib (F#) and lib (C#), but was %A" (parsed |> Array.map (fun x -> x.Key)))
         
-        Expect.equal (parsed.[0].Key) { ProjectKey.ProjectPath = projPath; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "first is a lib"
+        let findKey path parsed =
+          parsed
+          |> Array.tryPick (fun (kv: KeyValuePair<ProjectKey, ProjectOptions>) ->
+              if kv.Key.ProjectPath = path then Some kv.Key else None)
+          |> function
+             | Some x -> x
+             | None -> failwithf "key '%s' not found in %A" path (parsed |> Array.map (fun kv -> kv.Key))
+
+        Expect.equal (parsed |> findKey l1) { ProjectKey.ProjectPath = l1; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "the F# lib"
+        Expect.equal (parsed |> findKey l2) { ProjectKey.ProjectPath = l2; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "the C# lib"
+        Expect.equal (parsed |> findKey projPath) { ProjectKey.ProjectPath = projPath; Configuration = "Debug"; TargetFramework = "netcoreapp2.1" } "the F# console"
       )
 
       testCase |> withLog "can load sample4" (fun logger fs ->
