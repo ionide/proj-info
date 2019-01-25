@@ -350,6 +350,8 @@ let tests () =
         let parsed = loader.Projects
 
         Expect.equal parsed.Length 0 "no project loaded"
+        
+        Expect.equal (watcher.Notifications |> List.head) (WorkspaceProjectState.Failed(wrongPath, (GetProjectOptionsErrors.GenericError(wrongPath, "not found")))) "check error type"
       )
     ]
 
