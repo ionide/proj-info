@@ -285,9 +285,7 @@ let tests () =
 
         loader.LoadProjects [projPath]
 
-        //TODO it notify a wrong additional loading of the cross targeting
-        //     so should be [ loading; loaded ]
-
+        //the additional loading is the cross targeting
         [ loading; loading; loaded ]
         |> expectNotifications (watcher.Notifications)
 
