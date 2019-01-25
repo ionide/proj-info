@@ -264,7 +264,6 @@ module ProjectCrackerDotnetSdk =
                         s.StartsWith(tempPath.ToLower())
                     sources
                     |> List.filter (not << isTempFile)
-                | ProjectSdkType.ProjectJson
                 | ProjectSdkType.DotnetSdk _ ->
                     sources
             | _ -> sources

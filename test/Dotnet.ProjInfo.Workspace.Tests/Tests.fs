@@ -11,6 +11,7 @@ open System.IO.Compression
 open System.Xml.Linq
 open DotnetProjInfo.TestAssets
 open System.Collections.Generic
+open Dotnet.ProjInfo.Workspace
 
 let RepoDir = (__SOURCE_DIRECTORY__ /".." /"..") |> Path.GetFullPath
 let ExamplesDir = RepoDir/"test"/"examples"
@@ -156,9 +157,15 @@ let tests () =
         loader.Event1.Add(fun (_, arg) -> logNotification logger arg)
 
         loader.LoadProjects [projPath]
+
+        let parsed = loader.Projects.ToArray()
+
+        Expect.equal parsed.Length 1 "console and lib"
+        
+        Expect.equal (parsed.[0].Key) { ProjectKey.ProjectPath = projPath; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "first is a lib"
       )
 
-      ftestCase |> withLog "can load sample3" (fun logger fs ->
+      testCase |> withLog "can load sample3" (fun logger fs ->
         let testDir = inDir fs "sanity_check_sample2"
         copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
 
@@ -181,11 +188,9 @@ let tests () =
         Expect.equal (notifications.Count) 3 "notifications: [loading; loading; loaded]"
       )
 
-      testCase |> withLog "can load sample4" (fun _ fs ->
+      testCase |> withLog "can load sample4" (fun logger fs ->
         let testDir = inDir fs "sanity_check_sample4"
         copyDirFromAssets fs ``samples4 NetSdk multi tfm``.ProjDir testDir
-
-        Tests.skiptest "not yet implemented"
 
         let projPath = testDir/ (``samples4 NetSdk multi tfm``.ProjectFile)
         let projDir = Path.GetDirectoryName projPath
@@ -195,6 +200,16 @@ let tests () =
 
         for (tfm, _) in ``samples4 NetSdk multi tfm``.TargetFrameworks |> Map.toList do
           printfn "tfm: %s" tfm
+
+        let loader = Dotnet.ProjInfo.Workspace.Loader()
+
+        let notifications = List<_>()
+
+        loader.Event1.Add(fun (_, arg) ->
+          notifications.Add(arg)
+          logNotification logger arg)
+
+        loader.LoadProjects [projPath]
       )
 
     ]

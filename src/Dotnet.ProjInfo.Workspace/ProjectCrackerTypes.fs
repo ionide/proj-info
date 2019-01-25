@@ -8,7 +8,6 @@ type FilePath = string
 [<RequireQualifiedAccess>]
 type ProjectSdkType =
     | Verbose of ProjectSdkTypeVerbose
-    | ProjectJson
     | DotnetSdk of ProjectSdkTypeDotnetSdk
 and ProjectSdkTypeVerbose =
     {
