@@ -26,7 +26,7 @@ type Loader () =
             | ProjectSdkType.DotnetSdk t ->
                 t.TargetFramework
             | ProjectSdkType.Verbose v ->
-                v.TargetFrameworkVersion
+                v.TargetFrameworkVersion |> Dotnet.ProjInfo.NETFramework.netifyTargetFrameworkVersion
         }
 
     [<CLIEvent>]

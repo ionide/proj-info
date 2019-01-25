@@ -12,6 +12,7 @@
     <Compile Include="ExternalFSharp\FscConfig.fs" />
     <Compile Include="Inspect.fs" />
     <Compile Include="NETFrameworkInfoFromMSBuild.fs" />
+    <Compile Include="NETFramework.fs" />
   </ItemGroup>
 
   <ItemGroup>
