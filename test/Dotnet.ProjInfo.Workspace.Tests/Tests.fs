@@ -70,6 +70,52 @@ let downloadNugetClient (logger: Logger) (nugetUrl: string) nugetPath =
         eventX "nuget.exe already found in '{path}'"
         >> setField "path" nugetPath)
 
+let logNotification (logger: Logger) arg =
+  logger.info(
+    eventX "notified: {notification}'"
+    >> setField "notification" arg)
+
+[<AutoOpen>]
+module ExpectNotification =
+
+  let (|IsLoading|_|) n =
+    match n with
+    | WorkspaceProjectState.Loading _ -> Some ()
+    | _ -> None
+
+  let (|IsLoaded|_|) n =
+    match n with
+    | WorkspaceProjectState.Loaded _ -> Some ()
+    | _ -> None
+
+  let (|IsFailed|_|) n =
+    match n with
+    | WorkspaceProjectState.Failed _ -> Some ()
+    | _ -> None
+
+  let loading = "loading", ( |IsLoading|_| ) >> Option.isSome
+  let loaded = "loaded", ( |IsLoaded|_| ) >> Option.isSome
+  let failed = "failed", ( |IsFailed|_| ) >> Option.isSome
+
+  let expectNotifications actual expected =
+    Expect.equal (List.length actual) (List.length expected) (sprintf "notifications: %A" (expected |> List.map fst))
+
+    expected
+    |> List.zip actual
+    |> List.iter (fun (n, check) ->
+        let name, f = check
+        Expect.isTrue (f n) (sprintf "expected %s but was %A" name n) )
+
+  type NotificationWatcher (loader: Dotnet.ProjInfo.Workspace.Loader, log) =
+      let notifications = List<_>()
+
+      do loader.Event1.Add(fun (_, arg) ->
+            notifications.Add(arg)
+            log arg)
+
+      member __.Notifications
+          with get () = notifications |> List.ofSeq
+
 let tests () =
  
   let prepareTestsAssets = lazy(
@@ -116,10 +162,8 @@ let tests () =
     |> fun s -> s.Trim()
     |> asLines
 
-  let logNotification (logger: Logger) arg =
-    logger.info(
-      eventX "notified: {notification}'"
-      >> setField "notification" arg)
+  let watchNotifications logger loader =
+     NotificationWatcher (loader, logNotification logger)
 
   let valid =
     testList "valid" [
@@ -140,6 +184,9 @@ let tests () =
         fs.cd testDir
         msbuild fs [projPath; "/t:Build"]
         |> checkExitCodeZero
+
+        // [ loading; loaded ]
+        // |> expectNotifications (notifications |> List.ofSeq)
       )
 
       testCase |> withLog "can load sample2" (fun logger fs ->
@@ -154,9 +201,12 @@ let tests () =
 
         let loader = Dotnet.ProjInfo.Workspace.Loader()
 
-        loader.Event1.Add(fun (_, arg) -> logNotification logger arg)
+        let watcher = watchNotifications logger loader
 
         loader.LoadProjects [projPath]
+
+        [ loading; loaded ]
+        |> expectNotifications (watcher.Notifications)
 
         let parsed = loader.Projects.ToArray()
 
@@ -177,15 +227,13 @@ let tests () =
 
         let loader = Dotnet.ProjInfo.Workspace.Loader()
 
-        let notifications = List<_>()
-
-        loader.Event1.Add(fun (_, arg) ->
-          notifications.Add(arg)
-          logNotification logger arg)
+        let watcher = watchNotifications logger loader
 
         loader.LoadProjects [projPath]
 
-        Expect.equal (notifications.Count) 3 "notifications: [loading; loading; loaded]"
+        [ loading; loading; loading; loaded ]
+        |> expectNotifications (watcher.Notifications)
+
       )
 
       testCase |> withLog "can load sample4" (fun logger fs ->
@@ -203,13 +251,38 @@ let tests () =
 
         let loader = Dotnet.ProjInfo.Workspace.Loader()
 
-        let notifications = List<_>()
-
-        loader.Event1.Add(fun (_, arg) ->
-          notifications.Add(arg)
-          logNotification logger arg)
+        let watcher = watchNotifications logger loader
 
         loader.LoadProjects [projPath]
+
+        [ loading; loaded ]
+        |> expectNotifications (watcher.Notifications)
+      )
+
+      testCase |> withLog "can load sample5" (fun logger fs ->
+        let testDir = inDir fs "sanity_check_sample5"
+        copyDirFromAssets fs ``samples5 NetSdk CSharp library``.ProjDir testDir
+
+        let projPath = testDir/ (``samples5 NetSdk CSharp library``.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
+
+        dotnet fs ["restore"; projPath]
+        |> checkExitCodeZero
+
+        let loader = Dotnet.ProjInfo.Workspace.Loader()
+
+        let watcher = watchNotifications logger loader
+
+        loader.LoadProjects [projPath]
+
+        [ loading; loaded ]
+        |> expectNotifications (watcher.Notifications)
+
+        let parsed = loader.Projects.ToArray()
+
+        Expect.equal parsed.Length 1 "console and lib"
+        
+        Expect.equal (parsed.[0].Key) { ProjectKey.ProjectPath = projPath; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "first is a lib"
       )
 
     ]
