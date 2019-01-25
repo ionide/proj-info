@@ -128,9 +128,14 @@ module ProjectCrackerDotnetSdk =
                 | ProjectParsingSdk.VerboseSdk ->
                     Dotnet.ProjInfo.Inspect.getProjectInfos // getProjectInfosOldSdk
 
+            let globalArgs =
+                match Environment.GetEnvironmentVariable("DOTNET_PROJ_INFO_MSBUILD_BL") with
+                | "1" -> Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Switch("bl") :: []
+                | _ -> []
+
             let infoResult =
                 file
-                |> inspect loggedMessages.Enqueue msbuildExec [getFscArgs; getP2PRefs; gp] additionalArgs
+                |> inspect loggedMessages.Enqueue msbuildExec [getFscArgs; getP2PRefs; gp] (additionalArgs @ globalArgs)
 
             infoResult, (loggedMessages.ToArray() |> Array.toList)
 
