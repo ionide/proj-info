@@ -322,6 +322,37 @@ let tests () =
 
     ]
 
-  [ valid ]
+  let invalid =
+    testList "invalid" [
+
+      ftestCase |> withLog "project not found" (fun logger fs ->
+        let testDir = inDir fs "proj_not_found"
+        copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
+
+        let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
+
+        dotnet fs ["restore"; projPath]
+        |> checkExitCodeZero
+
+        let loader = Dotnet.ProjInfo.Workspace.Loader()
+
+        let watcher = watchNotifications logger loader
+
+        let wrongPath =
+          let dir, name, ext = Path.GetDirectoryName projPath, Path.GetFileNameWithoutExtension projPath, Path.GetExtension projPath
+          Path.Combine(dir, name + "aa" + ext)
+
+        loader.LoadProjects [wrongPath]
+
+        [ failed ]
+        |> expectNotifications (watcher.Notifications)
+
+        let parsed = loader.Projects
+
+        Expect.equal parsed.Length 0 "no project loaded"
+      )
+    ]
+
+  [ valid; invalid ]
   |> testList "workspace"
   |> testSequenced
