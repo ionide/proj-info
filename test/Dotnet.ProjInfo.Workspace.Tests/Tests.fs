@@ -14,6 +14,8 @@ open System.Collections.Generic
 open Dotnet.ProjInfo.Workspace
 open System.Collections.Generic
 
+#nowarn "25"
+
 let RepoDir = (__SOURCE_DIRECTORY__ /".." /"..") |> Path.GetFullPath
 let ExamplesDir = RepoDir/"test"/"examples"
 let TestRunDir = RepoDir/"test"/"testrun_ws"
@@ -116,6 +118,14 @@ module ExpectNotification =
 
       member __.Notifications
           with get () = notifications |> List.ofSeq
+        
+let findKey path parsed =
+  parsed
+  |> Array.tryPick (fun (kv: KeyValuePair<ProjectKey, ProjectOptions>) ->
+      if kv.Key.ProjectPath = path then Some kv.Key else None)
+  |> function
+     | Some x -> x
+     | None -> failwithf "key '%s' not found in %A" path (parsed |> Array.map (fun kv -> kv.Key))
 
 let tests () =
  
@@ -200,7 +210,7 @@ let tests () =
         
         //TODO Configuration should be Debug
         //TODO TargetFramework should be `net461`
-        Expect.equal (parsed.[0].Key) { ProjectKey.ProjectPath = projPath; Configuration = "unknown"; TargetFramework = "v4.6.1" } "a lib"
+        Expect.equal (parsed |> findKey projPath) { ProjectKey.ProjectPath = projPath; Configuration = "unknown"; TargetFramework = "v4.6.1" } "a lib"
       )
 
       testCase |> withLog "can load sample2" (fun logger fs ->
@@ -225,10 +235,10 @@ let tests () =
 
         Expect.equal parsed.Length 1 "console and lib"
         
-        Expect.equal (parsed.[0].Key) { ProjectKey.ProjectPath = projPath; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "first is a lib"
+        Expect.equal (parsed |> findKey projPath) { ProjectKey.ProjectPath = projPath; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "first is a lib"
       )
 
-      ftestCase |> withLog "can load sample3" (fun logger fs ->
+      testCase |> withLog "can load sample3" (fun logger fs ->
         let testDir = inDir fs "load_sample3"
         copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
 
@@ -252,14 +262,6 @@ let tests () =
         let parsed = loader.Projects
 
         Expect.equal parsed.Length 3 (sprintf "console (F#) and lib (F#) and lib (C#), but was %A" (parsed |> Array.map (fun x -> x.Key)))
-        
-        let findKey path parsed =
-          parsed
-          |> Array.tryPick (fun (kv: KeyValuePair<ProjectKey, ProjectOptions>) ->
-              if kv.Key.ProjectPath = path then Some kv.Key else None)
-          |> function
-             | Some x -> x
-             | None -> failwithf "key '%s' not found in %A" path (parsed |> Array.map (fun kv -> kv.Key))
 
         Expect.equal (parsed |> findKey l1) { ProjectKey.ProjectPath = l1; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "the F# lib"
         Expect.equal (parsed |> findKey l2) { ProjectKey.ProjectPath = l2; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "the C# lib"
@@ -271,7 +273,6 @@ let tests () =
         copyDirFromAssets fs ``samples4 NetSdk multi tfm``.ProjDir testDir
 
         let projPath = testDir/ (``samples4 NetSdk multi tfm``.ProjectFile)
-        let projDir = Path.GetDirectoryName projPath
 
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
