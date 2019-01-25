@@ -344,14 +344,38 @@ let tests () =
 
         loader.LoadProjects [wrongPath]
 
-        [ failed ]
+        [ loading; failed ]
         |> expectNotifications (watcher.Notifications)
 
         let parsed = loader.Projects
 
         Expect.equal parsed.Length 0 "no project loaded"
         
-        Expect.equal (watcher.Notifications |> List.head) (WorkspaceProjectState.Failed(wrongPath, (GetProjectOptionsErrors.GenericError(wrongPath, "not found")))) "check error type"
+        Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(wrongPath, (GetProjectOptionsErrors.GenericError(wrongPath, "not found")))) "check error type"
+      )
+
+      testCase |> withLog "project not restored" (fun logger fs ->
+        let testDir = inDir fs "proj_not_restored"
+        copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
+
+        let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
+
+        let loader = Dotnet.ProjInfo.Workspace.Loader()
+
+        // no restore
+
+        let watcher = watchNotifications logger loader
+
+        loader.LoadProjects [projPath]
+
+        [ loading; failed ]
+        |> expectNotifications (watcher.Notifications)
+
+        let parsed = loader.Projects
+
+        Expect.equal parsed.Length 0 "no project loaded"
+        
+        Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(projPath, (GetProjectOptionsErrors.ProjectNotRestored projPath))) "check error type"
       )
     ]
 

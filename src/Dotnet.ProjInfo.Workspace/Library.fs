@@ -57,7 +57,9 @@ type Loader () =
                     | NetCoreProjectJson | Unsupported ->
                         failwithf "unsupported project %s" project
                  else
-                    fun _ _ proj ->
+                    fun notify _ proj ->
+                        let loading = WorkspaceProjectState.Loading (proj, [])
+                        notify loading
                         Error (GetProjectOptionsErrors.GenericError(proj, "not found"))
 
             match loader notify cache project with
