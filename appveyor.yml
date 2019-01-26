@@ -31,10 +31,6 @@ on_finish:
       }
 
 deploy:
-  - provider: NuGet
-    server: https://www.myget.org/F/dotnet-proj-info/api/v2/package
-    api_key:
-      secure: 0FlVmxXeqNWXknPWU1OcfpYq3JhkyhlWGrTN0WOSzFhOX3bMwe5L+OXv+fbnfa67
 
   - provider: GitHub
     release: $(appveyor_repo_tag_name)
