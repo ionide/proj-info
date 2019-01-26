@@ -24,65 +24,44 @@ module DotnetProjInfoInspectHelpers =
     | Dotnet.ProjInfo.Inspect.MSBuild.StringList list  -> list
     | _ -> []
 
-(*
 
 module NETFrameworkInfoProvider =
 
   open System
   open System.IO
-  open DotnetProjInfoInspectHelpers
-
-  let private getInfoFromMsbuild getArgs additionalProps =
-    let file = Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.createEnvInfoProj ()
-
-    let result, log =
-        let loggedMessages = System.Collections.Concurrent.ConcurrentQueue<string>()
-
-        let msbuildExec =
-            let runCmd exePath args =
-              Utils.runProcess loggedMessages.Enqueue (Path.GetDirectoryName file) exePath (args |> String.concat " ")
-
-            let msbuildPath =
-                Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
-
-            Dotnet.ProjInfo.Inspect.msbuild msbuildPath runCmd
-
-        let infoResult =
-            let additionalArgs = additionalProps |> List.map Dotnet.ProjInfo.Inspect.MSBuild.Property
-
-            file
-            |> Dotnet.ProjInfo.Inspect.getProjectInfoOldSdk loggedMessages.Enqueue msbuildExec getArgs additionalArgs
-
-        infoResult, (loggedMessages.ToArray() |> Array.toList)
-
-    match result with
-    | MsbuildOk r ->
-        r, log
-    | MsbuildError x ->
-        match x with
-        | Dotnet.ProjInfo.Inspect.GetProjectInfoErrors.MSBuildSkippedTarget ->
-            failwithf "Unexpected MSBuild result, all targets skipped"
-        | Dotnet.ProjInfo.Inspect.GetProjectInfoErrors.UnexpectedMSBuildResult(r) ->
-            failwithf "Unexpected MSBuild result %s" r
-        | Dotnet.ProjInfo.Inspect.GetProjectInfoErrors.MSBuildFailed(exitCode, (workDir, exePath, args)) ->
-            let logMsg = [ yield "Log: "; yield! log ] |> String.concat (Environment.NewLine)
-            let msbuildErrorMsg =
-                [ sprintf "MSBuild failed with exitCode %i" exitCode
-                  sprintf "Working Directory: '%s'" workDir
-                  sprintf "Exe Path: '%s'" exePath
-                  sprintf "Args: '%s'" args ]
-                |> String.concat " "
-            
-            failwithf "%s%s%s" msbuildErrorMsg (Environment.NewLine) logMsg
-    | _ ->
-        failwithf "error getting msbuild info: internal error"
+  open Dotnet.ProjInfo
+  open Dotnet.ProjInfo.Inspect
 
   let private getInstalledNETVersions () =
-    let result, _ = getInfoFromMsbuild (Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.installedNETFrameworks) []
+
+    let log = ignore
+
+    let projPath =
+        //create the proj file
+        NETFrameworkInfoFromMSBuild.createEnvInfoProj ()
+        |> Path.GetFullPath
+
+    let projDir = Path.GetDirectoryName(projPath)
+
+    let msbuildHost = MSBuildExePath.Path "msbuild"
+
+    let cmd = NETFrameworkInfoFromMSBuild.installedNETFrameworks
+
+    let runCmd exePath args = Utils.runProcess log projDir exePath (args |> String.concat " ")
+
+    let msbuildExec =
+        msbuild msbuildHost runCmd
+
+    let result =
+        projPath
+        |> getProjectInfo log msbuildExec cmd []
+
     match result with
-    | Dotnet.ProjInfo.Inspect.GetResult.InstalledNETFw fws ->
+    | Ok (Dotnet.ProjInfo.Inspect.GetResult.InstalledNETFw fws) ->
         fws
-    | r ->
+    | Ok x ->
+        failwithf "error getting msbuild info: unexpected %A" x
+    | Error r ->
         failwithf "error getting msbuild info: unexpected %A" r
 
 
@@ -136,14 +115,44 @@ module NETFrameworkInfoProvider =
 
   let private getAdditionalArgumentsBy targetFramework =
     let refs =
+      let log = ignore
+
+      let projPath =
+        //create the proj file
+        NETFrameworkInfoFromMSBuild.createEnvInfoProj ()
+        |> Path.GetFullPath
+
+      let projDir = Path.GetDirectoryName(projPath)
+
+      let msbuildHost = MSBuildExePath.Path "msbuild"
+
       let allRefs = defaultReferencesForNonProjectFiles ()
-      let props = targetFramework |> Option.map (fun tfm -> "TargetFrameworkVersion", tfm) |> Option.toList
-      let result, _ = getInfoFromMsbuild (fun () -> Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild.getReferencePaths allRefs) props
+
+      let props =
+        targetFramework
+        |> Option.map (fun tfm -> "TargetFrameworkVersion", tfm)
+        |> Option.toList
+        |> List.map (Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Property)
+
+      let cmd () = NETFrameworkInfoFromMSBuild.getReferencePaths allRefs
+
+      let runCmd exePath args = Utils.runProcess log projDir exePath (args |> String.concat " ")
+
+      let msbuildExec =
+        msbuild msbuildHost runCmd
+
+      let result =
+        projPath
+        |> getProjectInfo log msbuildExec cmd props
+
       match result with
-      | Dotnet.ProjInfo.Inspect.GetResult.ResolvedNETRefs resolvedRefs ->
+      | Ok (Dotnet.ProjInfo.Inspect.GetResult.ResolvedNETRefs resolvedRefs) ->
           resolvedRefs
+      | Ok x ->
+          failwithf "error getting msbuild info: unexpected %A" x
       | r ->
           failwithf "error getting msbuild info: unexpected %A" r
+
     [ yield "--simpleresolution"
       yield "--noframework"
       yield! refs |> List.map (sprintf "-r:%s") ]
@@ -156,4 +165,3 @@ module NETFrameworkInfoProvider =
     let key = match targetFramework with Some x -> x | None -> ""
     additionalArgsByTfm.GetOrAdd(key, f)
 
-*)

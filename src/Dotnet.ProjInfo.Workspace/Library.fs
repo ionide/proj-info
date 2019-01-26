@@ -14,6 +14,9 @@ type Loader () =
     let event1 = new Event<_>()
     let parsedProjects = ConcurrentDictionary<_, _>()
 
+    let mutable msbuildPath = "msbuild"
+    let mutable msbuildNetSdkPath = "dotnet"
+
     let getKey (po: ProjectOptions) =
         { ProjectKey.ProjectPath = po.ProjectFileName
           Configuration =
@@ -77,6 +80,3 @@ type Loader () =
             | Error e ->
                 let failed = WorkspaceProjectState.Failed (project, e)
                 notify failed
-
-    member x.LoadFsx(fsx: string, tfm: string) =
-        ()

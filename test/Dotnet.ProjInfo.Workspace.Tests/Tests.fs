@@ -379,6 +379,55 @@ let tests () =
       )
     ]
 
-  [ valid; invalid ]
+  let fsx =
+
+    testList "fsx" [
+
+      testCase |> withLog "fsx no tfm" (fun logger fs ->
+        let testDir = inDir fs "fsx_none"
+
+        let dummy (file:string, source:string, additionaRefs: string array, assumeDotNetFramework:bool) = async {
+            printfn "%A" additionaRefs
+
+            Expect.exists additionaRefs (fun p -> p.Contains(@".NETFramework\v4.0\mscorlib.dll")) "check net461 exists"
+
+            return (4,5)
+        }
+
+        let a, mapper =
+          FSharpCompilerServiceChecker.getProjectOptionsFromScript dummy "a.fsx" "text" None
+          |> Async.RunSynchronously
+
+        Expect.equal a 4 "returned"
+
+        let _changed = mapper [| "a"; "b" |]
+
+        ()
+      )
+
+      testCase |> withLog "fsx net461" (fun logger fs ->
+        let testDir = inDir fs "fsx_net461"
+
+        let dummy (file:string, source:string, additionaRefs: string array, assumeDotNetFramework:bool) = async {
+            printfn "%A" additionaRefs
+
+            Expect.exists additionaRefs (fun p -> p.Contains(@".NETFramework\v4.6.1\mscorlib.dll")) "check net461 exists"
+
+            return (1,2)
+        }
+
+        let a, mapper =
+          FSharpCompilerServiceChecker.getProjectOptionsFromScript dummy "a.fsx" "text" (Some "v4.6.1")
+          |> Async.RunSynchronously
+
+        Expect.equal a 1 "returned"
+
+        let _changed = mapper [| "a"; "b" |]
+
+        ()
+      )
+    ]
+
+  [ valid; invalid; fsx ]
   |> testList "workspace"
   |> testSequenced

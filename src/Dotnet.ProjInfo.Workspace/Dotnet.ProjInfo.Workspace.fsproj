@@ -9,6 +9,7 @@
   <ItemGroup>
     <Compile Include="Common.fs" />
     <Compile Include="NETFrameworkInfoProvider.fs" />
+    <Compile Include="CompilerServiceInterface.fs" />
     <Compile Include="ProjectCrackerTypes.fs" />
     <Compile Include="..\..\paket-files\Microsoft\visualfsharp\src\fsharp\FSharp.Build\Fsc.fs" />
     <Compile Include="ProjectCrackerDotnetSdk.fs" />
