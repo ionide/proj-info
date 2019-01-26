@@ -72,7 +72,7 @@ module ProjectCrackerDotnetSdk =
   type ParsedProject = string * ProjectOptions * ((string * string) list)
   type ParsedProjectCache = Collections.Concurrent.ConcurrentDictionary<string, ParsedProject>
 
-  let private getProjectOptionsFromProjectFile notifyState (cache: ParsedProjectCache) parseAsSdk (file : string) =
+  let private getProjectOptionsFromProjectFile msbuildPath notifyState (cache: ParsedProjectCache) parseAsSdk (file : string) =
 
     let rec projInfoOf additionalMSBuildProps file : ParsedProject =
         let projDir = Path.GetDirectoryName file
@@ -123,12 +123,6 @@ module ProjectCrackerDotnetSdk =
             let runCmd exePath args = Utils.runProcess loggedMessages.Enqueue projDir exePath (args |> String.concat " ")
 
             let msbuildExec =
-                let msbuildPath =
-                    match parseAsSdk with
-                    | ProjectParsingSdk.DotnetSdk ->
-                        Dotnet.ProjInfo.Inspect.MSBuildExePath.DotnetMsbuild "dotnet"
-                    | ProjectParsingSdk.VerboseSdk ->
-                        Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
                 Dotnet.ProjInfo.Inspect.msbuild msbuildPath runCmd
 
             let additionalArgs = additionalMSBuildProps |> List.map (Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Property)
@@ -266,9 +260,9 @@ module ProjectCrackerDotnetSdk =
   let private (|ProjectExtraInfoBySdk|_|) po =
       Some po.ExtraProjectInfo
 
-  let private loadBySdk notifyState (cache: ParsedProjectCache) parseAsSdk file =
+  let private loadBySdk msbuildPath notifyState (cache: ParsedProjectCache) parseAsSdk file =
       try
-        let po, log = getProjectOptionsFromProjectFile notifyState cache parseAsSdk file
+        let po, log = getProjectOptionsFromProjectFile msbuildPath notifyState cache parseAsSdk file
 
         let compileFiles =
             let sources = FscArguments.compileFiles po.OtherOptions
@@ -293,8 +287,8 @@ module ProjectCrackerDotnetSdk =
         | ProjectInspectException d -> Error d
         | e -> Error (GenericError(file, e.Message))
 
-  let load notifyState (cache: ParsedProjectCache) file =
-      loadBySdk notifyState cache ProjectParsingSdk.DotnetSdk file
+  let load msbuildPath notifyState (cache: ParsedProjectCache) file =
+      loadBySdk msbuildPath notifyState cache ProjectParsingSdk.DotnetSdk file
 
-  let loadVerboseSdk notifyState (cache: ParsedProjectCache) file =
-      loadBySdk notifyState cache ProjectParsingSdk.VerboseSdk file
+  let loadVerboseSdk msbuildPath notifyState (cache: ParsedProjectCache) file =
+      loadBySdk msbuildPath notifyState cache ProjectParsingSdk.VerboseSdk file

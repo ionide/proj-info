@@ -62,9 +62,9 @@ type Loader () =
                 if File.Exists project then
                     match project with
                     | NetCoreSdk ->
-                        ProjectCrackerDotnetSdk.load
+                        ProjectCrackerDotnetSdk.load this.MSBuildNetSdkPath
                     | Net45 ->
-                        ProjectCrackerDotnetSdk.loadVerboseSdk
+                        ProjectCrackerDotnetSdk.loadVerboseSdk this.MSBuildPath
                     | NetCoreProjectJson | Unsupported ->
                         failwithf "unsupported project %s" project
                  else
