@@ -430,6 +430,23 @@ let tests () =
       )
     ]
 
-  [ valid; invalid; fsx ]
+  let netfw =
+
+    let msbuildHost = Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
+
+    testList "netfw" [
+
+      testCase |> withLog "installed .net fw" (fun logger fs ->
+        let testDir = inDir fs "netfw"
+
+        let fws = NETFrameworkInfoProvider.installedNETVersions msbuildHost
+
+        printfn "fws: %A" fws
+
+        Expect.contains fws "v4.6.1" "installed .net fw"
+      )
+    ]
+
+  [ valid; invalid; fsx; netfw ]
   |> testList "workspace"
   |> testSequenced

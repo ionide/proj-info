@@ -32,7 +32,7 @@ module NETFrameworkInfoProvider =
   open Dotnet.ProjInfo
   open Dotnet.ProjInfo.Inspect
 
-  let private getInstalledNETVersions () =
+  let private getInstalledNETVersions (msbuildHost: MSBuildExePath) =
 
     let log = ignore
 
@@ -42,8 +42,6 @@ module NETFrameworkInfoProvider =
         |> Path.GetFullPath
 
     let projDir = Path.GetDirectoryName(projPath)
-
-    let msbuildHost = MSBuildExePath.Path "msbuild"
 
     let cmd = NETFrameworkInfoFromMSBuild.installedNETFrameworks
 
@@ -64,10 +62,14 @@ module NETFrameworkInfoProvider =
     | Error r ->
         failwithf "error getting msbuild info: unexpected %A" r
 
+  //TODO remove it
+  let mutable private installedNETVersionsMSbuildHost = Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
 
-  let private installedNETVersionsLazy = lazy (getInstalledNETVersions ())
+  let private installedNETVersionsLazy = lazy (getInstalledNETVersions installedNETVersionsMSbuildHost)
 
-  let installedNETVersions () = installedNETVersionsLazy.Force()
+  let installedNETVersions msbuildHost =
+    installedNETVersionsMSbuildHost <- msbuildHost
+    installedNETVersionsLazy.Force()
 
   let private defaultReferencesForNonProjectFiles () =
     // ref https://github.com/fsharp/FSharp.Compiler.Service/blob/1f497ef86fd5d0a18e5a935f3d16984fda91f1de/src/fsharp/CompileOps.fs#L1801
@@ -113,7 +115,7 @@ module NETFrameworkInfoProvider =
           yield "System.Numerics" 
     ]
 
-  let private getAdditionalArgumentsBy msbuildHost targetFramework =
+  let private getAdditionalArgumentsBy (msbuildHost: MSBuildExePath) targetFramework =
     let refs =
       let log = ignore
 
