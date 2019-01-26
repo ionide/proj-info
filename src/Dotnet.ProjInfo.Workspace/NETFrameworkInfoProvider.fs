@@ -113,7 +113,7 @@ module NETFrameworkInfoProvider =
           yield "System.Numerics" 
     ]
 
-  let private getAdditionalArgumentsBy targetFramework =
+  let private getAdditionalArgumentsBy msbuildHost targetFramework =
     let refs =
       let log = ignore
 
@@ -123,8 +123,6 @@ module NETFrameworkInfoProvider =
         |> Path.GetFullPath
 
       let projDir = Path.GetDirectoryName(projPath)
-
-      let msbuildHost = MSBuildExePath.Path "msbuild"
 
       let allRefs = defaultReferencesForNonProjectFiles ()
 
@@ -159,9 +157,9 @@ module NETFrameworkInfoProvider =
 
   let private additionalArgsByTfm = System.Collections.Concurrent.ConcurrentDictionary<string, string list>()
 
-  let additionalArgumentsBy targetFramework =
+  let additionalArgumentsBy msbuildHost targetFramework =
     //memoize because expensive
-    let f tfm = getAdditionalArgumentsBy (if String.IsNullOrEmpty(tfm) then None else Some tfm)
+    let f tfm = getAdditionalArgumentsBy msbuildHost (if String.IsNullOrEmpty(tfm) then None else Some tfm)
     let key = match targetFramework with Some x -> x | None -> ""
     additionalArgsByTfm.GetOrAdd(key, f)
 

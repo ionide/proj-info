@@ -381,6 +381,8 @@ let tests () =
 
   let fsx =
 
+    let msbuildHost = Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
+
     testList "fsx" [
 
       testCase |> withLog "fsx no tfm" (fun logger fs ->
@@ -395,7 +397,7 @@ let tests () =
         }
 
         let a, mapper =
-          FSharpCompilerServiceChecker.getProjectOptionsFromScript dummy "a.fsx" "text" None
+          FSharpCompilerServiceChecker.getProjectOptionsFromScript msbuildHost dummy "a.fsx" "text" None
           |> Async.RunSynchronously
 
         Expect.equal a 4 "returned"
@@ -417,7 +419,7 @@ let tests () =
         }
 
         let a, mapper =
-          FSharpCompilerServiceChecker.getProjectOptionsFromScript dummy "a.fsx" "text" (Some "v4.6.1")
+          FSharpCompilerServiceChecker.getProjectOptionsFromScript msbuildHost dummy "a.fsx" "text" (Some "v4.6.1")
           |> Async.RunSynchronously
 
         Expect.equal a 1 "returned"
