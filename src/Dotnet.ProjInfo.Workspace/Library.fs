@@ -34,7 +34,7 @@ type Loader () =
         }
 
     [<CLIEvent>]
-    member __.Event1 = event1.Publish
+    member __.Notifications = event1.Publish
 
     member __.Projects
         with get () = parsedProjects.ToArray()

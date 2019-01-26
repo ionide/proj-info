@@ -112,7 +112,7 @@ module ExpectNotification =
   type NotificationWatcher (loader: Dotnet.ProjInfo.Workspace.Loader, log) =
       let notifications = List<_>()
 
-      do loader.Event1.Add(fun (_, arg) ->
+      do loader.Notifications.Add(fun (_, arg) ->
             notifications.Add(arg)
             log arg)
 
