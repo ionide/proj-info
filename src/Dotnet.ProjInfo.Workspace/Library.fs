@@ -14,8 +14,8 @@ type Loader () =
     let event1 = new Event<_>()
     let parsedProjects = ConcurrentDictionary<_, _>()
 
-    let mutable msbuildPath = "msbuild"
-    let mutable msbuildNetSdkPath = "dotnet"
+    let mutable msbuildPath = Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
+    let mutable msbuildNetSdkPath = Dotnet.ProjInfo.Inspect.MSBuildExePath.DotnetMsbuild "dotnet"
 
     let getKey (po: ProjectOptions) =
         { ProjectKey.ProjectPath = po.ProjectFileName
@@ -38,6 +38,14 @@ type Loader () =
 
     member __.Projects
         with get () = parsedProjects.ToArray()
+
+    member this.MSBuildPath
+        with get () = msbuildPath
+        and set (value) = msbuildPath <- value
+
+    member this.MSBuildNetSdkPath
+        with get () = msbuildNetSdkPath
+        and set (value) = msbuildNetSdkPath <- value
 
     member x.LoadSln(sln: string) =
         ()
