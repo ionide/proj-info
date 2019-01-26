@@ -13,6 +13,10 @@
     <Compile Include="ProjectCrackerTypes.fs" />
     <Compile Include="..\..\paket-files\Microsoft\visualfsharp\src\fsharp\FSharp.Build\Fsc.fs" />
     <Compile Include="ProjectCrackerDotnetSdk.fs" />
+    <Compile Include="InspectSln.fs" />
     <Compile Include="Library.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Sln" Version="0.3.0" />
   </ItemGroup>
 </Project>
