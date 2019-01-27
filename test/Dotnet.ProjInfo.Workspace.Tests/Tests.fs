@@ -390,7 +390,7 @@ let tests () =
           || path.Contains(sprintf "/%s/" tfm)
           || path.Contains(sprintf @"/%s-api/" tfm) )
 
-    ftestList "fsx" [
+    testList "fsx" [
 
       testCase |> withLog "fsx no tfm" (fun logger fs ->
         let testDir = inDir fs "fsx_none"
