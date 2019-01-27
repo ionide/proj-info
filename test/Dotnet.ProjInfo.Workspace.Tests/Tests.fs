@@ -383,7 +383,14 @@ let tests () =
 
     let msbuildHost = Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
 
-    testList "fsx" [
+    let isAssembly (name: string) (tfm: string) (path: string) =
+        path.EndsWith(name)
+        && (
+          path.Contains(sprintf @"\v%s\" tfm)
+          || path.Contains(sprintf "/%s/" tfm)
+          || path.Contains(sprintf @"/%s-api/" tfm) )
+
+    ftestList "fsx" [
 
       testCase |> withLog "fsx no tfm" (fun logger fs ->
         let testDir = inDir fs "fsx_none"
@@ -391,7 +398,7 @@ let tests () =
         let dummy (file:string, source:string, additionaRefs: string array, assumeDotNetFramework:bool) = async {
             printfn "%A" additionaRefs
 
-            Expect.exists additionaRefs (fun p -> p.Contains(@".NETFramework\v4.0\mscorlib.dll")) "check net461 exists"
+            Expect.exists additionaRefs (isAssembly "mscorlib.dll" "4.0") "check net461 exists"
 
             return (4,5)
         }
@@ -413,7 +420,7 @@ let tests () =
         let dummy (file:string, source:string, additionaRefs: string array, assumeDotNetFramework:bool) = async {
             printfn "%A" additionaRefs
 
-            Expect.exists additionaRefs (fun p -> p.Contains(@".NETFramework\v4.6.1\mscorlib.dll")) "check net461 exists"
+            Expect.exists additionaRefs (isAssembly "mscorlib.dll" "4.6.1") "check net461 exists"
 
             return (1,2)
         }
