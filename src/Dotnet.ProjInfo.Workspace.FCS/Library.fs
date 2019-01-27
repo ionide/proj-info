@@ -1,9 +1,11 @@
 namespace Dotnet.ProjInfo.Workspace.FCS
 
 open Dotnet.ProjInfo.Workspace
-open Microsoft.FSharp.Compiler.SourceCodeServices
 
-type FCSBinder () =
+type FCS_ProjectOptions = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpProjectOptions
+type FCS_Checker = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpChecker
+
+type FCSBinder (netFwInfo: NetFWInfo, checker: FCS_Checker) =
 
     // let projectLoadedSuccessfully projectFileName response =
     //     let project =
@@ -15,5 +17,18 @@ type FCSBinder () =
     //             proj
     //     ()
 
-    member this.Bind(fcs: FSharpChecker, workspace: Loader) =
+    member this.Bind(workspace: Loader) =
         ()
+
+    member this.GetProjectOptionsFromScriptBy(tfm, file, source) = async {
+      let dummy : FSharpCompilerServiceChecker.CheckerGetProjectOptionsFromScript<FCS_ProjectOptions, _> =
+        fun (file, source, otherFlags, assumeDotNetFramework) ->
+          checker.GetProjectOptionsFromScript(file, source, otherFlags = otherFlags, assumeDotNetFramework = assumeDotNetFramework)
+
+      let! (rawOptions, mapper) =
+        netFwInfo.GetProjectOptionsFromScript(dummy, tfm, file, source)
+
+      let rawOptions = { rawOptions with OtherOptions = mapper rawOptions.OtherOptions }
+
+      return rawOptions
+    }

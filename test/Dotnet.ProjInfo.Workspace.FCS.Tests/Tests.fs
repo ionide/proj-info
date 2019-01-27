@@ -14,6 +14,9 @@ open System.Collections.Generic
 open Dotnet.ProjInfo.Workspace
 open Dotnet.ProjInfo.Workspace.FCS
 
+type FCS_ProjectOptions = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpProjectOptions
+type FCS_Checker = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpChecker
+
 #nowarn "25"
 
 let RepoDir = (__SOURCE_DIRECTORY__ /".." /"..") |> Path.GetFullPath
@@ -200,12 +203,17 @@ let tests () =
         let config = LoaderConfig.Default msbuildLocator
         logConfig logger config
         let loader = Loader.Create(config)
-        loader
+
+        let netFwconfig = NetFWInfoConfig.Default msbuildLocator
+        logConfig logger netFwconfig
+        let netFwInfo = NetFWInfo.Create(netFwconfig)
+
+        loader, netFwInfo
 
     let createFCS () =
 
       let checker =
-        Microsoft.FSharp.Compiler.SourceCodeServices.FSharpChecker.Create(
+        FCS_Checker.Create(
           projectCacheSize = 200,
           keepAllBackgroundResolutions = true,
           keepAssemblyContents = true)
@@ -213,6 +221,13 @@ let tests () =
       checker.ImplicitlyStartBackgroundWork <- true
 
       checker
+
+    let createNetFwInfo logger =
+        let msbuildLocator = MSBuildLocator()
+        let config = NetFWInfoConfig.Default msbuildLocator
+        logConfig logger config
+        let netFwInfo = NetFWInfo.Create(config)
+        netFwInfo
 
     testList "valid" [
 
@@ -234,11 +249,29 @@ let tests () =
 
         let fcs = createFCS ()
 
-        let loader = createLoader logger
+        let loader, netFwInfo = createLoader logger
 
-        let fcsBinder = FCSBinder()
+        let fcsBinder = FCSBinder(netFwInfo, fcs)
 
-        fcsBinder.Bind(fcs, loader)
+        fcsBinder.Bind(loader)
+      )
+
+      ftestCase |> withLog "can fsx" (fun logger fs ->
+        let testDir = inDir fs "check_fsx"
+
+        let fcs = createFCS ()
+
+        let loader, netFwInfo = createLoader logger
+
+        let tfm = netFwInfo.LatestVersion ()
+
+        let fcsBinder = FCSBinder(netFwInfo, fcs)
+
+        let rawOptions =
+          fcsBinder.GetProjectOptionsFromScriptBy(tfm, "a.fsx", "1+1")
+          |> Async.RunSynchronously
+
+        printfn "raw: %A" rawOptions
       )
     ]
 
