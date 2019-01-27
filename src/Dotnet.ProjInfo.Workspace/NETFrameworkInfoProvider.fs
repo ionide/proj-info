@@ -25,14 +25,14 @@ module DotnetProjInfoInspectHelpers =
     | _ -> []
 
 
-module NETFrameworkInfoProvider =
+module internal NETFrameworkInfoProvider =
 
   open System
   open System.IO
   open Dotnet.ProjInfo
   open Dotnet.ProjInfo.Inspect
 
-  let private getInstalledNETVersions (msbuildHost: MSBuildExePath) =
+  let getInstalledNETVersions (msbuildHost: MSBuildExePath) =
 
     let log = ignore
 
@@ -61,15 +61,6 @@ module NETFrameworkInfoProvider =
         failwithf "error getting msbuild info: unexpected %A" x
     | Error r ->
         failwithf "error getting msbuild info: unexpected %A" r
-
-  //TODO remove it
-  let mutable private installedNETVersionsMSbuildHost = Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
-
-  let private installedNETVersionsLazy = lazy (getInstalledNETVersions installedNETVersionsMSbuildHost)
-
-  let installedNETVersions msbuildHost =
-    installedNETVersionsMSbuildHost <- msbuildHost
-    installedNETVersionsLazy.Force()
 
   let private defaultReferencesForNonProjectFiles () =
     // ref https://github.com/fsharp/FSharp.Compiler.Service/blob/1f497ef86fd5d0a18e5a935f3d16984fda91f1de/src/fsharp/CompileOps.fs#L1801
@@ -115,7 +106,7 @@ module NETFrameworkInfoProvider =
           yield "System.Numerics" 
     ]
 
-  let private getAdditionalArgumentsBy (msbuildHost: MSBuildExePath) targetFramework =
+  let getAdditionalArgumentsBy (msbuildHost: MSBuildExePath) targetFramework =
     let refs =
       let log = ignore
 
@@ -130,8 +121,8 @@ module NETFrameworkInfoProvider =
 
       let props =
         targetFramework
-        |> Option.map (fun tfm -> "TargetFrameworkVersion", tfm)
-        |> Option.toList
+        |> fun tfm -> "TargetFrameworkVersion", tfm
+        |> List.singleton
         |> List.map (Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Property)
 
       let cmd () = NETFrameworkInfoFromMSBuild.getReferencePaths allRefs
@@ -156,12 +147,4 @@ module NETFrameworkInfoProvider =
     [ yield "--simpleresolution"
       yield "--noframework"
       yield! refs |> List.map (sprintf "-r:%s") ]
-
-  let private additionalArgsByTfm = System.Collections.Concurrent.ConcurrentDictionary<string, string list>()
-
-  let additionalArgumentsBy msbuildHost targetFramework =
-    //memoize because expensive
-    let f tfm = getAdditionalArgumentsBy msbuildHost (if String.IsNullOrEmpty(tfm) then None else Some tfm)
-    let key = match targetFramework with Some x -> x | None -> ""
-    additionalArgsByTfm.GetOrAdd(key, f)
 

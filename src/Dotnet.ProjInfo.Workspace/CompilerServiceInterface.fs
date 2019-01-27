@@ -30,12 +30,10 @@ module FSharpCompilerServiceChecker =
   type CheckerGetProjectOptionsFromScriptArgs = string * string * (string array) * bool
   type CheckerGetProjectOptionsFromScript<'a, 'b> = CheckerGetProjectOptionsFromScriptArgs -> Async<'a * 'b>
 
-  let getProjectOptionsFromScript msbuildHost (checkerGetProjectOptionsFromScript: CheckerGetProjectOptionsFromScript<'a, 'b>) file source targetFramework = async {
-
-    // let targetFramework = NETFrameworkInfoProvider.netReferecesAssembliesTFMLatest ()
+  let getProjectOptionsFromScript additionalArgumentsBy (checkerGetProjectOptionsFromScript: CheckerGetProjectOptionsFromScript<'a, 'b>) file source targetFramework = async {
 
     let additionaRefs =
-      NETFrameworkInfoProvider.additionalArgumentsBy msbuildHost targetFramework
+      additionalArgumentsBy targetFramework
       |> Array.ofList
 
     // TODO SRTP

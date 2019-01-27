@@ -381,8 +381,6 @@ let tests () =
 
   let fsx =
 
-    let msbuildHost = Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
-
     let isAssembly (name: string) (tfm: string) (path: string) =
         path.EndsWith(name)
         && (
@@ -392,30 +390,8 @@ let tests () =
 
     testList "fsx" [
 
-      testCase |> withLog "fsx no tfm" (fun logger fs ->
-        let testDir = inDir fs "fsx_none"
-
-        let dummy (file:string, source:string, additionaRefs: string array, assumeDotNetFramework:bool) = async {
-            printfn "%A" additionaRefs
-
-            Expect.exists additionaRefs (isAssembly "mscorlib.dll" "4.0") "check net461 exists"
-
-            return (4,5)
-        }
-
-        let a, mapper =
-          FSharpCompilerServiceChecker.getProjectOptionsFromScript msbuildHost dummy "a.fsx" "text" None
-          |> Async.RunSynchronously
-
-        Expect.equal a 4 "returned"
-
-        let _changed = mapper [| "a"; "b" |]
-
-        ()
-      )
-
-      testCase |> withLog "fsx net461" (fun logger fs ->
-        let testDir = inDir fs "fsx_net461"
+      testCase |> withLog "fsx args" (fun logger fs ->
+        let testDir = inDir fs "fsx_args"
 
         let dummy (file:string, source:string, additionaRefs: string array, assumeDotNetFramework:bool) = async {
             printfn "%A" additionaRefs
@@ -425,8 +401,10 @@ let tests () =
             return (1,2)
         }
 
+        let netFw = NetFWInfo()
+
         let a, mapper =
-          FSharpCompilerServiceChecker.getProjectOptionsFromScript msbuildHost dummy "a.fsx" "text" (Some "v4.6.1")
+          netFw.GetProjectOptionsFromScript(dummy, "a.fsx", "text", "v4.6.1")
           |> Async.RunSynchronously
 
         Expect.equal a 1 "returned"
@@ -439,14 +417,14 @@ let tests () =
 
   let netfw =
 
-    let msbuildHost = Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
-
     testList "netfw" [
 
       testCase |> withLog "installed .net fw" (fun logger fs ->
         let testDir = inDir fs "netfw"
 
-        let fws = NETFrameworkInfoProvider.installedNETVersions msbuildHost
+        let netFw = NetFWInfo()
+
+        let fws = netFw.InstalledNetFws()
 
         printfn "fws: %A" fws
 

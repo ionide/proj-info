@@ -39,16 +39,15 @@ type Loader () =
     member __.Projects
         with get () = parsedProjects.ToArray()
 
+    // TODO get only
     member this.MSBuildPath
         with get () = msbuildPath
         and set (value) = msbuildPath <- value
 
+    // TODO get only
     member this.MSBuildNetSdkPath
         with get () = msbuildNetSdkPath
         and set (value) = msbuildNetSdkPath <- value
-
-    member x.LoadSln(sln: string) =
-        ()
 
     member this.LoadProjects(projects: string list) =
         let cache = ProjectCrackerDotnetSdk.ParsedProjectCache()
@@ -88,3 +87,37 @@ type Loader () =
             | Error e ->
                 let failed = WorkspaceProjectState.Failed (project, e)
                 notify failed
+
+type NetFWInfo () =
+
+    let mutable msbuildPath = Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
+
+    let installedNETVersionsLazy = lazy (NETFrameworkInfoProvider.getInstalledNETVersions msbuildPath)
+
+    let additionalArgsByTfm = System.Collections.Concurrent.ConcurrentDictionary<string, string list>()
+
+    let additionalArgumentsBy targetFramework =
+        let f tfm = NETFrameworkInfoProvider.getAdditionalArgumentsBy msbuildPath tfm
+        additionalArgsByTfm.GetOrAdd(targetFramework, f)
+
+    // TODO get only
+    member this.MSBuildPath
+        with get () = msbuildPath
+        and set (value) = msbuildPath <- value
+
+    member this.InstalledNetFws() =
+        installedNETVersionsLazy.Force()
+
+    member this.LatestVersion () =
+        let maxByVersion list =
+            //TODO extract and test
+            list
+            |> List.map (fun (s: string) -> s, (s.TrimStart('v').Replace(".","").PadRight(3, '0')))
+            |> List.maxBy snd
+            |> fst
+
+        this.InstalledNetFws()
+        |> maxByVersion
+
+    member this.GetProjectOptionsFromScript(checkerGetProjectOptionsFromScript, file, source, targetFramework) =
+        FSharpCompilerServiceChecker.getProjectOptionsFromScript additionalArgumentsBy checkerGetProjectOptionsFromScript file source targetFramework
