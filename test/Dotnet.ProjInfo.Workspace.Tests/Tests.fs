@@ -531,6 +531,12 @@ let tests () =
         logMsbuild logger msbuildPaths
 
         Expect.isNonEmpty msbuildPaths "paths"
+      )
+
+      testCase |> withLog "latest msbuild" (fun logger fs ->
+        let testDir = inDir fs "msbuild_exe"
+
+        let msbuildLocator = MSBuildLocator()
 
         let msbuildPath = msbuildLocator.LatestInstalledMSBuild ()
 
