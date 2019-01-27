@@ -134,5 +134,5 @@ type NetFWInfo () =
         this.InstalledNetFws()
         |> maxByVersion
 
-    member this.GetProjectOptionsFromScript(checkerGetProjectOptionsFromScript, file, source, targetFramework) =
+    member this.GetProjectOptionsFromScript(checkerGetProjectOptionsFromScript, targetFramework, file, source) =
         FSharpCompilerServiceChecker.getProjectOptionsFromScript additionalArgumentsBy checkerGetProjectOptionsFromScript file source targetFramework

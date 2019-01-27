@@ -449,7 +449,7 @@ let tests () =
         let netFw = NetFWInfo()
 
         let a, mapper =
-          netFw.GetProjectOptionsFromScript(dummy, "a.fsx", "text content", "v4.6.1")
+          netFw.GetProjectOptionsFromScript(dummy, "v4.6.1", "a.fsx", "text content")
           |> Async.RunSynchronously
 
         Expect.equal a 1 "returned"
