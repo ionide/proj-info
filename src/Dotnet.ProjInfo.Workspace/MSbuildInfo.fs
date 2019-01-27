@@ -45,9 +45,8 @@ module MSBuildInfo =
                   with
                   | _ -> "")
               |> Seq.filter ((<>) "")
-              |> Seq.cache
-          if not (Seq.isEmpty files) then Some(Seq.head files)
-          else None
+              |> Seq.toList
+          files
 
       let Stringsplit (splitter: char) (s: string) = s.Split([| splitter |], StringSplitOptions.RemoveEmptyEntries) |> List.ofArray
 
@@ -57,7 +56,7 @@ module MSBuildInfo =
 
   // TODO stop guessing, use vswhere
   // NOTE was msbuild function in FSAC
-  let installedMSBuild () =
+  let installedMSBuilds () =
 
       // TODO remove shadowing
       let programFilesX86 = programFilesX86 ()
@@ -67,12 +66,12 @@ module MSBuildInfo =
         |> List.map (fun (version, sku) -> Path.Combine(programFilesX86, "Microsoft Visual Studio", version, sku))
 
       if not (Utils.isWindows ()) then
-        Some "msbuild" // we're way past 5.0 now, time to get updated
+        ["msbuild"] // we're way past 5.0 now, time to get updated
       else
         let legacyPaths =
-            [ Path.Combine(programFilesX86, @"\MSBuild\14.0\Bin")
-              Path.Combine(programFilesX86, @"\MSBuild\12.0\Bin")
-              Path.Combine(programFilesX86, @"\MSBuild\12.0\Bin\amd64")
+            [ Path.Combine(programFilesX86, @"MSBuild\14.0\Bin")
+              Path.Combine(programFilesX86, @"MSBuild\12.0\Bin")
+              Path.Combine(programFilesX86, @"MSBuild\12.0\Bin\amd64")
               @"c:\Windows\Microsoft.NET\Framework\v4.0.30319"
               @"c:\Windows\Microsoft.NET\Framework\v4.0.30128"
               @"c:\Windows\Microsoft.NET\Framework\v3.5" ]
@@ -82,5 +81,5 @@ module MSBuildInfo =
           |> List.map (fun root -> Path.Combine(root, "MSBuild", "15.0", "bin") )
 
         let ev = Environment.GetEnvironmentVariable "MSBuild"
-        if not (String.IsNullOrEmpty ev) then Some ev
+        if not (String.IsNullOrEmpty ev) then [ev]
         else EnvUtils.tryFindPath (sideBySidePaths @ legacyPaths) "MsBuild.exe"

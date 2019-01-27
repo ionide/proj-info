@@ -11,15 +11,23 @@ type ProjectKey =
 
 type MSBuildLocator () =
 
+    let installedMSBuilds = lazy (
+        Dotnet.ProjInfo.Workspace.MSBuildInfo.installedMSBuilds () )
+
     member this.MSBuildFromPATH
         with get() = Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
 
     member this.DotnetMSBuildFromPATH
         with get() =  Dotnet.ProjInfo.Inspect.MSBuildExePath.DotnetMsbuild "dotnet"
 
+    member this.InstalledMSBuilds () =
+        installedMSBuilds.Force()
+        |> List.map (Dotnet.ProjInfo.Inspect.MSBuildExePath.Path)
+
     member this.LatestInstalledMSBuild () =
-        let latestInstalledMSBuild = Dotnet.ProjInfo.Workspace.MSBuildInfo.installedMSBuild ()
-        Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
+        match installedMSBuilds.Force() with
+        | [] -> this.MSBuildFromPATH
+        | path :: _ -> Dotnet.ProjInfo.Inspect.MSBuildExePath.Path path
 
 type LoaderConfig = {
     MSBuildHost : Dotnet.ProjInfo.Inspect.MSBuildExePath

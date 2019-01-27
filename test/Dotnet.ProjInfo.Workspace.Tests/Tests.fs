@@ -83,6 +83,11 @@ let logConfig (logger: Logger) arg =
     eventX "config: {config}'"
     >> setField "config" arg)
 
+let logMsbuild (logger: Logger) arg =
+  logger.info(
+    eventX "msbuild: {msbuild}'"
+    >> setField "msbuild" arg)
+
 [<AutoOpen>]
 module ExpectNotification =
 
@@ -512,6 +517,33 @@ let tests () =
       )
     ]
 
-  [ valid; invalid; fsx; netfw ]
+  let msbuild =
+
+    testList "msbuild" [
+
+      testCase |> withLog "installed msbuild" (fun logger fs ->
+        let testDir = inDir fs "msbuild_installed"
+
+        let msbuildLocator = MSBuildLocator()
+
+        let msbuildPaths = msbuildLocator.InstalledMSBuilds ()
+
+        logMsbuild logger msbuildPaths
+
+        Expect.isNonEmpty msbuildPaths "paths"
+
+        let msbuildPath = msbuildLocator.LatestInstalledMSBuild ()
+
+        logMsbuild logger msbuildPath
+
+        match msbuildPath with
+        | Dotnet.ProjInfo.Inspect.MSBuildExePath.Path path ->
+          Expect.isNotEmpty path "path"
+        | Dotnet.ProjInfo.Inspect.MSBuildExePath.DotnetMsbuild p ->
+          failwithf "expected msbuild, not 'dotnet %s'" p
+      )
+    ]
+
+  [ valid; invalid; fsx; netfw; msbuild ]
   |> testList "workspace"
   |> testSequenced
