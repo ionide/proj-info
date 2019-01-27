@@ -425,9 +425,10 @@ let tests () =
     let isAssembly (name: string) (tfm: string) (path: string) =
         path.EndsWith(name)
         && (
-          path.Contains(sprintf @"\v%s\" tfm)
-          || path.Contains(sprintf "/%s/" tfm)
-          || path.Contains(sprintf @"/%s-api/" tfm) )
+          // TODO do not use paths, check with cecil the assemblyversion
+          path.Contains(sprintf @"\v%s\" tfm) // win
+          || path.Contains(sprintf "/%s/" tfm) // mono
+          || path.Contains(sprintf @"/%s-api/" tfm) ) // mono
 
     testList "fsx" [
 
