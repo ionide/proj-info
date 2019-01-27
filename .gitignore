@@ -239,3 +239,4 @@ _Pvt_Extensions
 /test/testrun/
 /test/testrun_ws/
 msbuild.binlog
+/test/testrun_ws_fcs/
