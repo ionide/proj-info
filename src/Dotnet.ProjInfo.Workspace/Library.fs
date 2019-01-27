@@ -18,6 +18,7 @@ type MSBuildLocator () =
         with get() =  Dotnet.ProjInfo.Inspect.MSBuildExePath.DotnetMsbuild "dotnet"
 
     member this.LatestInstalledMSBuild () =
+        let latestInstalledMSBuild = Dotnet.ProjInfo.Workspace.MSBuildInfo.installedMSBuild ()
         Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
 
 type LoaderConfig = {

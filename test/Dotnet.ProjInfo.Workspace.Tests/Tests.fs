@@ -78,6 +78,11 @@ let logNotification (logger: Logger) arg =
     eventX "notified: {notification}'"
     >> setField "notification" arg)
 
+let logConfig (logger: Logger) arg =
+  logger.info(
+    eventX "config: {config}'"
+    >> setField "config" arg)
+
 [<AutoOpen>]
 module ExpectNotification =
 
@@ -185,9 +190,10 @@ let tests () =
 
   let valid =
 
-    let createLoader () =
+    let createLoader logger =
         let msbuildLocator = MSBuildLocator()
         let config = LoaderConfig.Default msbuildLocator
+        logConfig logger config
         let loader = Loader.Create(config)
         loader
 
@@ -209,7 +215,7 @@ let tests () =
         // msbuild fs [projPath; "/t:Build"]
         // |> checkExitCodeZero
 
-        let loader = createLoader ()
+        let loader = createLoader logger
 
         let watcher = watchNotifications logger loader
 
@@ -234,7 +240,7 @@ let tests () =
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
 
-        let loader = createLoader ()
+        let loader = createLoader logger
 
         let watcher = watchNotifications logger loader
 
@@ -262,7 +268,7 @@ let tests () =
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
 
-        let loader = createLoader ()
+        let loader = createLoader logger
 
         let watcher = watchNotifications logger loader
 
@@ -292,7 +298,7 @@ let tests () =
         for (tfm, _) in ``samples4 NetSdk multi tfm``.TargetFrameworks |> Map.toList do
           printfn "tfm: %s" tfm
 
-        let loader = createLoader ()
+        let loader = createLoader logger
 
         let watcher = watchNotifications logger loader
 
@@ -318,7 +324,7 @@ let tests () =
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
 
-        let loader = createLoader ()
+        let loader = createLoader logger
 
         let watcher = watchNotifications logger loader
 
@@ -343,7 +349,7 @@ let tests () =
         dotnet fs ["restore"; slnPath]
         |> checkExitCodeZero
 
-        let loader = createLoader ()
+        let loader = createLoader logger
 
         let watcher = watchNotifications logger loader
 
@@ -372,9 +378,10 @@ let tests () =
 
   let invalid =
 
-    let createLoader () =
+    let createLoader logger =
         let msbuildLocator = MSBuildLocator()
         let config = LoaderConfig.Default msbuildLocator
+        logConfig logger config
         let loader = Loader.Create(config)
         loader
 
@@ -389,7 +396,7 @@ let tests () =
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
 
-        let loader = createLoader ()
+        let loader = createLoader logger
 
         let watcher = watchNotifications logger loader
 
@@ -415,7 +422,7 @@ let tests () =
 
         let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
 
-        let loader = createLoader ()
+        let loader = createLoader logger
 
         // no restore
 
@@ -444,9 +451,10 @@ let tests () =
           || path.Contains(sprintf "/%s/" tfm) // mono
           || path.Contains(sprintf @"/%s-api/" tfm) ) // mono
 
-    let createNetFwInfo () =
+    let createNetFwInfo logger =
         let msbuildLocator = MSBuildLocator()
         let config = NetFWInfoConfig.Default msbuildLocator
+        logConfig logger config
         let netFwInfo = NetFWInfo.Create(config)
         netFwInfo
 
@@ -466,7 +474,7 @@ let tests () =
             return (1,2)
         }
 
-        let netFw = createNetFwInfo ()
+        let netFw = createNetFwInfo logger
 
         let a, mapper =
           netFw.GetProjectOptionsFromScript(dummy, "v4.6.1", "a.fsx", "text content")
@@ -482,9 +490,10 @@ let tests () =
 
   let netfw =
 
-    let createNetFwInfo () =
+    let createNetFwInfo logger =
         let msbuildLocator = MSBuildLocator()
         let config = NetFWInfoConfig.Default msbuildLocator
+        logConfig logger config
         let netFwInfo = NetFWInfo.Create(config)
         netFwInfo
 
@@ -493,7 +502,7 @@ let tests () =
       testCase |> withLog "installed .net fw" (fun logger fs ->
         let testDir = inDir fs "netfw"
 
-        let netFw = createNetFwInfo ()
+        let netFw = createNetFwInfo logger
 
         let fws = netFw.InstalledNetFws()
 

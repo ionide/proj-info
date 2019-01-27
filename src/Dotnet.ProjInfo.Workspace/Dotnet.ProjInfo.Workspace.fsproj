@@ -14,6 +14,7 @@
     <Compile Include="..\..\paket-files\Microsoft\visualfsharp\src\fsharp\FSharp.Build\Fsc.fs" />
     <Compile Include="ProjectCrackerDotnetSdk.fs" />
     <Compile Include="InspectSln.fs" />
+    <Compile Include="MSbuildInfo.fs" />
     <Compile Include="Library.fs" />
   </ItemGroup>
   <ItemGroup>

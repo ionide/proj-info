@@ -56,3 +56,6 @@ module Utils =
 
       exitCode, (workingDir, exePath, args)
 
+  let isWindows () =
+    System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+        System.Runtime.InteropServices.OSPlatform.Windows)
