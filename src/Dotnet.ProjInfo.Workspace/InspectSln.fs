@@ -1,6 +1,6 @@
 namespace Dotnet.ProjInfo.Workspace
 
-module InspectSln =
+module internal InspectSln =
 
   open System
   open System.IO
@@ -11,33 +11,33 @@ module InspectSln =
       | '/' -> path.Replace('\\', '/')
       | _ -> path
 
-  type private SolutionData = {
+  type SolutionData = {
         Items: SolutionItem list
         Configurations: SolutionConfiguration list
         }
-  and private SolutionConfiguration = {
+  and SolutionConfiguration = {
         Id: string
         ConfigurationName: string
         PlatformName: string
         IncludeInBuild: bool
         }
-  and private SolutionItem = {
+  and SolutionItem = {
         Guid: Guid
         Name: string
         Kind: SolutionItemKind
         }
-  and private SolutionItemKind =
+  and SolutionItemKind =
         | MsbuildFormat of SolutionItemMsbuildConfiguration list
         | Folder of (SolutionItem list) * (string list)
         | Unsupported
         | Unknown
-  and private SolutionItemMsbuildConfiguration = {
+  and SolutionItemMsbuildConfiguration = {
         Id: string
         ConfigurationName: string
         PlatformName: string
         }
 
-  let private tryParseSln (slnFilePath: string) = 
+  let tryParseSln (slnFilePath: string) = 
     let parseSln (sln: Microsoft.Build.Construction.SolutionFile) =
         let slnDir = Path.GetDirectoryName slnFilePath
         let makeAbsoluteFromSlnDir =
@@ -95,5 +95,17 @@ module InspectSln =
     with ex ->
         Choice2Of2 ex
 
-  let private loadingBuildOrder slnFilePath (data: SolutionData) =
-    ()
+  let loadingBuildOrder (data: SolutionData) =
+
+    let rec projs (item: SolutionItem) =
+        match item.Kind with
+        | MsbuildFormat items ->
+            [ item.Name ]
+        | Folder (items, _) ->
+            items |> List.collect projs
+        | Unsupported
+        | Unknown ->
+            []
+
+    data.Items
+    |> List.collect projs

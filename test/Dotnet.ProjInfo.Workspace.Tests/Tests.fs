@@ -107,7 +107,12 @@ module ExpectNotification =
     |> List.zip actual
     |> List.iter (fun (n, check) ->
         let name, f = check
-        Expect.isTrue (f n) (sprintf "expected %s but was %A" name n) )
+        let minimal_info =
+          match n with
+          | WorkspaceProjectState.Loading (path, _) -> sprintf "loading %s " path
+          | WorkspaceProjectState.Loaded (po, _, _) -> sprintf "loaded %s" po.ProjectFileName
+          | WorkspaceProjectState.Failed (path, _) -> sprintf "failed %s" path
+        Expect.isTrue (f n) (sprintf "expected %s but was %s" name minimal_info) )
 
   type NotificationWatcher (loader: Dotnet.ProjInfo.Workspace.Loader, log) =
       let notifications = List<_>()
@@ -318,6 +323,40 @@ let tests () =
         Expect.equal parsed.Length 1 "lib"
         
         Expect.equal (parsed |> findKey projPath) { ProjectKey.ProjectPath = projPath; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "a C# lib"
+      )
+
+      testCase |> withLog "can load sln" (fun logger fs ->
+        let testDir = inDir fs "load_sln"
+        copyDirFromAssets fs ``sample6 Netsdk Sparse/sln``.ProjDir testDir
+
+        let slnPath = testDir/ (``sample6 Netsdk Sparse/sln``.ProjectFile)
+
+        dotnet fs ["restore"; slnPath]
+        |> checkExitCodeZero
+
+        let loader = Dotnet.ProjInfo.Workspace.Loader()
+
+        let watcher = watchNotifications logger loader
+
+        loader.LoadSln(slnPath)
+
+        //TODO strange sequence, to check
+        [ loading; loading; loaded; loading; loaded; loaded ]
+        |> expectNotifications (watcher.Notifications)
+
+        let parsed = loader.Projects
+
+        Expect.equal parsed.Length 3 "c1, l1, l2"
+        
+        let c1 = testDir/ (``sample6 Netsdk Sparse/1``.ProjectFile)
+        let l2 :: [] =
+          ``sample6 Netsdk Sparse/1``.ProjectReferences
+          |> List.map (fun p2p -> testDir/ p2p.ProjectFile )
+        let l1 = testDir/ (``sample6 Netsdk Sparse/2``.ProjectFile)
+
+        Expect.equal (parsed |> findKey l1) { ProjectKey.ProjectPath = l1; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "the F# lib"
+        Expect.equal (parsed |> findKey l2) { ProjectKey.ProjectPath = l2; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "the C# lib"
+        Expect.equal (parsed |> findKey c1) { ProjectKey.ProjectPath = c1; Configuration = "Debug"; TargetFramework = "netcoreapp2.1" } "the F# console"
       )
 
     ]

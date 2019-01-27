@@ -88,6 +88,17 @@ type Loader () =
                 let failed = WorkspaceProjectState.Failed (project, e)
                 notify failed
 
+    member this.LoadSln(slnPath: string) =
+
+        match InspectSln.tryParseSln slnPath with
+        | Choice1Of2 (_, slnData) ->
+            let projs = InspectSln.loadingBuildOrder slnData
+
+            this.LoadProjects(projs)
+        | Choice2Of2 d ->
+            failwithf "cannot load the sln: %A" d
+
+
 type NetFWInfo () =
 
     let mutable msbuildPath = Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
