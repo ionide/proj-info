@@ -74,7 +74,8 @@ type Loader () =
 
             match loader notify cache project with
             | Ok (po, sources, props) ->
-                let loaded = WorkspaceProjectState.Loaded (po, sources, props)
+                // TODO sources and props are wrong, because not project specific. but of root proj
+                let loaded po = WorkspaceProjectState.Loaded (po, sources, props)
 
                 let rec visit (p: ProjectOptions) = seq {
                     yield p
@@ -83,7 +84,10 @@ type Loader () =
 
                 for proj in visit po do
                     parsedProjects.AddOrUpdate(getKey proj, proj, fun _ _ -> proj) |> ignore
-                notify loaded
+
+                for proj in visit po do
+                    notify (loaded proj)
+
             | Error e ->
                 let failed = WorkspaceProjectState.Failed (project, e)
                 notify failed

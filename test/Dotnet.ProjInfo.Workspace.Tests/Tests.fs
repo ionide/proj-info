@@ -261,8 +261,7 @@ let tests () =
 
         loader.LoadProjects [projPath]
 
-        // TODO should trigger also `loaded l1`
-        [ loading "c1.fsproj"; loading "l1.csproj"; loading "l2.fsproj"; loaded "c1.fsproj" ]
+        [ loading "c1.fsproj"; loading "l1.csproj"; loading "l2.fsproj"; loaded "c1.fsproj"; loaded "l1.csproj"; loaded "l2.fsproj";  ]
         |> expectNotifications (watcher.Notifications)
 
         let parsed = loader.Projects
@@ -344,7 +343,7 @@ let tests () =
         loader.LoadSln(slnPath)
 
         //TODO strange sequence, to check
-        [ loading "c1.fsproj"; loading "l2.fsproj"; loaded "c1.fsproj"; loading "l1.fsproj"; loaded "l1.fsproj"; loaded "l2.fsproj" ]
+        [ loading "c1.fsproj"; loading "l2.fsproj"; loaded "c1.fsproj"; loaded "l2.fsproj"; loading "l1.fsproj"; loaded "l1.fsproj"; loaded "l2.fsproj" ]
         |> expectNotifications (watcher.Notifications)
 
         let parsed = loader.Projects
