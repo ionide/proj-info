@@ -81,24 +81,26 @@ let logNotification (logger: Logger) arg =
 [<AutoOpen>]
 module ExpectNotification =
 
-  let (|IsLoading|_|) n =
-    match n with
-    | WorkspaceProjectState.Loading _ -> Some ()
-    | _ -> None
+  let loading (name: string) =
+    let isLoading n =
+      match n with
+      | WorkspaceProjectState.Loading (path, _) when path.EndsWith(name) -> true
+      | _ -> false
+    sprintf "loading %s" name, isLoading
 
-  let (|IsLoaded|_|) n =
-    match n with
-    | WorkspaceProjectState.Loaded _ -> Some ()
-    | _ -> None
+  let loaded (name: string) =
+    let isLoaded n =
+      match n with
+      | WorkspaceProjectState.Loaded (po, _, _) when po.ProjectFileName.EndsWith(name) -> true
+      | _ -> false
+    sprintf "loaded %s" name, isLoaded
 
-  let (|IsFailed|_|) n =
-    match n with
-    | WorkspaceProjectState.Failed _ -> Some ()
-    | _ -> None
-
-  let loading = "loading", ( |IsLoading|_| ) >> Option.isSome
-  let loaded = "loaded", ( |IsLoaded|_| ) >> Option.isSome
-  let failed = "failed", ( |IsFailed|_| ) >> Option.isSome
+  let failed (name: string) =
+    let isFailed n =
+      match n with
+      | WorkspaceProjectState.Failed (path, _) when path.EndsWith(name) -> true
+      | _ -> false
+    sprintf "failed %s" name, isFailed
 
   let expectNotifications actual expected =
     Expect.equal (List.length actual) (List.length expected) (sprintf "notifications: %A" (expected |> List.map fst))
@@ -206,7 +208,7 @@ let tests () =
 
         loader.LoadProjects [projPath]
 
-        [ loading; loaded ]
+        [ loading "l1.fsproj"; loaded "l1.fsproj" ]
         |> expectNotifications (watcher.Notifications)
 
         let parsed = loader.Projects
@@ -231,7 +233,7 @@ let tests () =
 
         loader.LoadProjects [projPath]
 
-        [ loading; loaded ]
+        [ loading "n1.fsproj"; loaded "n1.fsproj" ]
         |> expectNotifications (watcher.Notifications)
 
         let parsed = loader.Projects
@@ -259,7 +261,8 @@ let tests () =
 
         loader.LoadProjects [projPath]
 
-        [ loading; loading; loading; loaded ]
+        // TODO should trigger also `loaded l1`
+        [ loading "c1.fsproj"; loading "l1.csproj"; loading "l2.fsproj"; loaded "c1.fsproj" ]
         |> expectNotifications (watcher.Notifications)
 
         let parsed = loader.Projects
@@ -290,7 +293,7 @@ let tests () =
         loader.LoadProjects [projPath]
 
         //the additional loading is the cross targeting
-        [ loading; loading; loaded ]
+        [ loading "m1.fsproj"; loading "m1.fsproj"; loaded "m1.fsproj" ]
         |> expectNotifications (watcher.Notifications)
 
         let parsed = loader.Projects
@@ -315,7 +318,7 @@ let tests () =
 
         loader.LoadProjects [projPath]
 
-        [ loading; loaded ]
+        [ loading "l2.csproj"; loaded "l2.csproj" ]
         |> expectNotifications (watcher.Notifications)
 
         let parsed = loader.Projects
@@ -341,7 +344,7 @@ let tests () =
         loader.LoadSln(slnPath)
 
         //TODO strange sequence, to check
-        [ loading; loading; loaded; loading; loaded; loaded ]
+        [ loading "c1.fsproj"; loading "l2.fsproj"; loaded "c1.fsproj"; loading "l1.fsproj"; loaded "l1.fsproj"; loaded "l2.fsproj" ]
         |> expectNotifications (watcher.Notifications)
 
         let parsed = loader.Projects
@@ -383,7 +386,7 @@ let tests () =
 
         loader.LoadProjects [wrongPath]
 
-        [ loading; failed ]
+        [ loading "n1aa.fsproj"; failed "n1aa.fsproj" ]
         |> expectNotifications (watcher.Notifications)
 
         let parsed = loader.Projects
@@ -407,7 +410,7 @@ let tests () =
 
         loader.LoadProjects [projPath]
 
-        [ loading; failed ]
+        [ loading "n1.fsproj"; failed "n1.fsproj" ]
         |> expectNotifications (watcher.Notifications)
 
         let parsed = loader.Projects
