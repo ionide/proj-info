@@ -9,13 +9,34 @@ type ProjectKey =
       Configuration: string
       TargetFramework: string }
 
-type Loader () =
+type MSBuildLocator () =
+
+    member this.MSBuildFromPATH
+        with get() = Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
+
+    member this.DotnetMSBuildFromPATH
+        with get() =  Dotnet.ProjInfo.Inspect.MSBuildExePath.DotnetMsbuild "dotnet"
+
+    member this.LatestInstalledMSBuild () =
+        Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
+
+type LoaderConfig = {
+    MSBuildHost : Dotnet.ProjInfo.Inspect.MSBuildExePath
+    MSBuildNetSdkHost: Dotnet.ProjInfo.Inspect.MSBuildExePath } with
+
+    static member Default (msbuildLocator: MSBuildLocator) =
+        let latestMSBuild = msbuildLocator.LatestInstalledMSBuild ()
+        { LoaderConfig.MSBuildHost = latestMSBuild
+          MSBuildNetSdkHost = msbuildLocator.DotnetMSBuildFromPATH }
+
+    static member FromPATH (msbuildLocator: MSBuildLocator) =
+        { LoaderConfig.MSBuildHost = msbuildLocator.MSBuildFromPATH
+          MSBuildNetSdkHost = msbuildLocator.DotnetMSBuildFromPATH }
+
+type Loader private (msbuildPath, msbuildNetSdkPath) =
 
     let event1 = new Event<_>()
     let parsedProjects = ConcurrentDictionary<_, _>()
-
-    let mutable msbuildPath = Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
-    let mutable msbuildNetSdkPath = Dotnet.ProjInfo.Inspect.MSBuildExePath.DotnetMsbuild "dotnet"
 
     let getKey (po: ProjectOptions) =
         { ProjectKey.ProjectPath = po.ProjectFileName
@@ -39,15 +60,11 @@ type Loader () =
     member __.Projects
         with get () = parsedProjects.ToArray()
 
-    // TODO get only
     member this.MSBuildPath
-        with get () = msbuildPath
-        and set (value) = msbuildPath <- value
+        with get () : Dotnet.ProjInfo.Inspect.MSBuildExePath = msbuildPath
 
-    // TODO get only
     member this.MSBuildNetSdkPath
-        with get () = msbuildNetSdkPath
-        and set (value) = msbuildNetSdkPath <- value
+        with get () : Dotnet.ProjInfo.Inspect.MSBuildExePath = msbuildNetSdkPath
 
     member this.LoadProjects(projects: string list) =
         let cache = ProjectCrackerDotnetSdk.ParsedProjectCache()
@@ -102,10 +119,20 @@ type Loader () =
         | Choice2Of2 d ->
             failwithf "cannot load the sln: %A" d
 
+    static member Create(config: LoaderConfig) =
+        Loader(config.MSBuildHost, config.MSBuildNetSdkHost)
 
-type NetFWInfo () =
+type NetFWInfoConfig = {
+    MSBuildHost : Dotnet.ProjInfo.Inspect.MSBuildExePath } with
 
-    let mutable msbuildPath = Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
+    static member Default (msbuildLocator: MSBuildLocator) =
+        let latestMSBuild = msbuildLocator.LatestInstalledMSBuild ()
+        { NetFWInfoConfig.MSBuildHost = latestMSBuild }
+
+    static member FromPATH (msbuildLocator: MSBuildLocator) =
+        { NetFWInfoConfig.MSBuildHost = msbuildLocator.MSBuildFromPATH }
+
+type NetFWInfo private (msbuildPath) =
 
     let installedNETVersionsLazy = lazy (NETFrameworkInfoProvider.getInstalledNETVersions msbuildPath)
 
@@ -115,10 +142,8 @@ type NetFWInfo () =
         let f tfm = NETFrameworkInfoProvider.getAdditionalArgumentsBy msbuildPath tfm
         additionalArgsByTfm.GetOrAdd(targetFramework, f)
 
-    // TODO get only
     member this.MSBuildPath
-        with get () = msbuildPath
-        and set (value) = msbuildPath <- value
+        with get () : Dotnet.ProjInfo.Inspect.MSBuildExePath = msbuildPath
 
     member this.InstalledNetFws() =
         installedNETVersionsLazy.Force()
@@ -136,3 +161,6 @@ type NetFWInfo () =
 
     member this.GetProjectOptionsFromScript(checkerGetProjectOptionsFromScript, targetFramework, file, source) =
         FSharpCompilerServiceChecker.getProjectOptionsFromScript additionalArgumentsBy checkerGetProjectOptionsFromScript file source targetFramework
+
+    static member Create(config: NetFWInfoConfig) =
+        NetFWInfo(config.MSBuildHost)

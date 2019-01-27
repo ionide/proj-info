@@ -184,6 +184,13 @@ let tests () =
      NotificationWatcher (loader, logNotification logger)
 
   let valid =
+
+    let createLoader () =
+        let msbuildLocator = MSBuildLocator()
+        let config = LoaderConfig.Default msbuildLocator
+        let loader = Loader.Create(config)
+        loader
+
     testList "valid" [
 
       testCase |> withLog "can load sample1" (fun logger fs ->
@@ -202,7 +209,7 @@ let tests () =
         // msbuild fs [projPath; "/t:Build"]
         // |> checkExitCodeZero
 
-        let loader = Dotnet.ProjInfo.Workspace.Loader()
+        let loader = createLoader ()
 
         let watcher = watchNotifications logger loader
 
@@ -227,7 +234,7 @@ let tests () =
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
 
-        let loader = Dotnet.ProjInfo.Workspace.Loader()
+        let loader = createLoader ()
 
         let watcher = watchNotifications logger loader
 
@@ -255,7 +262,7 @@ let tests () =
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
 
-        let loader = Dotnet.ProjInfo.Workspace.Loader()
+        let loader = createLoader ()
 
         let watcher = watchNotifications logger loader
 
@@ -285,7 +292,7 @@ let tests () =
         for (tfm, _) in ``samples4 NetSdk multi tfm``.TargetFrameworks |> Map.toList do
           printfn "tfm: %s" tfm
 
-        let loader = Dotnet.ProjInfo.Workspace.Loader()
+        let loader = createLoader ()
 
         let watcher = watchNotifications logger loader
 
@@ -311,7 +318,7 @@ let tests () =
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
 
-        let loader = Dotnet.ProjInfo.Workspace.Loader()
+        let loader = createLoader ()
 
         let watcher = watchNotifications logger loader
 
@@ -336,7 +343,7 @@ let tests () =
         dotnet fs ["restore"; slnPath]
         |> checkExitCodeZero
 
-        let loader = Dotnet.ProjInfo.Workspace.Loader()
+        let loader = createLoader ()
 
         let watcher = watchNotifications logger loader
 
@@ -364,6 +371,13 @@ let tests () =
     ]
 
   let invalid =
+
+    let createLoader () =
+        let msbuildLocator = MSBuildLocator()
+        let config = LoaderConfig.Default msbuildLocator
+        let loader = Loader.Create(config)
+        loader
+
     testList "invalid" [
 
       testCase |> withLog "project not found" (fun logger fs ->
@@ -375,7 +389,7 @@ let tests () =
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
 
-        let loader = Dotnet.ProjInfo.Workspace.Loader()
+        let loader = createLoader ()
 
         let watcher = watchNotifications logger loader
 
@@ -401,7 +415,7 @@ let tests () =
 
         let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
 
-        let loader = Dotnet.ProjInfo.Workspace.Loader()
+        let loader = createLoader ()
 
         // no restore
 
@@ -430,6 +444,12 @@ let tests () =
           || path.Contains(sprintf "/%s/" tfm) // mono
           || path.Contains(sprintf @"/%s-api/" tfm) ) // mono
 
+    let createNetFwInfo () =
+        let msbuildLocator = MSBuildLocator()
+        let config = NetFWInfoConfig.Default msbuildLocator
+        let netFwInfo = NetFWInfo.Create(config)
+        netFwInfo
+
     testList "fsx" [
 
       testCase |> withLog "fsx args" (fun logger fs ->
@@ -446,7 +466,7 @@ let tests () =
             return (1,2)
         }
 
-        let netFw = NetFWInfo()
+        let netFw = createNetFwInfo ()
 
         let a, mapper =
           netFw.GetProjectOptionsFromScript(dummy, "v4.6.1", "a.fsx", "text content")
@@ -462,12 +482,18 @@ let tests () =
 
   let netfw =
 
+    let createNetFwInfo () =
+        let msbuildLocator = MSBuildLocator()
+        let config = NetFWInfoConfig.Default msbuildLocator
+        let netFwInfo = NetFWInfo.Create(config)
+        netFwInfo
+
     testList "netfw" [
 
       testCase |> withLog "installed .net fw" (fun logger fs ->
         let testDir = inDir fs "netfw"
 
-        let netFw = NetFWInfo()
+        let netFw = createNetFwInfo ()
 
         let fws = netFw.InstalledNetFws()
 
