@@ -439,7 +439,7 @@ let tests () =
             printfn "%A" additionaRefs
 
             Expect.equal file "a.fsx" "filename"
-            Expect.equal source "a.fsx" "filename"
+            Expect.equal source "text content" "filename"
             Expect.equal assumeDotNetFramework true "hardcoded value"
             Expect.exists additionaRefs (isAssembly "mscorlib.dll" "4.6.1") "check net461 exists"
 
