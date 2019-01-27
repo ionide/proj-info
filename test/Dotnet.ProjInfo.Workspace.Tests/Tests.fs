@@ -438,6 +438,9 @@ let tests () =
         let dummy (file:string, source:string, additionaRefs: string array, assumeDotNetFramework:bool) = async {
             printfn "%A" additionaRefs
 
+            Expect.equal file "a.fsx" "filename"
+            Expect.equal source "a.fsx" "filename"
+            Expect.equal assumeDotNetFramework true "hardcoded value"
             Expect.exists additionaRefs (isAssembly "mscorlib.dll" "4.6.1") "check net461 exists"
 
             return (1,2)
@@ -446,7 +449,7 @@ let tests () =
         let netFw = NetFWInfo()
 
         let a, mapper =
-          netFw.GetProjectOptionsFromScript(dummy, "a.fsx", "text", "v4.6.1")
+          netFw.GetProjectOptionsFromScript(dummy, "a.fsx", "text content", "v4.6.1")
           |> Async.RunSynchronously
 
         Expect.equal a 1 "returned"
