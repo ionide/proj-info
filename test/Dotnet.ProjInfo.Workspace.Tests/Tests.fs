@@ -342,7 +342,7 @@ let tests () =
 
         loader.LoadSln(slnPath)
 
-        //TODO strange sequence, to check
+        //TODO to check: l2 is loaded from cache, but no loading notification
         [ loading "c1.fsproj"; loading "l2.fsproj"; loaded "c1.fsproj"; loaded "l2.fsproj"; loading "l1.fsproj"; loaded "l1.fsproj"; loaded "l2.fsproj" ]
         |> expectNotifications (watcher.Notifications)
 
