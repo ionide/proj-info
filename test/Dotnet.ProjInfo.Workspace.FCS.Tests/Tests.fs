@@ -16,6 +16,9 @@ open Dotnet.ProjInfo.Workspace.FCS
 
 type FCS_ProjectOptions = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpProjectOptions
 type FCS_Checker = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpChecker
+type FCS_Entity = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpEntity
+type FCS_Symbol = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpSymbol
+type FCS_CheckFileAnswer = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpCheckFileAnswer
 
 #nowarn "25"
 
@@ -91,53 +94,10 @@ let logMsbuild (logger: Logger) arg =
     eventX "msbuild: {msbuild}'"
     >> setField "msbuild" arg)
 
-[<AutoOpen>]
-module ExpectNotification =
-
-  let loading (name: string) =
-    let isLoading n =
-      match n with
-      | WorkspaceProjectState.Loading (path, _) when path.EndsWith(name) -> true
-      | _ -> false
-    sprintf "loading %s" name, isLoading
-
-  let loaded (name: string) =
-    let isLoaded n =
-      match n with
-      | WorkspaceProjectState.Loaded (po, _, _) when po.ProjectFileName.EndsWith(name) -> true
-      | _ -> false
-    sprintf "loaded %s" name, isLoaded
-
-  let failed (name: string) =
-    let isFailed n =
-      match n with
-      | WorkspaceProjectState.Failed (path, _) when path.EndsWith(name) -> true
-      | _ -> false
-    sprintf "failed %s" name, isFailed
-
-  let expectNotifications actual expected =
-    Expect.equal (List.length actual) (List.length expected) (sprintf "notifications: %A" (expected |> List.map fst))
-
-    expected
-    |> List.zip actual
-    |> List.iter (fun (n, check) ->
-        let name, f = check
-        let minimal_info =
-          match n with
-          | WorkspaceProjectState.Loading (path, _) -> sprintf "loading %s " path
-          | WorkspaceProjectState.Loaded (po, _, _) -> sprintf "loaded %s" po.ProjectFileName
-          | WorkspaceProjectState.Failed (path, _) -> sprintf "failed %s" path
-        Expect.isTrue (f n) (sprintf "expected %s but was %s" name minimal_info) )
-
-  type NotificationWatcher (loader: Dotnet.ProjInfo.Workspace.Loader, log) =
-      let notifications = List<_>()
-
-      do loader.Notifications.Add(fun (_, arg) ->
-            notifications.Add(arg)
-            log arg)
-
-      member __.Notifications
-          with get () = notifications |> List.ofSeq
+let logProjectOptions (logger: Logger) arg =
+  logger.info(
+    eventX "project options: {po}'"
+    >> setField "po" (sprintf "%A" arg))
         
 let findKey path parsed =
   parsed
@@ -192,9 +152,6 @@ let tests () =
     cmd.Result.StandardOutput
     |> fun s -> s.Trim()
     |> asLines
-
-  let watchNotifications logger loader =
-     NotificationWatcher (loader, logNotification logger)
 
   let valid =
 
@@ -256,7 +213,7 @@ let tests () =
         fcsBinder.Bind(loader)
       )
 
-      ftestCase |> withLog "can fsx" (fun logger fs ->
+      testCase |> withLog "can fsx" (fun logger fs ->
         let testDir = inDir fs "check_fsx"
 
         let fcs = createFCS ()
@@ -267,11 +224,46 @@ let tests () =
 
         let fcsBinder = FCSBinder(netFwInfo, fcs)
 
-        let rawOptions =
-          fcsBinder.GetProjectOptionsFromScriptBy(tfm, "a.fsx", "1+1")
+        let file = "a.fsx"
+        let input =
+          """
+let foo = 1+1"
+          """
+
+        //TODO fsharp.core is wrong, is netstandard1.6
+        //TODO parametrize fsharp.core
+        let projOptions =
+          fcsBinder.GetProjectOptionsFromScriptBy(tfm, file, input)
           |> Async.RunSynchronously
 
-        printfn "raw: %A" rawOptions
+        logProjectOptions logger projOptions
+
+        let result =
+          fcs.ParseAndCheckProject(projOptions)
+          |> Async.RunSynchronously
+
+        Expect.equal result.Errors.Length 0 "no errors"
+
+        let parseFileResults, checkFileResults = 
+            fcs.ParseAndCheckFileInProject(file, 0, input, projOptions) 
+            |> Async.RunSynchronously
+
+        let res =
+          match checkFileResults with
+          | FCS_CheckFileAnswer.Succeeded(res) -> res
+          | res -> failwithf "Parsing did not finish... (%A)" res
+
+        let partialAssemblySignature = res.PartialAssemblySignature
+            
+        Expect.equal partialAssemblySignature.Entities.Count 1 "one entity"
+            
+        let moduleEntity = partialAssemblySignature.Entities.[0]
+
+        Expect.equal moduleEntity.MembersFunctionsAndValues.Count 1 "one function"
+
+        let fnVal = moduleEntity.MembersFunctionsAndValues.[0]
+
+        Expect.equal fnVal.DisplayName "foo" "exists function foo"
       )
     ]
 
