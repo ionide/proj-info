@@ -222,7 +222,7 @@ let tests () =
 
         let tfm = netFwInfo.LatestVersion ()
 
-        let fcsBinder = FCSBinder(netFwInfo, fcs)
+        let fsxBinder = FsxBinder(netFwInfo, fcs)
 
         let file = "a.fsx"
         let input =
@@ -233,7 +233,7 @@ let foo = 1+1"
         //TODO fsharp.core is wrong, is netstandard1.6
         //TODO parametrize fsharp.core
         let projOptions =
-          fcsBinder.GetProjectOptionsFromScriptBy(tfm, file, input)
+          fsxBinder.GetProjectOptionsFromScriptBy(tfm, file, input)
           |> Async.RunSynchronously
 
         logProjectOptions logger projOptions

@@ -20,6 +20,8 @@ type FCSBinder (netFwInfo: NetFWInfo, checker: FCS_Checker) =
     member this.Bind(workspace: Loader) =
         ()
 
+type FsxBinder (netFwInfo: NetFWInfo, checker: FCS_Checker) =
+
     member this.GetProjectOptionsFromScriptBy(tfm, file, source) = async {
       let dummy : FSharpCompilerServiceChecker.CheckerGetProjectOptionsFromScript<FCS_ProjectOptions, _> =
         fun (file, source, otherFlags, assumeDotNetFramework) ->
