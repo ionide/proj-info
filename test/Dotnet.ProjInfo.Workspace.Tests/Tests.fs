@@ -136,10 +136,10 @@ module ExpectNotification =
       member __.Notifications
           with get () = notifications |> List.ofSeq
         
-let findKey path parsed =
+let findByPath path parsed =
   parsed
   |> Array.tryPick (fun (kv: KeyValuePair<ProjectKey, ProjectOptions>) ->
-      if kv.Key.ProjectPath = path then Some kv.Key else None)
+      if kv.Key.ProjectPath = path then Some kv else None)
   |> function
      | Some x -> x
      | None -> failwithf "key '%s' not found in %A" path (parsed |> Array.map (fun kv -> kv.Key))
@@ -193,6 +193,14 @@ let tests () =
   let watchNotifications logger loader =
      NotificationWatcher (loader, logNotification logger)
 
+  let expectFind projPath key msg parsed =
+     let p = (parsed |> findByPath projPath)
+     Expect.equal p.Key key msg
+     p.Value
+
+  let expectExists projPath key msg =
+     expectFind projPath key msg >> ignore
+
   let valid =
 
     let createLoader logger =
@@ -202,7 +210,7 @@ let tests () =
         let loader = Loader.Create(config)
         loader
 
-    testList "valid" [
+    ftestList "valid" [
 
       testCase |> withLog "can load sample1" (fun logger fs ->
         let testDir = inDir fs "load_sample1"
@@ -233,7 +241,8 @@ let tests () =
 
         Expect.equal parsed.Length 1 "lib"
         
-        Expect.equal (parsed |> findKey projPath) { ProjectKey.ProjectPath = projPath; Configuration = "Debug"; TargetFramework = "net461" } "a lib"
+        parsed
+        |> expectExists projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "net461" } "a lib"
       )
 
       testCase |> withLog "can load sample2" (fun logger fs ->
@@ -258,7 +267,8 @@ let tests () =
 
         Expect.equal parsed.Length 1 "console and lib"
         
-        Expect.equal (parsed |> findKey projPath) { ProjectKey.ProjectPath = projPath; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "first is a lib"
+        parsed
+        |> expectExists projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "first is a lib"
       )
 
       testCase |> withLog "can load sample3" (fun logger fs ->
@@ -286,9 +296,12 @@ let tests () =
 
         Expect.equal parsed.Length 3 (sprintf "console (F#) and lib (F#) and lib (C#), but was %A" (parsed |> Array.map (fun x -> x.Key)))
 
-        Expect.equal (parsed |> findKey l1) { ProjectKey.ProjectPath = l1; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "the F# lib"
-        Expect.equal (parsed |> findKey l2) { ProjectKey.ProjectPath = l2; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "the C# lib"
-        Expect.equal (parsed |> findKey projPath) { ProjectKey.ProjectPath = projPath; Configuration = "Debug"; TargetFramework = "netcoreapp2.1" } "the F# console"
+        parsed
+        |> expectExists l1 { ProjectKey.ProjectPath = l1; TargetFramework = "netstandard2.0" } "the F# lib"
+        parsed
+        |> expectExists l2 { ProjectKey.ProjectPath = l2; TargetFramework = "netstandard2.0" } "the C# lib"
+        parsed
+        |> expectExists projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netcoreapp2.1" } "the F# console"
       )
 
       testCase |> withLog "can load sample4" (fun logger fs ->
@@ -317,7 +330,8 @@ let tests () =
 
         Expect.equal parsed.Length 1 (sprintf "multi-tfm lib (F#), but was %A" (parsed |> Array.map (fun x -> x.Key)))
 
-        Expect.equal (parsed |> findKey projPath) { ProjectKey.ProjectPath = projPath; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "the F# console"
+        parsed
+        |> expectExists projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "the F# console"
       )
 
       testCase |> withLog "can load sample5" (fun logger fs ->
@@ -341,8 +355,9 @@ let tests () =
         let parsed = loader.Projects
 
         Expect.equal parsed.Length 1 "lib"
-        
-        Expect.equal (parsed |> findKey projPath) { ProjectKey.ProjectPath = projPath; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "a C# lib"
+
+        parsed
+        |> expectExists projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "a C# lib"
       )
 
       testCase |> withLog "can load sln" (fun logger fs ->
@@ -374,9 +389,12 @@ let tests () =
           |> List.map (fun p2p -> testDir/ p2p.ProjectFile )
         let l1 = testDir/ (``sample6 Netsdk Sparse/2``.ProjectFile)
 
-        Expect.equal (parsed |> findKey l1) { ProjectKey.ProjectPath = l1; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "the F# lib"
-        Expect.equal (parsed |> findKey l2) { ProjectKey.ProjectPath = l2; Configuration = "Debug"; TargetFramework = "netstandard2.0" } "the C# lib"
-        Expect.equal (parsed |> findKey c1) { ProjectKey.ProjectPath = c1; Configuration = "Debug"; TargetFramework = "netcoreapp2.1" } "the F# console"
+        parsed
+        |> expectExists l1 { ProjectKey.ProjectPath = l1; TargetFramework = "netstandard2.0" } "the F# lib"
+        parsed
+        |> expectExists l2 { ProjectKey.ProjectPath = l2; TargetFramework = "netstandard2.0" } "the C# lib"
+        parsed
+        |> expectExists c1 { ProjectKey.ProjectPath = c1; TargetFramework = "netcoreapp2.1" } "the F# console"
       )
 
     ]

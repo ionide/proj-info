@@ -6,7 +6,6 @@ open System.IO
 
 type ProjectKey =
     { ProjectPath: string
-      Configuration: string
       TargetFramework: string }
 
 type MSBuildLocator () =
@@ -49,12 +48,6 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
 
     let getKey (po: ProjectOptions) =
         { ProjectKey.ProjectPath = po.ProjectFileName
-          Configuration =
-            match po.ExtraProjectInfo.ProjectSdkType with
-            | ProjectSdkType.DotnetSdk t ->
-                t.Configuration
-            | ProjectSdkType.Verbose v ->
-                v.Configuration
           TargetFramework =
             match po.ExtraProjectInfo.ProjectSdkType with
             | ProjectSdkType.DotnetSdk t ->
