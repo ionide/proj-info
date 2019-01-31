@@ -59,15 +59,20 @@ type GetProjectOptionsErrors =
      | ProjectNotRestored of string
      | GenericError of string * string
 
-
 type ProjectOptions =
     {
         ProjectId: string option
         ProjectFileName: string
+        TargetFramework: string
         OtherOptions: string list
-        ReferencedProjects: (string * ProjectOptions) list
+        ReferencedProjects: ProjectReference list
         LoadTime: DateTime
         ExtraProjectInfo: ExtraProjectInfoData
+    }
+and ProjectReference =
+    {
+        ProjectFileName: string
+        TargetFramework: string
     }
 
 type [<RequireQualifiedAccess>] WorkspaceProjectState =

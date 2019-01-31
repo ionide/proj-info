@@ -48,13 +48,7 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
 
     let getKey (po: ProjectOptions) =
         { ProjectKey.ProjectPath = po.ProjectFileName
-          TargetFramework =
-            match po.ExtraProjectInfo.ProjectSdkType with
-            | ProjectSdkType.DotnetSdk t ->
-                t.TargetFramework
-            | ProjectSdkType.Verbose v ->
-                v.TargetFrameworkVersion |> Dotnet.ProjInfo.NETFramework.netifyTargetFrameworkVersion
-        }
+          TargetFramework = po.TargetFramework }
 
     [<CLIEvent>]
     member __.Notifications = event1.Publish
@@ -92,13 +86,16 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
                         Error (GetProjectOptionsErrors.GenericError(proj, "not found"))
 
             match loader notify cache project with
-            | Ok (po, sources, props) ->
+            | Ok (po, sources, props, additionalProjs) ->
                 // TODO sources and props are wrong, because not project specific. but of root proj
                 let loaded po = WorkspaceProjectState.Loaded (po, sources, props)
 
                 let rec visit (p: ProjectOptions) = seq {
                     yield p
-                    for (_, p2p) in p.ReferencedProjects do
+                    for p2pRef in p.ReferencedProjects do
+                        let p2p =
+                            additionalProjs
+                            |> List.find (fun p -> p.ProjectFileName = p2pRef.ProjectFileName && p.TargetFramework = p2pRef.TargetFramework)
                         yield! visit p2p }
 
                 for proj in visit po do

@@ -69,7 +69,7 @@ module ProjectCrackerDotnetSdk =
 
   type private ProjectParsingSdk = DotnetSdk | VerboseSdk
 
-  type ParsedProject = string * ProjectOptions * ((string * string) list)
+  type ParsedProject = string * ProjectOptions * ((string * string) list) * (ProjectOptions list)
   type ParsedProjectCache = Collections.Concurrent.ConcurrentDictionary<string, ParsedProject>
 
   let private getProjectOptionsFromProjectFile msbuildPath notifyState (cache: ParsedProjectCache) parseAsSdk (file : string) =
@@ -223,7 +223,7 @@ module ProjectCrackerDotnetSdk =
                     //compatibility with old behaviour, so output is exactly the same
                     let mergedLog =
                         [ yield (file, "")
-                          yield! p2pProjects |> List.collect (fun (_,_,x) -> x) ]
+                          yield! p2pProjects |> List.collect (fun (_,_,x,_) -> x) ]
                     
                     let extraInfo = getExtraInfoVerboseSdk tar props
                     ProjectSdkType.Verbose(extraInfo), mergedLog
@@ -232,8 +232,14 @@ module ProjectCrackerDotnetSdk =
                 {
                     ProjectId = Some file
                     ProjectFileName = file
+                    TargetFramework = 
+                        match sdkTypeData with
+                        | ProjectSdkType.DotnetSdk t ->
+                            t.TargetFramework
+                        | ProjectSdkType.Verbose v ->
+                            v.TargetFrameworkVersion |> Dotnet.ProjInfo.NETFramework.netifyTargetFrameworkVersion
                     OtherOptions = rspNormalized
-                    ReferencedProjects = p2pProjects |> List.map (fun (x,y,_) -> (x,y))
+                    ReferencedProjects = p2pProjects |> List.map (fun (x,y,_,_) -> { ProjectReference.ProjectFileName = x; TargetFramework = y.TargetFramework })
                     LoadTime = DateTime.Now
                     ExtraProjectInfo =
                         {
@@ -242,7 +248,14 @@ module ProjectCrackerDotnetSdk =
                         }
                 }
 
-            tar, po, log
+            let additionalProjects : ProjectOptions list =
+                let rec getAdditionalProjs (_,parsedP2P,_,parsedP2PDeps) =
+                    [ yield parsedP2P
+                      yield! parsedP2PDeps ]
+
+                p2pProjects |> List.collect getAdditionalProjs
+
+            (tar, po, log, additionalProjects)
 
     and projInfo additionalMSBuildProps file : ParsedProject =
         let key = sprintf "%s;%A" file additionalMSBuildProps
@@ -254,15 +267,15 @@ module ProjectCrackerDotnetSdk =
             cache.AddOrUpdate(key, p, fun _ _ -> p)
 
 
-    let _, po, log = projInfo [] file
-    po, log
+    let _, po, log, additionalProjs = projInfo [] file
+    (po, log, additionalProjs)
 
   let private (|ProjectExtraInfoBySdk|_|) po =
       Some po.ExtraProjectInfo
 
   let private loadBySdk msbuildPath notifyState (cache: ParsedProjectCache) parseAsSdk file =
       try
-        let po, log = getProjectOptionsFromProjectFile msbuildPath notifyState cache parseAsSdk file
+        let po, log, additionalProjs = getProjectOptionsFromProjectFile msbuildPath notifyState cache parseAsSdk file
 
         let compileFiles =
             let sources = FscArguments.compileFiles po.OtherOptions
@@ -282,7 +295,7 @@ module ProjectCrackerDotnetSdk =
                     sources
             | _ -> sources
 
-        Ok (po, Seq.toList compileFiles, (log |> Map.ofList))
+        Ok (po, Seq.toList compileFiles, (log |> Map.ofList), additionalProjs)
       with
         | ProjectInspectException d -> Error d
         | e -> Error (GenericError(file, e.Message))
