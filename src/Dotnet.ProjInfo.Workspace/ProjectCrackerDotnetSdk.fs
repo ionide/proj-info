@@ -239,7 +239,7 @@ module ProjectCrackerDotnetSdk =
                         | ProjectSdkType.Verbose v ->
                             v.TargetFrameworkVersion |> Dotnet.ProjInfo.NETFramework.netifyTargetFrameworkVersion
                     OtherOptions = rspNormalized
-                    ReferencedProjects = p2pProjects |> List.map (fun (x,y,_,_) -> { ProjectReference.ProjectFileName = x; TargetFramework = y.TargetFramework })
+                    ReferencedProjects = p2pProjects |> List.map (fun (_,y,_,_) -> { ProjectReference.ProjectFileName = y.ProjectFileName; TargetFramework = y.TargetFramework })
                     LoadTime = DateTime.Now
                     ExtraProjectInfo =
                         {
