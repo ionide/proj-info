@@ -208,9 +208,9 @@ let tests () =
 
         let loader, netFwInfo = createLoader logger
 
-        let fcsBinder = FCSBinder(netFwInfo, fcs)
+        let fcsBinder = FCSBinder(netFwInfo, loader, fcs)
 
-        fcsBinder.Bind(loader)
+        fcsBinder.GetProjectOptions("")
       )
 
       testCase |> withLog "can fsx" (fun logger fs ->

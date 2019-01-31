@@ -5,7 +5,7 @@ open Dotnet.ProjInfo.Workspace
 type FCS_ProjectOptions = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpProjectOptions
 type FCS_Checker = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpChecker
 
-type FCSBinder (netFwInfo: NetFWInfo, checker: FCS_Checker) =
+type FCSBinder (netFwInfo: NetFWInfo, workspace: Loader, checker: FCS_Checker) =
 
     // let projectLoadedSuccessfully projectFileName response =
     //     let project =
@@ -17,7 +17,7 @@ type FCSBinder (netFwInfo: NetFWInfo, checker: FCS_Checker) =
     //             proj
     //     ()
 
-    member this.Bind(workspace: Loader) =
+    member this.GetProjectOptions(path: string) =
         ()
 
 type FsxBinder (netFwInfo: NetFWInfo, checker: FCS_Checker) =
