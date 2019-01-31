@@ -210,7 +210,7 @@ let tests () =
         let loader = Loader.Create(config)
         loader
 
-    ftestList "valid" [
+    testList "valid" [
 
       testCase |> withLog "can load sample1" (fun logger fs ->
         let testDir = inDir fs "load_sample1"
