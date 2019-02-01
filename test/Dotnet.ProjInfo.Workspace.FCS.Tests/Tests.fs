@@ -208,9 +208,15 @@ let tests () =
 
         let loader, netFwInfo = createLoader logger
 
+        loader.LoadProjects [ projPath ]
+
         let fcsBinder = FCSBinder(netFwInfo, loader, fcs)
 
-        fcsBinder.GetProjectOptions("")
+        let fcsPo = fcsBinder.GetProjectOptions(projPath)
+
+        logProjectOptions logger fcsPo
+
+        //TODO add asserts
       )
 
       testCase |> withLog "can fsx" (fun logger fs ->
