@@ -208,9 +208,9 @@ let tests () =
 
         let loader, netFwInfo = createLoader logger
 
-        loader.LoadProjects [ projPath ]
-
         let fcsBinder = FCSBinder(netFwInfo, loader, fcs)
+
+        loader.LoadProjects [ projPath ]
 
         let fcsPo = fcsBinder.GetProjectOptions(projPath)
 
