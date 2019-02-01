@@ -99,13 +99,13 @@ let logProjectOptions (logger: Logger) arg =
     eventX "project options: {po}'"
     >> setField "po" (sprintf "%A" arg))
         
-let findKey path parsed =
+let expectFind key msg parsed =
   parsed
   |> Array.tryPick (fun (kv: KeyValuePair<ProjectKey, ProjectOptions>) ->
-      if kv.Key.ProjectPath = path then Some kv.Key else None)
+      if kv.Key = key then Some kv.Value else None)
   |> function
      | Some x -> x
-     | None -> failwithf "key '%s' not found in %A" path (parsed |> Array.map (fun kv -> kv.Key))
+     | None -> failwithf "%s. key '%A' not found in %A" msg key (parsed |> Array.map (fun kv -> kv.Key))
 
 let tests () =
  
@@ -212,11 +212,18 @@ let tests () =
 
         loader.LoadProjects [ projPath ]
 
-        let fcsPo = fcsBinder.GetProjectOptions(projPath)
+        let fcsPoOpt = fcsBinder.GetProjectOptions(projPath)
 
-        logProjectOptions logger fcsPo
+        logProjectOptions logger fcsPoOpt
 
-        //TODO add asserts
+        let fcsPo = fcsPoOpt |> Option.get
+
+        let po =
+          loader.Projects
+          |> expectFind { ProjectKey.ProjectPath = projPath; TargetFramework = "net461" } "find proj"
+
+        Expect.equal fcsPo.LoadTime po.LoadTime "load time"
+        Expect.equal fcsPo.ReferencedProjects.Length po.ReferencedProjects.Length "refs"
       )
 
       testCase |> withLog "can fsx" (fun logger fs ->
