@@ -224,6 +224,68 @@ let tests () =
 
         Expect.equal fcsPo.LoadTime po.LoadTime "load time"
         Expect.equal fcsPo.ReferencedProjects.Length po.ReferencedProjects.Length "refs"
+
+        //TODO check fullpaths
+        //TODO check sourcefiles
+
+        let result =
+          fcs.ParseAndCheckProject(fcsPo)
+          |> Async.RunSynchronously
+
+        Expect.equal result.Errors.Length 0 "no errors"
+
+        let uses =
+          result.GetAllUsesOfAllSymbols()
+          |> Async.RunSynchronously
+
+        Expect.isNonEmpty uses "all symbols usages"
+      )
+
+      testCase |> withLog "can load sample2" (fun logger fs ->
+        let testDir = inDir fs "load_sample2"
+        copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
+
+        let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
+
+        dotnet fs ["restore"; projPath]
+        |> checkExitCodeZero
+
+        let fcs = createFCS ()
+
+        let loader, netFwInfo = createLoader logger
+
+        let fcsBinder = FCSBinder(netFwInfo, loader, fcs)
+
+        loader.LoadProjects [projPath]
+
+        let fcsPoOpt = fcsBinder.GetProjectOptions(projPath)
+
+        logProjectOptions logger fcsPoOpt
+
+        let fcsPo = fcsPoOpt |> Option.get
+
+        let po =
+          loader.Projects
+          |> expectFind { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "first is a lib"
+
+        Expect.equal fcsPo.LoadTime po.LoadTime "load time"
+        Expect.equal fcsPo.ReferencedProjects.Length po.ReferencedProjects.Length "refs"
+
+        //TODO check fullpaths
+        //TODO check sourcefiles
+
+        let result =
+          fcs.ParseAndCheckProject(fcsPo)
+          |> Async.RunSynchronously
+
+        Expect.equal result.Errors.Length 0 "no errors"
+
+        let uses =
+          result.GetAllUsesOfAllSymbols()
+          |> Async.RunSynchronously
+
+        Expect.isNonEmpty uses "all symbols usages"
+
       )
 
       testCase |> withLog "can fsx" (fun logger fs ->

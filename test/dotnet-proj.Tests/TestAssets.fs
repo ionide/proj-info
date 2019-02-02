@@ -22,6 +22,7 @@ let andProps props x =
       yield! props ]
   { x with Props = n |> Map.ofList }
 
+/// old sdk, one net461 lib l1
 let ``samples1 OldSdk library`` =
   { ProjDir = "sample1-oldsdk-lib"
     AssemblyName = "Lib1"
@@ -31,6 +32,7 @@ let ``samples1 OldSdk library`` =
     ]
     ProjectReferences = [] }
 
+/// dotnet sdk, one netstandard2.0 lib n1
 let ``samples2 NetSdk library`` =
   { ProjDir = "sample2-netsdk-lib"
     AssemblyName = "n1"
@@ -40,6 +42,10 @@ let ``samples2 NetSdk library`` =
     ]
     ProjectReferences = [] }
 
+/// dotnet sdk, a netcoreapp2.1 console c1
+/// reference:
+/// - netstandard2.0 lib l1 (C#)
+/// - netstandard2.0 lib l2 (F#)
 let ``sample3 Netsdk projs`` =
   { ProjDir = "sample3-netsdk-projs"
     AssemblyName = "c1"
@@ -64,6 +70,9 @@ let ``sample3 Netsdk projs`` =
           ProjectReferences = [] }
       ] }
 
+/// dotnet sdk, m1 library multi tfm:
+/// - netstandard2.0 with file LibraryA.fs and prop MyProperty=AAA
+/// - net461 with file LibraryB.fs and prop MyProperty=BBB
 let ``samples4 NetSdk multi tfm`` =
   { ProjDir = "sample4-netsdk-multitfm"
     AssemblyName = "m1"
@@ -74,6 +83,7 @@ let ``samples4 NetSdk multi tfm`` =
     ]
     ProjectReferences = [] }
 
+/// dotnet sdk, a C# netstandard2.0 library l2
 let ``samples5 NetSdk CSharp library`` =
   { ProjDir = "sample5-netsdk-lib-cs"
     AssemblyName = "l2"
@@ -83,6 +93,8 @@ let ``samples5 NetSdk CSharp library`` =
     ]
     ProjectReferences = [] }
 
+/// dotnet sdk, a c1 console app (netcoreapp) who reference:
+/// - netstandard2.0 l1 library
 let ``sample6 Netsdk Sparse/1`` =
   { ProjDir = "sample6-netsdk-sparse"
     AssemblyName = "c1"
@@ -100,6 +112,7 @@ let ``sample6 Netsdk Sparse/1`` =
           ProjectReferences = [] }
       ] }
 
+/// dotnet sdk, a netstandard2.0 library l2
 let ``sample6 Netsdk Sparse/2`` =
     { ProjDir = "sample6-netsdk-sparse"/"l2"
       AssemblyName = "l2"
@@ -109,6 +122,7 @@ let ``sample6 Netsdk Sparse/2`` =
       ]
       ProjectReferences = [] }
 
+/// sln
 let ``sample6 Netsdk Sparse/sln`` =
     { ProjDir = "sample6-netsdk-sparse"
       AssemblyName = ""

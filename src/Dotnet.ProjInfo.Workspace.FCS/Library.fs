@@ -6,7 +6,44 @@ open System.Collections.Generic
 type FCS_ProjectOptions = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpProjectOptions
 type FCS_Checker = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpChecker
 
+module FscArguments =
+
+    let isCompileFile (s:string) =
+        s.EndsWith(".fs") || s.EndsWith (".fsi")
+
+    let compileFiles =
+        //TODO filter the one without initial -
+        List.filter isCompileFile
+
+    let isTempFile (name: string) =
+        let tempPath = System.IO.Path.GetTempPath()
+        let s = name.ToLower()
+        s.StartsWith(tempPath.ToLower())
+
+    let isDeprecatedArg n =
+      // TODO put in FCS
+      (n = "--times") || (n = "--no-jit-optimize")
+
 type FCSBinder (netFwInfo: NetFWInfo, workspace: Loader, checker: FCS_Checker) =
+
+    let removeDeprecatedArgs (opts: FCS_ProjectOptions) =
+      // TODO add test
+      let oos =
+        opts.OtherOptions
+        |> Array.filter (fun n -> not (FscArguments.isDeprecatedArg n))
+      { opts with OtherOptions = oos }
+
+    let compileFiles po =
+        let sources = FscArguments.compileFiles po.OtherOptions
+        match po.ExtraProjectInfo.ProjectSdkType with
+        | ProjectSdkType.Verbose _ ->
+            //compatibility with old behaviour (projectcracker), so test output is exactly the same
+            //the temp source files (like generated assemblyinfo.fs) are not added to sources
+            sources
+            |> List.filter (fun p -> not(FscArguments.isTempFile p))
+
+        | ProjectSdkType.DotnetSdk _ ->
+            sources
 
     member this.GetProjectOptions(path: string) =
         let parsed = workspace.Projects
@@ -24,11 +61,13 @@ type FCSBinder (netFwInfo: NetFWInfo, workspace: Loader, checker: FCS_Checker) =
               None
           | Some po ->
 
-              Some ({
+              let fcsPo : FCS_ProjectOptions = {
                   FCS_ProjectOptions.ProjectId = po.ProjectId
                   ProjectFileName = po.ProjectFileName
-                  SourceFiles = [||] // TODO set source files
-                  OtherOptions = po.OtherOptions |> Array.ofList
+                  SourceFiles = [||] // TODO set source files?
+                  OtherOptions =
+                    po.OtherOptions
+                    |> Array.ofList
                   ReferencedProjects =
                     po.ReferencedProjects
                      // TODO choose will skip the if not found, should instead log or better
@@ -43,7 +82,13 @@ type FCSBinder (netFwInfo: NetFWInfo, workspace: Loader, checker: FCS_Checker) =
                   OriginalLoadReferences = []
                   Stamp = None
                   ExtraProjectInfo = None
-              })
+              }
+
+              fcsPo
+              |> removeDeprecatedArgs
+              // TODO deduplicateReferences, why?
+              // TODO check use full paths
+              |> Some
 
         let byPath path (kv: KeyValuePair<ProjectKey, ProjectOptions>) =
           if kv.Key.ProjectPath = path then
@@ -54,6 +99,7 @@ type FCSBinder (netFwInfo: NetFWInfo, workspace: Loader, checker: FCS_Checker) =
         parsed
         |> Array.tryPick (byPath path)
         |> Option.bind getPo
+
 
 type FsxBinder (netFwInfo: NetFWInfo, checker: FCS_Checker) =
 
