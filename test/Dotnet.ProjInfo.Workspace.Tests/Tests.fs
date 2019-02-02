@@ -280,7 +280,7 @@ let tests () =
           ``sample3 Netsdk projs``.ProjectReferences
           |> List.map (fun p2p -> testDir/ p2p.ProjectFile )
 
-        dotnet fs ["restore"; projPath]
+        dotnet fs ["build"; projPath]
         |> checkExitCodeZero
 
         let loader = createLoader logger
