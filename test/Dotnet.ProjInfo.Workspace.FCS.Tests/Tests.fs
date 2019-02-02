@@ -343,7 +343,7 @@ let tests () =
 no errors but was: [|commandLineArgs (0,1)-(0,1) parameter error No inputs specified;
  unknown (1,1)-(1,1) parameter error Assembly reference 'mscorlib.dll' was not found or is invalid|]. Should be empty.
             """.Trim()
-          Tests.skiptest (sprintf "Known failure on OSX. error is %s" errorOnOsx)
+          Tests.skiptest (sprintf "Known failure on OSX travis. error is %s" errorOnOsx)
           //TODO check failure on osx
         else
           expectNoErrors result
