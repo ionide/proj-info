@@ -19,6 +19,7 @@ type FCS_Checker = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpChecker
 type FCS_Entity = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpEntity
 type FCS_Symbol = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpSymbol
 type FCS_CheckFileAnswer = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpCheckFileAnswer
+type FCS_CheckProjectResults = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpCheckProjectResults
 
 #nowarn "25"
 
@@ -106,6 +107,9 @@ let expectFind key msg parsed =
   |> function
      | Some x -> x
      | None -> failwithf "%s. key '%A' not found in %A" msg key (parsed |> Array.map (fun kv -> kv.Key))
+
+let expectNoErrors (result: FCS_CheckProjectResults) =
+  Expect.isEmpty result.Errors (sprintf "no errors but was: %A" result.Errors)
 
 let tests () =
  
@@ -233,7 +237,7 @@ let tests () =
           fcs.ParseAndCheckProject(fcsPo)
           |> Async.RunSynchronously
 
-        Expect.isEmpty result.Errors "no errors"
+        expectNoErrors result
 
         let uses =
           result.GetAllUsesOfAllSymbols()
@@ -280,7 +284,7 @@ let tests () =
           fcs.ParseAndCheckProject(fcsPo)
           |> Async.RunSynchronously
 
-        Expect.isEmpty result.Errors "no errors"
+        expectNoErrors result
 
         let uses =
           result.GetAllUsesOfAllSymbols()
@@ -329,7 +333,7 @@ let tests () =
           fcs.ParseAndCheckProject(fcsPo)
           |> Async.RunSynchronously
 
-        Expect.isEmpty result.Errors "no errors"
+        expectNoErrors result
 
         let uses =
           result.GetAllUsesOfAllSymbols()
@@ -368,7 +372,7 @@ let foo = 1+1"
           fcs.ParseAndCheckProject(projOptions)
           |> Async.RunSynchronously
 
-        Expect.isEmpty result.Errors "no errors"
+        expectNoErrors result
 
         let parseFileResults, checkFileResults = 
             fcs.ParseAndCheckFileInProject(file, 0, input, projOptions) 
