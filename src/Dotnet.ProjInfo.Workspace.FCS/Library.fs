@@ -8,13 +8,6 @@ type FCS_Checker = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpChecker
 
 module FscArguments =
 
-    let isCompileFile (s:string) =
-        s.EndsWith(".fs") || s.EndsWith (".fsi")
-
-    let compileFiles =
-        //TODO filter the one without initial -
-        List.filter isCompileFile
-
     let isTempFile (name: string) =
         let tempPath = System.IO.Path.GetTempPath()
         let s = name.ToLower()
@@ -32,18 +25,6 @@ type FCSBinder (netFwInfo: NetFWInfo, workspace: Loader, checker: FCS_Checker) =
         opts.OtherOptions
         |> Array.filter (fun n -> not (FscArguments.isDeprecatedArg n))
       { opts with OtherOptions = oos }
-
-    let compileFiles po =
-        let sources = FscArguments.compileFiles po.OtherOptions
-        match po.ExtraProjectInfo.ProjectSdkType with
-        | ProjectSdkType.Verbose _ ->
-            //compatibility with old behaviour (projectcracker), so test output is exactly the same
-            //the temp source files (like generated assemblyinfo.fs) are not added to sources
-            sources
-            |> List.filter (fun p -> not(FscArguments.isTempFile p))
-
-        | ProjectSdkType.DotnetSdk _ ->
-            sources
 
     member this.GetProjectOptions(path: string) =
         let parsed = workspace.Projects
@@ -86,8 +67,7 @@ type FCSBinder (netFwInfo: NetFWInfo, workspace: Loader, checker: FCS_Checker) =
 
               fcsPo
               |> removeDeprecatedArgs
-              // TODO deduplicateReferences, why?
-              // TODO check use full paths
+              // TODO check use full paths?
               |> Some
 
         let byPath path (kv: KeyValuePair<ProjectKey, ProjectOptions>) =
