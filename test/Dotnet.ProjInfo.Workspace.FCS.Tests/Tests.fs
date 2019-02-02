@@ -323,7 +323,7 @@ let tests () =
           |> expectFind { ProjectKey.ProjectPath = projPath; TargetFramework = "netcoreapp2.1" } "first is a console app"
 
         Expect.equal fcsPo.LoadTime po.LoadTime "load time"
-        Expect.equal fcsPo.ReferencedProjects.Length po.ReferencedProjects.Length "refs"
+        Expect.equal fcsPo.ReferencedProjects.Length (po.ReferencedProjects.Length - 1) "refs" // one is C#, no FSharpProjectOptions for that
         Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
 
         //TODO check fullpaths
