@@ -232,7 +232,7 @@ let tests () =
           fcs.ParseAndCheckProject(fcsPo)
           |> Async.RunSynchronously
 
-        Expect.equal result.Errors.Length 0 "no errors"
+        Expect.isEmpty result.Errors "no errors"
 
         let uses =
           result.GetAllUsesOfAllSymbols()
@@ -278,7 +278,55 @@ let tests () =
           fcs.ParseAndCheckProject(fcsPo)
           |> Async.RunSynchronously
 
-        Expect.equal result.Errors.Length 0 "no errors"
+        Expect.isEmpty result.Errors "no errors"
+
+        let uses =
+          result.GetAllUsesOfAllSymbols()
+          |> Async.RunSynchronously
+
+        Expect.isNonEmpty uses "all symbols usages"
+
+      )
+
+      testCase |> withLog "can load sample3" (fun logger fs ->
+        let testDir = inDir fs "load_sample3"
+        copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
+
+        let projPath = testDir/ (``sample3 Netsdk projs``.ProjectFile)
+
+        // for no errors, use build instead of restore because there is a C# lib.
+        dotnet fs ["build"; projPath]
+        |> checkExitCodeZero
+
+        let fcs = createFCS ()
+
+        let loader, netFwInfo = createLoader logger
+
+        let fcsBinder = FCSBinder(netFwInfo, loader, fcs)
+
+        loader.LoadProjects [projPath]
+
+        let fcsPoOpt = fcsBinder.GetProjectOptions(projPath)
+
+        logProjectOptions logger fcsPoOpt
+
+        let fcsPo = fcsPoOpt |> Option.get
+
+        let po =
+          loader.Projects
+          |> expectFind { ProjectKey.ProjectPath = projPath; TargetFramework = "netcoreapp2.1" } "first is a console app"
+
+        Expect.equal fcsPo.LoadTime po.LoadTime "load time"
+        Expect.equal fcsPo.ReferencedProjects.Length po.ReferencedProjects.Length "refs"
+
+        //TODO check fullpaths
+        //TODO check sourcefiles
+
+        let result =
+          fcs.ParseAndCheckProject(fcsPo)
+          |> Async.RunSynchronously
+
+        Expect.isEmpty result.Errors "no errors"
 
         let uses =
           result.GetAllUsesOfAllSymbols()
@@ -317,7 +365,7 @@ let foo = 1+1"
           fcs.ParseAndCheckProject(projOptions)
           |> Async.RunSynchronously
 
-        Expect.equal result.Errors.Length 0 "no errors"
+        Expect.isEmpty result.Errors "no errors"
 
         let parseFileResults, checkFileResults = 
             fcs.ParseAndCheckFileInProject(file, 0, input, projOptions) 
