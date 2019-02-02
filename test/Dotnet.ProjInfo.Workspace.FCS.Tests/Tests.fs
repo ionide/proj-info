@@ -194,9 +194,9 @@ let tests () =
 
       testCase |> withLog "can load sample1" (fun logger fs ->
         let testDir = inDir fs "load_sample1"
-        copyDirFromAssets fs ``samples1 OldSdk library``.ProjDir testDir
+        copyDirFromAssets fs ``sample1 OldSdk library``.ProjDir testDir
 
-        let projPath = testDir/ (``samples1 OldSdk library``.ProjectFile)
+        let projPath = testDir/ (``sample1 OldSdk library``.ProjectFile)
         let projDir = Path.GetDirectoryName projPath
 
         fs.cd projDir
@@ -248,9 +248,9 @@ let tests () =
 
       testCase |> withLog "can load sample2" (fun logger fs ->
         let testDir = inDir fs "load_sample2"
-        copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
+        copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
 
-        let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
+        let projPath = testDir/ (``sample2 NetSdk library``.ProjectFile)
 
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero

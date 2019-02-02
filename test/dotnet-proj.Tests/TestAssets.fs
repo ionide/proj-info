@@ -23,7 +23,7 @@ let andProps props x =
   { x with Props = n |> Map.ofList }
 
 /// old sdk, one net461 lib l1
-let ``samples1 OldSdk library`` =
+let ``sample1 OldSdk library`` =
   { ProjDir = "sample1-oldsdk-lib"
     AssemblyName = "Lib1"
     ProjectFile = "l1"/"l1.fsproj"
@@ -33,7 +33,7 @@ let ``samples1 OldSdk library`` =
     ProjectReferences = [] }
 
 /// dotnet sdk, one netstandard2.0 lib n1
-let ``samples2 NetSdk library`` =
+let ``sample2 NetSdk library`` =
   { ProjDir = "sample2-netsdk-lib"
     AssemblyName = "n1"
     ProjectFile = "n1"/"n1.fsproj"
@@ -73,7 +73,7 @@ let ``sample3 Netsdk projs`` =
 /// dotnet sdk, m1 library multi tfm:
 /// - netstandard2.0 with file LibraryA.fs and prop MyProperty=AAA
 /// - net461 with file LibraryB.fs and prop MyProperty=BBB
-let ``samples4 NetSdk multi tfm`` =
+let ``sample4 NetSdk multi tfm`` =
   { ProjDir = "sample4-netsdk-multitfm"
     AssemblyName = "m1"
     ProjectFile = "m1"/"m1.fsproj"
@@ -84,7 +84,7 @@ let ``samples4 NetSdk multi tfm`` =
     ProjectReferences = [] }
 
 /// dotnet sdk, a C# netstandard2.0 library l2
-let ``samples5 NetSdk CSharp library`` =
+let ``sample5 NetSdk CSharp library`` =
   { ProjDir = "sample5-netsdk-lib-cs"
     AssemblyName = "l2"
     ProjectFile = "l2"/"l2.csproj"

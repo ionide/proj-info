@@ -214,9 +214,9 @@ let tests () =
 
       testCase |> withLog "can load sample1" (fun logger fs ->
         let testDir = inDir fs "load_sample1"
-        copyDirFromAssets fs ``samples1 OldSdk library``.ProjDir testDir
+        copyDirFromAssets fs ``sample1 OldSdk library``.ProjDir testDir
 
-        let projPath = testDir/ (``samples1 OldSdk library``.ProjectFile)
+        let projPath = testDir/ (``sample1 OldSdk library``.ProjectFile)
         let projDir = Path.GetDirectoryName projPath
 
         fs.cd projDir
@@ -247,9 +247,9 @@ let tests () =
 
       testCase |> withLog "can load sample2" (fun logger fs ->
         let testDir = inDir fs "load_sample2"
-        copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
+        copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
 
-        let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
+        let projPath = testDir/ (``sample2 NetSdk library``.ProjectFile)
 
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
@@ -306,14 +306,14 @@ let tests () =
 
       testCase |> withLog "can load sample4" (fun logger fs ->
         let testDir = inDir fs "load_sample4"
-        copyDirFromAssets fs ``samples4 NetSdk multi tfm``.ProjDir testDir
+        copyDirFromAssets fs ``sample4 NetSdk multi tfm``.ProjDir testDir
 
-        let projPath = testDir/ (``samples4 NetSdk multi tfm``.ProjectFile)
+        let projPath = testDir/ (``sample4 NetSdk multi tfm``.ProjectFile)
 
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
 
-        for (tfm, _) in ``samples4 NetSdk multi tfm``.TargetFrameworks |> Map.toList do
+        for (tfm, _) in ``sample4 NetSdk multi tfm``.TargetFrameworks |> Map.toList do
           printfn "tfm: %s" tfm
 
         let loader = createLoader logger
@@ -336,9 +336,9 @@ let tests () =
 
       testCase |> withLog "can load sample5" (fun logger fs ->
         let testDir = inDir fs "load_sample5"
-        copyDirFromAssets fs ``samples5 NetSdk CSharp library``.ProjDir testDir
+        copyDirFromAssets fs ``sample5 NetSdk CSharp library``.ProjDir testDir
 
-        let projPath = testDir/ (``samples5 NetSdk CSharp library``.ProjectFile)
+        let projPath = testDir/ (``sample5 NetSdk CSharp library``.ProjectFile)
 
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
@@ -412,9 +412,9 @@ let tests () =
 
       testCase |> withLog "project not found" (fun logger fs ->
         let testDir = inDir fs "proj_not_found"
-        copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
+        copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
 
-        let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
+        let projPath = testDir/ (``sample2 NetSdk library``.ProjectFile)
 
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
@@ -441,9 +441,9 @@ let tests () =
 
       testCase |> withLog "project not restored" (fun logger fs ->
         let testDir = inDir fs "proj_not_restored"
-        copyDirFromAssets fs ``samples2 NetSdk library``.ProjDir testDir
+        copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
 
-        let projPath = testDir/ (``samples2 NetSdk library``.ProjectFile)
+        let projPath = testDir/ (``sample2 NetSdk library``.ProjectFile)
 
         let loader = createLoader logger
 
