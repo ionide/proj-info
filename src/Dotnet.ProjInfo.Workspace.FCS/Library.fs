@@ -40,6 +40,9 @@ type FCSBinder (netFwInfo: NetFWInfo, workspace: Loader, checker: FCS_Checker) =
           match parsed |> Array.tryPick (byKey key) with
           | None ->
               None
+          | Some po when not (po.ProjectFileName.EndsWith(".fsproj")) ->
+              // FCS doest support others languages
+              None
           | Some po ->
 
               let fcsPo : FCS_ProjectOptions = {
