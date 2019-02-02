@@ -62,7 +62,7 @@ type FCSBinder (netFwInfo: NetFWInfo, workspace: Loader, checker: FCS_Checker) =
                   UnresolvedReferences = None
                   OriginalLoadReferences = []
                   Stamp = None
-                  ExtraProjectInfo = None
+                  ExtraProjectInfo = Some(box po)
               }
 
               fcsPo

@@ -224,6 +224,7 @@ let tests () =
 
         Expect.equal fcsPo.LoadTime po.LoadTime "load time"
         Expect.equal fcsPo.ReferencedProjects.Length po.ReferencedProjects.Length "refs"
+        Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
 
         //TODO check fullpaths
         //TODO check sourcefiles
@@ -270,6 +271,7 @@ let tests () =
 
         Expect.equal fcsPo.LoadTime po.LoadTime "load time"
         Expect.equal fcsPo.ReferencedProjects.Length po.ReferencedProjects.Length "refs"
+        Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
 
         //TODO check fullpaths
         //TODO check sourcefiles
@@ -318,6 +320,7 @@ let tests () =
 
         Expect.equal fcsPo.LoadTime po.LoadTime "load time"
         Expect.equal fcsPo.ReferencedProjects.Length po.ReferencedProjects.Length "refs"
+        Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
 
         //TODO check fullpaths
         //TODO check sourcefiles
