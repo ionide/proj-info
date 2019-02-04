@@ -237,3 +237,6 @@ _Pvt_Extensions
 .dotnetsdk
 /paket-files/
 /test/testrun/
+/test/testrun_ws/
+msbuild.binlog
+/test/testrun_ws_fcs/
