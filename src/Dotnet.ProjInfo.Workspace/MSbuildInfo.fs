@@ -6,6 +6,8 @@ module MSBuildInfo =
   open System.IO
 
   let private programFilesX86 () =
+      //TODO  Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)
+      //TODO try/catch + option
       let environVar v = Environment.GetEnvironmentVariable v
 
       let wow64 = environVar "PROCESSOR_ARCHITEW6432"
@@ -16,6 +18,10 @@ module MSBuildInfo =
       | "x86", "AMD64" -> environVar "ProgramFiles(x86)"
       | _ -> environVar "ProgramFiles"
       |> fun detected -> if detected = null then @"C:\Program Files (x86)\" else detected
+
+  let private programFiles () =
+      //TODO try/catch + option
+      Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles)
 
   let private vsSkus = ["Community"; "Professional"; "Enterprise"; "BuildTools"]
   let private vsVersions = ["2017"]
@@ -59,15 +65,17 @@ module MSBuildInfo =
   let installedMSBuilds () =
 
       // TODO remove shadowing
-      let programFilesX86 = programFilesX86 ()
-
-      let vsRoots =
-        cartesian vsVersions vsSkus 
-        |> List.map (fun (version, sku) -> Path.Combine(programFilesX86, "Microsoft Visual Studio", version, sku))
 
       if not (Utils.isWindows ()) then
         ["msbuild"] // we're way past 5.0 now, time to get updated
       else
+        let programFiles = programFiles ()
+        let programFilesX86 = programFilesX86 ()
+
+        let vsRoots =
+            cartesian vsVersions vsSkus 
+            |> List.map (fun (version, sku) -> Path.Combine(programFilesX86, "Microsoft Visual Studio", version, sku))
+
         let legacyPaths =
             [ Path.Combine(programFilesX86, @"MSBuild\14.0\Bin")
               Path.Combine(programFilesX86, @"MSBuild\12.0\Bin")
@@ -80,6 +88,9 @@ module MSBuildInfo =
           vsRoots
           |> List.map (fun root -> Path.Combine(root, "MSBuild", "15.0", "bin") )
 
+        let jetbrainsMsbuild =
+            [ Path.Combine(programFiles, @"Jetbrains\MSBuild\15.0\Bin") ]
+
         let ev = Environment.GetEnvironmentVariable "MSBuild"
         if not (String.IsNullOrEmpty ev) then [ev]
-        else EnvUtils.tryFindPath (sideBySidePaths @ legacyPaths) "MsBuild.exe"
+        else EnvUtils.tryFindPath (sideBySidePaths @ jetbrainsMsbuild @ legacyPaths) "MsBuild.exe"
