@@ -3,10 +3,6 @@ module Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild
 open System
 open System.IO
 
-#if NET461
-open Dotnet.ProjInfo.Inspect
-#endif
-
 open Dotnet.ProjInfo.Inspect.MSBuild
 
 let createEnvInfoProj () =
