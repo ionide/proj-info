@@ -5,7 +5,7 @@ dotnet: 2.1.401
 
 install:
   # workaround for missing .net 4.6.1 targing pack
-  - export FrameworkPathOverride=$(dirname $(which mono))/../lib/mono/4.6.1/
+  - export FrameworkPathOverride=$(dirname $(which mono))/../lib/mono/4.6.1-api/
 
 script:
   - dotnet pack -v n
