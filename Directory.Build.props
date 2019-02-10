@@ -13,6 +13,10 @@
   </PropertyGroup>
 
   <PropertyGroup>
+    <NoWarn>$(NoWarn);FS2003</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <RepoRootDir>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)"))</RepoRootDir>
     <NupkgsDir>$([System.IO.Path]::GetFullPath("$(RepoRootDir)/bin/nupkg"))</NupkgsDir>
     <MonoOrEmpty Condition=" '$(OS)' != 'Windows_NT' ">mono </MonoOrEmpty>
