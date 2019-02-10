@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -17,7 +18,5 @@
     <Compile Include="MSbuildInfo.fs" />
     <Compile Include="Library.fs" />
   </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Sln" Version="0.3.0" />
-  </ItemGroup>
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
