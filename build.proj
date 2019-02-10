@@ -4,6 +4,7 @@
 
   <Target Name="Restore">
     <Exec Command="$(MonoOrEmpty)paket.exe restore" WorkingDirectory=".paket" ConsoleToMSBuild="true" />
+    <Exec Command='dotnet restore src/dotnet-proj.sln /p:Version=$(Version)' />
   </Target>
 
   <Target Name="Build">
