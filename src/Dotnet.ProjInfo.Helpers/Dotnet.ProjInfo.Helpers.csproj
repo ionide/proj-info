@@ -1,9 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <TargetFrameworks>netstandard2.0;net45</TargetFrameworks>
   </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="..\..\paket-files\mono\mono\mcs\class\Microsoft.Build.Utilities\Microsoft.Build.Utilities\CommandLineBuilder.cs" />
     <Compile Include="..\..\paket-files\mono\mono\mcs\class\Microsoft.Build.Framework\Microsoft.Build.Framework\ITaskItem.cs" />
@@ -12,5 +11,5 @@
     <Compile Include="..\..\paket-files\mono\mono\mcs\class\Microsoft.Build.Utilities\Mono.XBuild.Utilities\MSBuildUtils.cs" />
     <Compile Include="..\..\paket-files\mono\mono\mcs\class\Microsoft.Build.Utilities\Mono.XBuild.Utilities\ReservedNameUtils.cs" />
   </ItemGroup>
-
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

@@ -1,11 +1,10 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;net45</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;net461</TargetFrameworks>
     <Description>Get msbuild info</Description>
     <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
   </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="Resources.fs" />
     <Compile Include="ExternalFSharp\MissingApi.fs" />
@@ -14,11 +13,9 @@
     <Compile Include="NETFrameworkInfoFromMSBuild.fs" />
     <Compile Include="NETFramework.fs" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\Dotnet.ProjInfo.Helpers\Dotnet.ProjInfo.Helpers.csproj" PrivateAssets="All" />
   </ItemGroup>
-
   <ItemGroup>
     <EmbeddedResource Include="..\..\paket-files\Microsoft\visualfsharp\src\fsharp\FSharp.Build\Microsoft.FSharp.Targets">
       <LogicalName>Microsoft.FSharp.Targets</LogicalName>
@@ -27,17 +24,6 @@
       <LogicalName>EnvironmentInfo.proj</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="FSharp.Core" Condition=" '$(TargetFramework)' == 'netstandard2.0' " Version="4.1.*" />
-    <PackageReference Include="FSharp.Core" Condition=" '$(TargetFramework)' == 'net45' " Version="4.0.0.1" />
-  </ItemGroup>
-
-  <PropertyGroup Condition=" '$(TargetFramework)' == 'net45' ">
-    <!-- no need to reference System.ValueTuple nupkg on net45 because use FSharp.Core v4.0 -->
-    <DisableImplicitSystemValueTupleReference>true</DisableImplicitSystemValueTupleReference>
-  </PropertyGroup>
-
   <!-- HACK: p2p of type project, not package (ref https://github.com/NuGet/Home/issues/3891 ) -->
   <PropertyGroup>
     <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeP2POutput</TargetsForTfmSpecificBuildOutput>
@@ -47,5 +33,5 @@
       <BuildOutputInPackage Include="$(MSBuildProjectDirectory)/$(OutputPath)Dotnet.ProjInfo.Helpers.dll" />
     </ItemGroup>
   </Target>
-
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
