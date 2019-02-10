@@ -3,7 +3,7 @@ module Dotnet.ProjInfo.NETFrameworkInfoFromMSBuild
 open System
 open System.IO
 
-#if NET45
+#if NET461
 open Dotnet.ProjInfo.Inspect
 #endif
 

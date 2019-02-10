@@ -3,7 +3,7 @@ module Dotnet.ProjInfo.Inspect
 open System
 open System.IO
 
-#if NET45
+#if NET461
 let inline internal Ok x = Choice1Of2 x
 let inline internal Error x = Choice2Of2 x
 
