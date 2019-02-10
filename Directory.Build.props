@@ -1,6 +1,10 @@
 <Project ToolsVersion="15.0">
 
   <PropertyGroup>
+    <Version Condition=" '$(Version)' == '' ">0.30.0$(VersionSuffix)</Version>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <Authors>enricosada</Authors>
     <PackageProjectUrl>https://github.com/enricosada/dotnet-proj-info/</PackageProjectUrl>
     <PackageTags>msbuild;dotnet;sdk;csproj;fsproj</PackageTags>
@@ -9,9 +13,12 @@
   </PropertyGroup>
 
   <PropertyGroup>
+    <NoWarn>$(NoWarn);FS2003</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <RepoRootDir>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)"))</RepoRootDir>
     <NupkgsDir>$([System.IO.Path]::GetFullPath("$(RepoRootDir)/bin/nupkg"))</NupkgsDir>
-    <Version Condition=" '$(Version)' == '' ">0.20.0$(VersionSuffix)</Version>
     <MonoOrEmpty Condition=" '$(OS)' != 'Windows_NT' ">mono </MonoOrEmpty>
   </PropertyGroup>
 
