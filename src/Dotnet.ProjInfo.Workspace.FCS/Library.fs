@@ -3,8 +3,8 @@ namespace Dotnet.ProjInfo.Workspace.FCS
 open Dotnet.ProjInfo.Workspace
 open System.Collections.Generic
 
-type FCS_ProjectOptions = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpProjectOptions
-type FCS_Checker = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpChecker
+type FCS_ProjectOptions = FSharp.Compiler.SourceCodeServices.FSharpProjectOptions
+type FCS_Checker = FSharp.Compiler.SourceCodeServices.FSharpChecker
 
 module FscArguments =
 

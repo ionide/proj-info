@@ -14,12 +14,12 @@ open System.Collections.Generic
 open Dotnet.ProjInfo.Workspace
 open Dotnet.ProjInfo.Workspace.FCS
 
-type FCS_ProjectOptions = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpProjectOptions
-type FCS_Checker = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpChecker
-type FCS_Entity = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpEntity
-type FCS_Symbol = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpSymbol
-type FCS_CheckFileAnswer = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpCheckFileAnswer
-type FCS_CheckProjectResults = Microsoft.FSharp.Compiler.SourceCodeServices.FSharpCheckProjectResults
+type FCS_ProjectOptions = FSharp.Compiler.SourceCodeServices.FSharpProjectOptions
+type FCS_Checker = FSharp.Compiler.SourceCodeServices.FSharpChecker
+type FCS_Entity = FSharp.Compiler.SourceCodeServices.FSharpEntity
+type FCS_Symbol = FSharp.Compiler.SourceCodeServices.FSharpSymbol
+type FCS_CheckFileAnswer = FSharp.Compiler.SourceCodeServices.FSharpCheckFileAnswer
+type FCS_CheckProjectResults = FSharp.Compiler.SourceCodeServices.FSharpCheckProjectResults
 
 #nowarn "25"
 
