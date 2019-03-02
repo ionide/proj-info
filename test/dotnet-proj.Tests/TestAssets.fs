@@ -94,7 +94,7 @@ let ``sample5 NetSdk CSharp library`` =
     ProjectReferences = [] }
 
 /// dotnet sdk, a c1 console app (netcoreapp) who reference:
-/// - netstandard2.0 l1 library
+/// - netstandard2.0 l2 library
 let ``sample6 Netsdk Sparse/1`` =
   { ProjDir = "sample6-netsdk-sparse"
     AssemblyName = "c1"
@@ -103,20 +103,20 @@ let ``sample6 Netsdk Sparse/1`` =
       "netcoreapp2.1", sourceFiles ["Program.fs"]
     ]
     ProjectReferences =
-      [ { ProjDir = "sample6-netsdk-sparse"/"l1"
-          AssemblyName = "l1"
-          ProjectFile = "l1"/"l1.fsproj"
+      [ { ProjDir = "sample6-netsdk-sparse"/"l2"
+          AssemblyName = "l2"
+          ProjectFile = "l2"/"l2.fsproj"
           TargetFrameworks =  Map.ofList [
             "netstandard2.0", sourceFiles ["Library.fs"]
           ]
           ProjectReferences = [] }
       ] }
 
-/// dotnet sdk, a netstandard2.0 library l2
+/// dotnet sdk, a netstandard2.0 library l1
 let ``sample6 Netsdk Sparse/2`` =
-    { ProjDir = "sample6-netsdk-sparse"/"l2"
-      AssemblyName = "l2"
-      ProjectFile = "l2"/"l2.fsproj"
+    { ProjDir = "sample6-netsdk-sparse"/"l1"
+      AssemblyName = "l1"
+      ProjectFile = "l1"/"l1.fsproj"
       TargetFrameworks =  Map.ofList [
         "netstandard2.0", sourceFiles ["Library.fs"]
       ]

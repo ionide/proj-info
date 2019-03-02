@@ -235,7 +235,7 @@ let tests () =
         Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
 
         //TODO check fullpaths
-        //TODO check sourcefiles
+        Expect.equal fcsPo.SourceFiles (po.SourceFiles |> Array.ofList) "check sources"
 
         let result =
           fcs.ParseAndCheckProject(fcsPo)
@@ -282,7 +282,7 @@ let tests () =
         Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
 
         //TODO check fullpaths
-        //TODO check sourcefiles
+        Expect.equal fcsPo.SourceFiles (po.SourceFiles |> Array.ofList) "check sources"
 
         let result =
           fcs.ParseAndCheckProject(fcsPo)
@@ -331,7 +331,7 @@ let tests () =
         Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
 
         //TODO check fullpaths
-        //TODO check sourcefiles
+        Expect.equal fcsPo.SourceFiles (po.SourceFiles |> Array.ofList) "check sources"
 
         let result =
           fcs.ParseAndCheckProject(fcsPo)

@@ -228,6 +228,16 @@ module ProjectCrackerDotnetSdk =
                     let extraInfo = getExtraInfoVerboseSdk tar props
                     ProjectSdkType.Verbose(extraInfo), mergedLog
 
+            let isSourceFile : (string -> bool) =
+                if Path.GetExtension(file) = ".fsproj" then
+                    (fun n -> n.EndsWith ".fs" || n.EndsWith ".fsx" || n.EndsWith ".fsi")
+                else
+                    (fun n -> n.EndsWith ".cs")
+
+            let sourceFiles, otherOptions =
+                rspNormalized
+                |> List.partition isSourceFile
+
             let po =
                 {
                     ProjectId = Some file
@@ -238,7 +248,8 @@ module ProjectCrackerDotnetSdk =
                             t.TargetFramework
                         | ProjectSdkType.Verbose v ->
                             v.TargetFrameworkVersion |> Dotnet.ProjInfo.NETFramework.netifyTargetFrameworkVersion
-                    OtherOptions = rspNormalized
+                    SourceFiles = sourceFiles
+                    OtherOptions = otherOptions
                     ReferencedProjects = p2pProjects |> List.map (fun (_,y,_,_) -> { ProjectReference.ProjectFileName = y.ProjectFileName; TargetFramework = y.TargetFramework })
                     LoadTime = DateTime.Now
                     ExtraProjectInfo =
