@@ -144,6 +144,10 @@ let findByPath path parsed =
      | Some x -> x
      | None -> failwithf "key '%s' not found in %A" path (parsed |> Array.map (fun kv -> kv.Key))
 
+let isOSX () =
+  System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+      System.Runtime.InteropServices.OSPlatform.OSX)
+
 let tests () =
  
   let prepareTestsAssets = lazy(
@@ -241,8 +245,16 @@ let tests () =
 
         Expect.equal parsed.Length 1 "lib"
         
-        parsed
-        |> expectExists projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "net461" } "a lib"
+        let l1Parsed =
+          parsed
+          |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "net461" } "a lib"
+
+        let expectedSources =
+          [ projDir / "AssemblyInfo.fs"
+            projDir / "Library.fs"
+            (Path.GetTempPath()) / ".NETFramework,Version=v4.6.1.AssemblyAttributes.fs" ]
+
+        Expect.equal l1Parsed.SourceFiles expectedSources "check sources"
       )
 
       testCase |> withLog "can load sample2" (fun logger fs ->
@@ -250,6 +262,7 @@ let tests () =
         copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
 
         let projPath = testDir/ (``sample2 NetSdk library``.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
 
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
@@ -267,8 +280,16 @@ let tests () =
 
         Expect.equal parsed.Length 1 "console and lib"
         
-        parsed
-        |> expectExists projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "first is a lib"
+        let n1Parsed =
+          parsed
+          |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "first is a lib"
+
+        let expectedSources =
+          [ projDir / "obj/Debug/netstandard2.0/n1.AssemblyInfo.fs"
+            projDir / "Library.fs" ]
+          |> List.map Path.GetFullPath
+
+        Expect.equal n1Parsed.SourceFiles expectedSources "check sources"
       )
 
       testCase |> withLog "can load sample3" (fun logger fs ->
@@ -276,9 +297,13 @@ let tests () =
         copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
 
         let projPath = testDir/ (``sample3 Netsdk projs``.ProjectFile)
-        let l1 :: l2 :: [] =
+        let projDir = Path.GetDirectoryName projPath
+
+        let (l1, l1Dir) :: (l2, l2Dir) :: [] =
           ``sample3 Netsdk projs``.ProjectReferences
           |> List.map (fun p2p -> testDir/ p2p.ProjectFile )
+          |> List.map Path.GetFullPath
+          |> List.map (fun path -> path, Path.GetDirectoryName(path))
 
         dotnet fs ["build"; projPath]
         |> checkExitCodeZero
@@ -296,12 +321,57 @@ let tests () =
 
         Expect.equal parsed.Length 3 (sprintf "console (F#) and lib (F#) and lib (C#), but was %A" (parsed |> Array.map (fun x -> x.Key)))
 
-        parsed
-        |> expectExists l1 { ProjectKey.ProjectPath = l1; TargetFramework = "netstandard2.0" } "the F# lib"
-        parsed
-        |> expectExists l2 { ProjectKey.ProjectPath = l2; TargetFramework = "netstandard2.0" } "the C# lib"
-        parsed
-        |> expectExists projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netcoreapp2.1" } "the F# console"
+        let l1Parsed =
+          parsed
+          |> expectFind l1 { ProjectKey.ProjectPath = l1; TargetFramework = "netstandard2.0" } "the C# lib"
+
+        let l1ExpectedSources =
+          [ l1Dir / "obj/Debug/netstandard2.0/l1.AssemblyInfo.cs"
+            l1Dir / "Class1.fs" ]
+          |> List.map Path.GetFullPath
+
+        // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
+        // Expect.equal l1Parsed.SourceFiles l1ExpectedSources "check sources"
+        Expect.equal l1Parsed.SourceFiles [] "check sources"
+
+        let l2Parsed =
+          parsed
+          |> expectFind l2 { ProjectKey.ProjectPath = l2; TargetFramework = "netstandard2.0" } "the F# lib"
+
+        let l2ExpectedSources =
+          [ l2Dir / "obj/Debug/netstandard2.0/l2.AssemblyInfo.fs"
+            l2Dir / "Library.fs" ]
+          |> List.map Path.GetFullPath
+
+        Expect.equal l2Parsed.SourceFiles l2ExpectedSources "check sources"
+
+
+        let c1Parsed =
+          parsed
+          |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netcoreapp2.1" } "the F# console"
+
+        if (isOSX ()) then
+          let errorOnOsx =
+            """
+         check sources.
+         expected:
+         ["/Users/travis/build/enricosada/dotnet-proj-info/test/testrun_ws/load_sample3/c1/obj/Debug/netcoreapp2.1/c1.AssemblyInfo.fs";
+          "/Users/travis/build/enricosada/dotnet-proj-info/test/testrun_ws/load_sample3/c1/Program.fs"]
+           actual:
+         []
+
+         The OtherOptions is empty.
+            """.Trim()
+          Tests.skiptest (sprintf "Known failure on OSX travis. error is %s" errorOnOsx)
+          //TODO check failure on osx
+
+        let c1ExpectedSources =
+          [ projDir / "obj/Debug/netcoreapp2.1/c1.AssemblyInfo.fs"
+            projDir / "Program.fs" ]
+          |> List.map Path.GetFullPath
+
+        Expect.equal c1Parsed.SourceFiles c1ExpectedSources "check sources"
+
       )
 
       testCase |> withLog "can load sample4" (fun logger fs ->
@@ -309,6 +379,7 @@ let tests () =
         copyDirFromAssets fs ``sample4 NetSdk multi tfm``.ProjDir testDir
 
         let projPath = testDir/ (``sample4 NetSdk multi tfm``.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
 
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
@@ -330,8 +401,16 @@ let tests () =
 
         Expect.equal parsed.Length 1 (sprintf "multi-tfm lib (F#), but was %A" (parsed |> Array.map (fun x -> x.Key)))
 
-        parsed
-        |> expectExists projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "the F# console"
+        let m1Parsed =
+          parsed
+          |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "the F# console"
+
+        let m1ExpectedSources =
+          [ projDir / "obj/Debug/netstandard2.0/m1.AssemblyInfo.fs"
+            projDir / "LibraryA.fs" ]
+          |> List.map Path.GetFullPath
+
+        Expect.equal m1Parsed.SourceFiles m1ExpectedSources "check sources"
       )
 
       testCase |> withLog "can load sample5" (fun logger fs ->
@@ -339,6 +418,7 @@ let tests () =
         copyDirFromAssets fs ``sample5 NetSdk CSharp library``.ProjDir testDir
 
         let projPath = testDir/ (``sample5 NetSdk CSharp library``.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
 
         dotnet fs ["restore"; projPath]
         |> checkExitCodeZero
@@ -356,8 +436,18 @@ let tests () =
 
         Expect.equal parsed.Length 1 "lib"
 
-        parsed
-        |> expectExists projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "a C# lib"
+        let l2Parsed =
+          parsed
+          |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "a C# lib"
+
+        let l2ExpectedSources =
+          [ projDir / "obj/Debug/netstandard2.0/l2.AssemblyInfo.cs"
+            projDir / "Class1.cs" ]
+          |> List.map Path.GetFullPath
+
+        // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
+        // Expect.equal l2Parsed.SourceFiles l2ExpectedSources "check sources"
+        Expect.equal l2Parsed.SourceFiles [] "check sources"
       )
 
       testCase |> withLog "can load sln" (fun logger fs ->
@@ -384,17 +474,52 @@ let tests () =
         Expect.equal parsed.Length 3 "c1, l1, l2"
         
         let c1 = testDir/ (``sample6 Netsdk Sparse/1``.ProjectFile)
+        let c1Dir = Path.GetDirectoryName c1
+
         let l2 :: [] =
           ``sample6 Netsdk Sparse/1``.ProjectReferences
           |> List.map (fun p2p -> testDir/ p2p.ProjectFile )
-        let l1 = testDir/ (``sample6 Netsdk Sparse/2``.ProjectFile)
+        let l2Dir = Path.GetDirectoryName l2
 
-        parsed
-        |> expectExists l1 { ProjectKey.ProjectPath = l1; TargetFramework = "netstandard2.0" } "the F# lib"
-        parsed
-        |> expectExists l2 { ProjectKey.ProjectPath = l2; TargetFramework = "netstandard2.0" } "the C# lib"
-        parsed
-        |> expectExists c1 { ProjectKey.ProjectPath = c1; TargetFramework = "netcoreapp2.1" } "the F# console"
+        let l1 = testDir/ (``sample6 Netsdk Sparse/2``.ProjectFile)
+        let l1Dir = Path.GetDirectoryName l1
+
+        let l1Parsed =
+          parsed
+          |> expectFind l1 { ProjectKey.ProjectPath = l1; TargetFramework = "netstandard2.0" } "the F# lib"
+
+        let l1ExpectedSources =
+          [ l1Dir / "obj/Debug/netstandard2.0/l1.AssemblyInfo.fs"
+            l1Dir / "Library.fs" ]
+          |> List.map Path.GetFullPath
+
+        Expect.equal l1Parsed.SourceFiles l1ExpectedSources "check sources l1"
+        Expect.equal l1Parsed.ReferencedProjects [] "check p2p l1"
+
+        let l2Parsed =
+          parsed
+          |> expectFind l2 { ProjectKey.ProjectPath = l2; TargetFramework = "netstandard2.0" } "the C# lib"
+
+        let l2ExpectedSources =
+          [ l2Dir / "obj/Debug/netstandard2.0/l2.AssemblyInfo.fs"
+            l2Dir / "Library.fs" ]
+          |> List.map Path.GetFullPath
+
+        Expect.equal l2Parsed.SourceFiles l2ExpectedSources "check sources l2"
+        Expect.equal l2Parsed.ReferencedProjects [] "check p2p l2"
+
+        let c1Parsed =
+          parsed
+          |> expectFind c1 { ProjectKey.ProjectPath = c1; TargetFramework = "netcoreapp2.1" } "the F# console"
+
+        let c1ExpectedSources =
+          [ c1Dir / "obj/Debug/netcoreapp2.1/c1.AssemblyInfo.fs"
+            c1Dir / "Program.fs" ]
+          |> List.map Path.GetFullPath
+
+        Expect.equal c1Parsed.SourceFiles c1ExpectedSources "check sources c1"
+        Expect.equal c1Parsed.ReferencedProjects.Length 1 "check p2p c1"
+
       )
 
     ]

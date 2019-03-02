@@ -48,10 +48,8 @@ type FCSBinder (netFwInfo: NetFWInfo, workspace: Loader, checker: FCS_Checker) =
               let fcsPo : FCS_ProjectOptions = {
                   FCS_ProjectOptions.ProjectId = po.ProjectId
                   ProjectFileName = po.ProjectFileName
-                  SourceFiles = [||] // TODO set source files?
-                  OtherOptions =
-                    po.OtherOptions
-                    |> Array.ofList
+                  SourceFiles = po.SourceFiles |> Array.ofList
+                  OtherOptions = po.OtherOptions |> Array.ofList
                   ReferencedProjects =
                     po.ReferencedProjects
                      // TODO choose will skip the if not found, should instead log or better

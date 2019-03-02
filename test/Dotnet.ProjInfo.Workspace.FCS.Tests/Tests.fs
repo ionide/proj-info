@@ -235,7 +235,7 @@ let tests () =
         Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
 
         //TODO check fullpaths
-        //TODO check sourcefiles
+        Expect.equal fcsPo.SourceFiles (po.SourceFiles |> Array.ofList) "check sources"
 
         let result =
           fcs.ParseAndCheckProject(fcsPo)
@@ -282,7 +282,7 @@ let tests () =
         Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
 
         //TODO check fullpaths
-        //TODO check sourcefiles
+        Expect.equal fcsPo.SourceFiles (po.SourceFiles |> Array.ofList) "check sources"
 
         let result =
           fcs.ParseAndCheckProject(fcsPo)
@@ -331,7 +331,7 @@ let tests () =
         Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
 
         //TODO check fullpaths
-        //TODO check sourcefiles
+        Expect.equal fcsPo.SourceFiles (po.SourceFiles |> Array.ofList) "check sources"
 
         let result =
           fcs.ParseAndCheckProject(fcsPo)
@@ -345,6 +345,7 @@ no errors but was: [|commandLineArgs (0,1)-(0,1) parameter error No inputs speci
             """.Trim()
           Tests.skiptest (sprintf "Known failure on OSX travis. error is %s" errorOnOsx)
           //TODO check failure on osx
+          //the same sample3 workspace test fails, OtherOptions is empty
         else
           expectNoErrors result
 

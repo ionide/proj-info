@@ -64,6 +64,7 @@ type ProjectOptions =
         ProjectId: string option
         ProjectFileName: string
         TargetFramework: string
+        SourceFiles: string list
         OtherOptions: string list
         ReferencedProjects: ProjectReference list
         LoadTime: DateTime
