@@ -345,6 +345,7 @@ no errors but was: [|commandLineArgs (0,1)-(0,1) parameter error No inputs speci
             """.Trim()
           Tests.skiptest (sprintf "Known failure on OSX travis. error is %s" errorOnOsx)
           //TODO check failure on osx
+          //the same sample3 workspace test fails, OtherOptions is empty
         else
           expectNoErrors result
 
