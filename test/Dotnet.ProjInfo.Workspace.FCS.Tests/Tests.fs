@@ -115,6 +115,11 @@ let isOSX () =
   System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
       System.Runtime.InteropServices.OSPlatform.OSX)
 
+let rec allFCSProjects (po: FCS_ProjectOptions) =
+  [ yield po;
+    for (_, p2p) in po.ReferencedProjects do
+      yield! allFCSProjects p2p ]
+
 let tests () =
  
   let prepareTestsAssets = lazy(
@@ -226,6 +231,8 @@ let tests () =
 
         let fcsPo = fcsPoOpt |> Option.get
 
+        Expect.all (allFCSProjects fcsPo) (fun p -> p.ProjectId |> Option.isNone) "all ProjectId are None"
+
         let po =
           loader.Projects
           |> expectFind { ProjectKey.ProjectPath = projPath; TargetFramework = "net461" } "find proj"
@@ -304,6 +311,8 @@ let tests () =
 
         let fcsPo = fcsPoOpt |> Option.get
 
+        Expect.all (allFCSProjects fcsPo) (fun p -> p.ProjectId |> Option.isNone) "all ProjectId are None"
+
         let po =
           loader.Projects
           |> expectFind { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "first is a lib"
@@ -352,6 +361,8 @@ let tests () =
         logProjectOptions logger fcsPoOpt
 
         let fcsPo = fcsPoOpt |> Option.get
+
+        Expect.all (allFCSProjects fcsPo) (fun p -> p.ProjectId |> Option.isNone) "all ProjectId are None"
 
         let po =
           loader.Projects
