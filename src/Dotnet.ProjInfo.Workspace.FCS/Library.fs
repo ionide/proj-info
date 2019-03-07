@@ -45,10 +45,14 @@ type FCSBinder (netFwInfo: NetFWInfo, workspace: Loader, checker: FCS_Checker) =
               None
           | Some po ->
 
+              let isGeneratedTfmAssemblyInfoFile path =
+                let f = System.IO.Path.GetFileName(path)
+                f.StartsWith(".NETFramework,Version=v") && f.EndsWith(".AssemblyAttributes.fs")
+
               let fcsPo : FCS_ProjectOptions = {
                   FCS_ProjectOptions.ProjectId = po.ProjectId
                   ProjectFileName = po.ProjectFileName
-                  SourceFiles = po.SourceFiles |> Array.ofList
+                  SourceFiles = po.SourceFiles |> List.filter (fun p -> not (isGeneratedTfmAssemblyInfoFile p)) |> Array.ofList
                   OtherOptions = po.OtherOptions |> Array.ofList
                   ReferencedProjects =
                     po.ReferencedProjects

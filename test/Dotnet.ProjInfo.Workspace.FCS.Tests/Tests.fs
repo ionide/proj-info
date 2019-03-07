@@ -250,6 +250,37 @@ let tests () =
         Expect.isNonEmpty uses "all symbols usages"
       )
 
+      testCase |> withLog "do not include generated tfm assemblyinfo" (fun logger fs ->
+        let testDir = inDir fs "load_sample1"
+        copyDirFromAssets fs ``sample1 OldSdk library``.ProjDir testDir
+
+        let projPath = testDir/ (``sample1 OldSdk library``.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
+
+        fs.cd projDir
+        nuget fs ["restore"; "-PackagesDirectory"; "packages"]
+        |> checkExitCodeZero
+
+        fs.cd testDir
+
+        let fcs = createFCS ()
+
+        let loader, netFwInfo = createLoader logger
+
+        let fcsBinder = FCSBinder(netFwInfo, loader, fcs)
+
+        loader.LoadProjects [ projPath ]
+
+        let fcsPoOpt = fcsBinder.GetProjectOptions(projPath)
+
+        logProjectOptions logger fcsPoOpt
+
+        let fcsPo = fcsPoOpt |> Option.get
+
+        Expect.isFalse (fcsPo.SourceFiles |> Array.contains (Path.GetTempPath()/".NETFramework,Version=v4.6.1.AssemblyAttributes.fs")) (sprintf "check doesnt exists the generated tfm assemblyinfo file, but was %A" fcsPo.SourceFiles)
+        Expect.equal fcsPo.SourceFiles [| projDir/"AssemblyInfo.fs"; projDir/"Library.fs" |] "check exact sourcefiles"
+      )
+
       testCase |> withLog "can load sample2" (fun logger fs ->
         let testDir = inDir fs "load_sample2"
         copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
