@@ -235,7 +235,7 @@ let tests () =
         Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
 
         //TODO check fullpaths
-        Expect.equal fcsPo.SourceFiles (po.SourceFiles |> Array.ofList) "check sources"
+        Expect.equal fcsPo.SourceFiles [| projDir/"AssemblyInfo.fs"; projDir/"Library.fs" |] "check sourcefiles"
 
         let result =
           fcs.ParseAndCheckProject(fcsPo)
