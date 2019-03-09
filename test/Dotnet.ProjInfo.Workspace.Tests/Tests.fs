@@ -345,7 +345,6 @@ let tests () =
 
         Expect.equal l2Parsed.SourceFiles l2ExpectedSources "check sources"
 
-
         let c1Parsed =
           parsed
           |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netcoreapp2.1" } "the F# console"
