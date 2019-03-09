@@ -405,7 +405,7 @@ no errors but was: [|commandLineArgs (0,1)-(0,1) parameter error No inputs speci
 
       )
 
-      ftestCase |> withLog "can load sample7" (fun logger fs ->
+      testCase |> withLog "can load sample7" (fun logger fs ->
         let testDir = inDir fs "load_sample7"
         copyDirFromAssets fs ``sample7 Oldsdk projs``.ProjDir testDir
 
