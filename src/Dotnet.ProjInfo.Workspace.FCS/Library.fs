@@ -58,8 +58,18 @@ type FCSBinder (netFwInfo: NetFWInfo, workspace: Loader, checker: FCS_Checker) =
                     po.ReferencedProjects
                      // TODO choose will skip the if not found, should instead log or better
                     |> List.choose (fun key -> getPo { ProjectKey.ProjectPath = key.ProjectFileName; TargetFramework = key.TargetFramework })
-                    // Is (path * projectOption) ok? or was .dll?
-                    |> List.map (fun po -> (key.ProjectPath, po) )
+                    |> List.choose (fun po ->
+                      match po.ExtraProjectInfo with
+                      | None ->
+                        // TODO choose will skip the if not found, should instead log or better
+                        None
+                      | Some dpwPoObj ->
+                        match dpwPoObj with
+                        | :? ProjectOptions as dpwPo ->
+                          Some (dpwPo.ExtraProjectInfo.TargetPath, po)
+                        | _ ->
+                          // TODO choose will skip the if not found, should instead log or better
+                          None)
                     |> Array.ofList
                   IsIncompleteTypeCheckEnvironment = false
                   UseScriptResolutionRules = false
