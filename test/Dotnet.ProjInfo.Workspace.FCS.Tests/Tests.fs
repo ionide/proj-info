@@ -120,6 +120,24 @@ let rec allFCSProjects (po: FCS_ProjectOptions) =
     for (_, p2p) in po.ReferencedProjects do
       yield! allFCSProjects p2p ]
 
+let findProjectExtraInfo (po: FCS_ProjectOptions) =
+  match po.ExtraProjectInfo with
+  | None -> failwithf "expect ExtraProjectInfo but was None"
+  | Some extra ->
+    match extra with
+    | :? ProjectOptions as poDPW -> poDPW
+    | ex -> failwithf "expected ProjectOptions but was '%A'" ex
+
+let rec allP2P (po: FCS_ProjectOptions) =
+  [ for (key, p2p) in po.ReferencedProjects do
+      let poDPW = findProjectExtraInfo p2p
+      yield (key, p2p, poDPW)
+      yield! allP2P p2p ]
+
+let expectP2PKeyIsTargetPath po =
+  for (tar, fcsPO, poDPW) in allP2P po do
+    Expect.equal tar poDPW.ExtraProjectInfo.TargetPath (sprintf "p2p key is TargetPath, fsc projet options was '%A'" fcsPO)
+
 let tests () =
  
   let prepareTestsAssets = lazy(
@@ -246,6 +264,8 @@ let tests () =
         //TODO check fullpaths
         Expect.equal fcsPo.SourceFiles [| projDir/"AssemblyInfo.fs"; projDir/"Library.fs" |] "check sourcefiles"
 
+        expectP2PKeyIsTargetPath fcsPo
+
         let result =
           fcs.ParseAndCheckProject(fcsPo)
           |> Async.RunSynchronously
@@ -328,6 +348,8 @@ let tests () =
         //TODO check fullpaths
         Expect.equal fcsPo.SourceFiles (po.SourceFiles |> Array.ofList) "check sources"
 
+        expectP2PKeyIsTargetPath fcsPo
+
         let result =
           fcs.ParseAndCheckProject(fcsPo)
           |> Async.RunSynchronously
@@ -380,6 +402,8 @@ let tests () =
 
         //TODO check fullpaths
         Expect.equal fcsPo.SourceFiles (po.SourceFiles |> Array.ofList) "check sources"
+
+        expectP2PKeyIsTargetPath fcsPo
 
         let result =
           fcs.ParseAndCheckProject(fcsPo)
@@ -446,6 +470,8 @@ no errors but was: [|commandLineArgs (0,1)-(0,1) parameter error No inputs speci
 
         //TODO check fullpaths
         Expect.equal fcsPo.SourceFiles [| projDir/"MultiProject1.fs" |] "check sourcefiles"
+
+        expectP2PKeyIsTargetPath fcsPo
 
         let result =
           fcs.ParseAndCheckProject(fcsPo)
