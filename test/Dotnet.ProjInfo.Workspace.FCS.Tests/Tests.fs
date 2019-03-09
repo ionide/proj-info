@@ -238,7 +238,9 @@ let tests () =
           |> expectFind { ProjectKey.ProjectPath = projPath; TargetFramework = "net461" } "find proj"
 
         Expect.equal fcsPo.LoadTime po.LoadTime "load time"
-        Expect.equal fcsPo.ReferencedProjects.Length po.ReferencedProjects.Length "refs"
+
+        Expect.equal fcsPo.ReferencedProjects.Length ``sample1 OldSdk library``.ProjectReferences.Length "refs"
+
         Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
 
         //TODO check fullpaths
@@ -318,7 +320,9 @@ let tests () =
           |> expectFind { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "first is a lib"
 
         Expect.equal fcsPo.LoadTime po.LoadTime "load time"
-        Expect.equal fcsPo.ReferencedProjects.Length po.ReferencedProjects.Length "refs"
+
+        Expect.equal fcsPo.ReferencedProjects.Length ``sample2 NetSdk library``.ProjectReferences.Length "refs"
+
         Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
 
         //TODO check fullpaths
@@ -369,7 +373,9 @@ let tests () =
           |> expectFind { ProjectKey.ProjectPath = projPath; TargetFramework = "netcoreapp2.1" } "first is a console app"
 
         Expect.equal fcsPo.LoadTime po.LoadTime "load time"
-        Expect.equal fcsPo.ReferencedProjects.Length (po.ReferencedProjects.Length - 1) "refs" // one is C#, no FSharpProjectOptions for that
+
+        Expect.equal fcsPo.ReferencedProjects.Length (``sample3 Netsdk projs``.ProjectReferences.Length - 1) "only F# refs"  // one is C#, no FSharpProjectOptions for that
+
         Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
 
         //TODO check fullpaths
