@@ -260,7 +260,7 @@ let tests () =
       )
 
       testCase |> withLog "do not include generated tfm assemblyinfo" (fun logger fs ->
-        let testDir = inDir fs "load_sample1"
+        let testDir = inDir fs "no_gen_tfm_assemblyinfo"
         copyDirFromAssets fs ``sample1 OldSdk library``.ProjDir testDir
 
         let projPath = testDir/ (``sample1 OldSdk library``.ProjectFile)
