@@ -405,6 +405,61 @@ no errors but was: [|commandLineArgs (0,1)-(0,1) parameter error No inputs speci
 
       )
 
+      ftestCase |> withLog "can load sample7" (fun logger fs ->
+        let testDir = inDir fs "load_sample7"
+        copyDirFromAssets fs ``sample7 Oldsdk projs``.ProjDir testDir
+
+        let projPath = testDir/ (``sample7 Oldsdk projs``.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
+
+        fs.cd projDir
+        // nuget fs ["restore"; "-PackagesDirectory"; "packages"]
+        // |> checkExitCodeZero
+
+        fs.cd testDir
+
+        let fcs = createFCS ()
+
+        let loader, netFwInfo = createLoader logger
+
+        let fcsBinder = FCSBinder(netFwInfo, loader, fcs)
+
+        loader.LoadProjects [ projPath ]
+
+        let fcsPoOpt = fcsBinder.GetProjectOptions(projPath)
+
+        logProjectOptions logger fcsPoOpt
+
+        let fcsPo = fcsPoOpt |> Option.get
+
+        Expect.all (allFCSProjects fcsPo) (fun p -> p.ProjectId |> Option.isNone) "all ProjectId are None"
+
+        let po =
+          loader.Projects
+          |> expectFind { ProjectKey.ProjectPath = projPath; TargetFramework = "net45" } "find proj"
+
+        Expect.equal fcsPo.LoadTime po.LoadTime "load time"
+
+        Expect.equal fcsPo.ReferencedProjects.Length ``sample7 Oldsdk projs``.ProjectReferences.Length "refs"
+
+        Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
+
+        //TODO check fullpaths
+        Expect.equal fcsPo.SourceFiles [| projDir/"MultiProject1.fs" |] "check sourcefiles"
+
+        let result =
+          fcs.ParseAndCheckProject(fcsPo)
+          |> Async.RunSynchronously
+
+        expectNoErrors result
+
+        let uses =
+          result.GetAllUsesOfAllSymbols()
+          |> Async.RunSynchronously
+
+        Expect.isNonEmpty uses "all symbols usages"
+      )
+
       testCase |> withLog "can fsx" (fun logger fs ->
         let testDir = inDir fs "check_fsx"
 

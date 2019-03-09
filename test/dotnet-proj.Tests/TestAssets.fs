@@ -129,3 +129,31 @@ let ``sample6 Netsdk Sparse/sln`` =
       ProjectFile = "sample6-netsdk-sparse.sln"
       TargetFrameworks = Map.empty
       ProjectReferences = [] }
+
+/// old sdk, a net461 console MultiProject1
+/// reference:
+/// - net461 lib Project1A (F#)
+/// - net461 lib Project1B (F#)
+let ``sample7 Oldsdk projs`` =
+  { ProjDir = "sample7-oldsdk-projs"
+    AssemblyName = "MultiProject1"
+    ProjectFile = "m1"/"MultiProject1.fsproj"
+    TargetFrameworks =  Map.ofList [
+      "net45", sourceFiles ["MultiProject1.fs"]
+    ]
+    ProjectReferences =
+      [ { ProjDir = "sample7-oldsdk-projs"/"a"
+          AssemblyName = "Project1A"
+          ProjectFile = "a"/"Project1A.fsproj"
+          TargetFrameworks =  Map.ofList [
+            "net45", sourceFiles ["Project1A.fs"]
+          ]
+          ProjectReferences = [] }
+        { ProjDir = "sample7-oldsdk-projs"/"b"
+          AssemblyName = "Project1B"
+          ProjectFile = "b"/"Project1B.fsproj"
+          TargetFrameworks =  Map.ofList [
+            "net45", sourceFiles ["Project1B.fs"]
+          ]
+          ProjectReferences = [] }
+      ] }
