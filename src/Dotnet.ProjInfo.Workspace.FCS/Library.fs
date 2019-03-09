@@ -60,6 +60,7 @@ type FCSBinder (netFwInfo: NetFWInfo, workspace: Loader, checker: FCS_Checker) =
                     |> List.choose (fun key -> getPo { ProjectKey.ProjectPath = key.ProjectFileName; TargetFramework = key.TargetFramework })
                     // Is (path * projectOption) ok? or was .dll?
                     |> List.map (fun po -> (key.ProjectPath, po) )
+                     // TODO assert the .dll is in the parent project references, otherwise is strange
                     |> Array.ofList
                   IsIncompleteTypeCheckEnvironment = false
                   UseScriptResolutionRules = false
