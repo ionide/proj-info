@@ -11,7 +11,6 @@ type ProjectSdkType =
     | DotnetSdk of ProjectSdkTypeDotnetSdk
 and ProjectSdkTypeVerbose =
     {
-      TargetPath: string
       TargetFrameworkVersion: string
       Configuration: string
     }
@@ -33,8 +32,6 @@ and ProjectSdkTypeDotnetSdk =
       Configurations: string list // Debug;Release
       TargetFrameworks: string list // netcoreapp1.0;netstandard1.6
 
-      TargetPath: string
-
       //may not exists
       RunArguments: string option // exec "e:\github\DotnetNewFsprojTestingSamples\sdk1.0\sample1\c1\bin\Debug\netcoreapp1.0\c1.dll"
       RunCommand: string option // dotnet
@@ -46,6 +43,7 @@ and ProjectSdkTypeDotnetSdk =
 
 type ExtraProjectInfoData =
     {
+        TargetPath: string
         ProjectOutputType: ProjectOutputType
         ProjectSdkType: ProjectSdkType
     }

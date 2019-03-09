@@ -25,7 +25,7 @@ module ProjectCrackerDotnetSdk =
     | MSBuildPrj.MSBuild.ConditionEquals "Library" -> ProjectOutputType.Library
     | x -> ProjectOutputType.Custom x
 
-  let getExtraInfo targetPath props =
+  let getExtraInfo props =
     let msbuildPropBool prop =
         props |> Map.tryFind prop |> Option.bind msbuildPropBool
     let msbuildPropStringList prop =
@@ -39,7 +39,6 @@ module ProjectCrackerDotnetSdk =
       TargetFramework = msbuildPropString MSBuildKnownProperties.TargetFramework |> Option.getOrElse ""
       TargetFrameworkIdentifier = msbuildPropString "TargetFrameworkIdentifier" |> Option.getOrElse ""
       TargetFrameworkVersion = msbuildPropString "TargetFrameworkVersion" |> Option.getOrElse ""
-      TargetPath = targetPath
 
       MSBuildAllProjects = msbuildPropStringList "MSBuildAllProjects" |> Option.getOrElse []
       MSBuildToolsVersion = msbuildPropString "MSBuildToolsVersion" |> Option.getOrElse ""
@@ -55,7 +54,7 @@ module ProjectCrackerDotnetSdk =
 
       IsPublishable = msbuildPropBool "IsPublishable" }
 
-  let getExtraInfoVerboseSdk targetPath props =
+  let getExtraInfoVerboseSdk props =
     let msbuildPropBool prop =
         props |> Map.tryFind prop |> Option.bind msbuildPropBool
     let msbuildPropStringList prop =
@@ -63,8 +62,7 @@ module ProjectCrackerDotnetSdk =
     let msbuildPropString prop =
         props |> Map.tryFind prop
 
-    { ProjectSdkTypeVerbose.TargetPath = targetPath
-      Configuration = msbuildPropString "Configuration" |> Option.getOrElse ""
+    { Configuration = msbuildPropString "Configuration" |> Option.getOrElse ""
       TargetFrameworkVersion = msbuildPropString "TargetFrameworkVersion" |> Option.getOrElse "" }
 
   type private ProjectParsingSdk = DotnetSdk | VerboseSdk
@@ -101,6 +99,7 @@ module ProjectCrackerDotnetSdk =
         let additionalInfo = //needed for extra
             [ "OutputType"
               "IsTestProject"
+              "TargetPath"
               "Configuration"
               "IsPackable"
               MSBuildKnownProperties.TargetFramework
@@ -217,7 +216,7 @@ module ProjectCrackerDotnetSdk =
             let sdkTypeData, log =
                 match parseAsSdk with
                 | ProjectParsingSdk.DotnetSdk ->
-                    let extraInfo = getExtraInfo tar props
+                    let extraInfo = getExtraInfo props
                     ProjectSdkType.DotnetSdk(extraInfo), []
                 | ProjectParsingSdk.VerboseSdk ->
                     //compatibility with old behaviour, so output is exactly the same
@@ -225,7 +224,7 @@ module ProjectCrackerDotnetSdk =
                         [ yield (file, "")
                           yield! p2pProjects |> List.collect (fun (_,_,x,_) -> x) ]
                     
-                    let extraInfo = getExtraInfoVerboseSdk tar props
+                    let extraInfo = getExtraInfoVerboseSdk props
                     ProjectSdkType.Verbose(extraInfo), mergedLog
 
             let isSourceFile : (string -> bool) =
@@ -254,6 +253,7 @@ module ProjectCrackerDotnetSdk =
                     LoadTime = DateTime.Now
                     ExtraProjectInfo =
                         {
+                            TargetPath = tar
                             ExtraProjectInfoData.ProjectSdkType = sdkTypeData
                             ExtraProjectInfoData.ProjectOutputType = FscArguments.outType rspNormalized
                         }
