@@ -120,6 +120,24 @@ let rec allFCSProjects (po: FCS_ProjectOptions) =
     for (_, p2p) in po.ReferencedProjects do
       yield! allFCSProjects p2p ]
 
+let findProjectExtraInfo (po: FCS_ProjectOptions) =
+  match po.ExtraProjectInfo with
+  | None -> failwithf "expect ExtraProjectInfo but was None"
+  | Some extra ->
+    match extra with
+    | :? ProjectOptions as poDPW -> poDPW
+    | ex -> failwithf "expected ProjectOptions but was '%A'" ex
+
+let rec allP2P (po: FCS_ProjectOptions) =
+  [ for (key, p2p) in po.ReferencedProjects do
+      let poDPW = findProjectExtraInfo p2p
+      yield (key, p2p, poDPW)
+      yield! allP2P p2p ]
+
+let expectP2PKeyIsTargetPath po =
+  for (tar, fcsPO, poDPW) in allP2P po do
+    Expect.equal tar poDPW.ExtraProjectInfo.TargetPath (sprintf "p2p key is TargetPath, fsc projet options was '%A'" fcsPO)
+
 let tests () =
  
   let prepareTestsAssets = lazy(
@@ -238,11 +256,15 @@ let tests () =
           |> expectFind { ProjectKey.ProjectPath = projPath; TargetFramework = "net461" } "find proj"
 
         Expect.equal fcsPo.LoadTime po.LoadTime "load time"
-        Expect.equal fcsPo.ReferencedProjects.Length po.ReferencedProjects.Length "refs"
+
+        Expect.equal fcsPo.ReferencedProjects.Length ``sample1 OldSdk library``.ProjectReferences.Length "refs"
+
         Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
 
         //TODO check fullpaths
         Expect.equal fcsPo.SourceFiles [| projDir/"AssemblyInfo.fs"; projDir/"Library.fs" |] "check sourcefiles"
+
+        expectP2PKeyIsTargetPath fcsPo
 
         let result =
           fcs.ParseAndCheckProject(fcsPo)
@@ -258,7 +280,7 @@ let tests () =
       )
 
       testCase |> withLog "do not include generated tfm assemblyinfo" (fun logger fs ->
-        let testDir = inDir fs "load_sample1"
+        let testDir = inDir fs "no_gen_tfm_assemblyinfo"
         copyDirFromAssets fs ``sample1 OldSdk library``.ProjDir testDir
 
         let projPath = testDir/ (``sample1 OldSdk library``.ProjectFile)
@@ -318,11 +340,15 @@ let tests () =
           |> expectFind { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "first is a lib"
 
         Expect.equal fcsPo.LoadTime po.LoadTime "load time"
-        Expect.equal fcsPo.ReferencedProjects.Length po.ReferencedProjects.Length "refs"
+
+        Expect.equal fcsPo.ReferencedProjects.Length ``sample2 NetSdk library``.ProjectReferences.Length "refs"
+
         Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
 
         //TODO check fullpaths
         Expect.equal fcsPo.SourceFiles (po.SourceFiles |> Array.ofList) "check sources"
+
+        expectP2PKeyIsTargetPath fcsPo
 
         let result =
           fcs.ParseAndCheckProject(fcsPo)
@@ -369,11 +395,15 @@ let tests () =
           |> expectFind { ProjectKey.ProjectPath = projPath; TargetFramework = "netcoreapp2.1" } "first is a console app"
 
         Expect.equal fcsPo.LoadTime po.LoadTime "load time"
-        Expect.equal fcsPo.ReferencedProjects.Length (po.ReferencedProjects.Length - 1) "refs" // one is C#, no FSharpProjectOptions for that
+
+        Expect.equal fcsPo.ReferencedProjects.Length (``sample3 Netsdk projs``.ProjectReferences.Length - 1) "only F# refs"  // one is C#, no FSharpProjectOptions for that
+
         Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
 
         //TODO check fullpaths
         Expect.equal fcsPo.SourceFiles (po.SourceFiles |> Array.ofList) "check sources"
+
+        expectP2PKeyIsTargetPath fcsPo
 
         let result =
           fcs.ParseAndCheckProject(fcsPo)
@@ -397,6 +427,63 @@ no errors but was: [|commandLineArgs (0,1)-(0,1) parameter error No inputs speci
 
         Expect.isNonEmpty uses "all symbols usages"
 
+      )
+
+      testCase |> withLog "can load sample7" (fun logger fs ->
+        let testDir = inDir fs "load_sample7"
+        copyDirFromAssets fs ``sample7 Oldsdk projs``.ProjDir testDir
+
+        let projPath = testDir/ (``sample7 Oldsdk projs``.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
+
+        fs.cd projDir
+        // nuget fs ["restore"; "-PackagesDirectory"; "packages"]
+        // |> checkExitCodeZero
+
+        fs.cd testDir
+
+        let fcs = createFCS ()
+
+        let loader, netFwInfo = createLoader logger
+
+        let fcsBinder = FCSBinder(netFwInfo, loader, fcs)
+
+        loader.LoadProjects [ projPath ]
+
+        let fcsPoOpt = fcsBinder.GetProjectOptions(projPath)
+
+        logProjectOptions logger fcsPoOpt
+
+        let fcsPo = fcsPoOpt |> Option.get
+
+        Expect.all (allFCSProjects fcsPo) (fun p -> p.ProjectId |> Option.isNone) "all ProjectId are None"
+
+        let po =
+          loader.Projects
+          |> expectFind { ProjectKey.ProjectPath = projPath; TargetFramework = "net45" } "find proj"
+
+        Expect.equal fcsPo.LoadTime po.LoadTime "load time"
+
+        Expect.equal fcsPo.ReferencedProjects.Length ``sample7 Oldsdk projs``.ProjectReferences.Length "refs"
+
+        Expect.equal fcsPo.ExtraProjectInfo (Some (box po)) "extra info"
+
+        //TODO check fullpaths
+        Expect.equal fcsPo.SourceFiles [| projDir/"MultiProject1.fs" |] "check sourcefiles"
+
+        expectP2PKeyIsTargetPath fcsPo
+
+        let result =
+          fcs.ParseAndCheckProject(fcsPo)
+          |> Async.RunSynchronously
+
+        expectNoErrors result
+
+        let uses =
+          result.GetAllUsesOfAllSymbols()
+          |> Async.RunSynchronously
+
+        Expect.isNonEmpty uses "all symbols usages"
       )
 
       testCase |> withLog "can fsx" (fun logger fs ->

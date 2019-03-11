@@ -12,7 +12,7 @@ let main argv =
 
     let resultsPath = IO.Path.Combine(__SOURCE_DIRECTORY__,"..","..","bin","test_results","Workspace.TestResults.xml")
 
-    let writeResults = TestResults.writeNUnitSummary (resultsPath, "Dotnet.ProjInfo.Workspace.Tests")
+    let writeResults = TestResults.writeNUnitSummary (resultsPath, "Dotnet.ProjInfo.Workspace.FCS.Tests")
     let config = defaultConfig.appendSummaryHandler writeResults
 
     Tests.runTestsWithArgs config argv (Tests.tests ())
