@@ -148,7 +148,9 @@ let isOSX () =
   System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
       System.Runtime.InteropServices.OSPlatform.OSX)
 
-let tests () =
+open TestsConfig
+
+let tests (suiteConfig: TestSuiteConfig) =
  
   let prepareTestsAssets = lazy(
       let logger = Log.create "Tests Assets"
@@ -292,7 +294,7 @@ let tests () =
         Expect.equal n1Parsed.SourceFiles expectedSources "check sources"
       )
 
-      testCase |> withLog "can load sample3" (fun logger fs ->
+      testCase |> withLog ("can load sample3" |> knownFailure) (fun logger fs ->
         let testDir = inDir fs "load_sample3"
         copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
 
@@ -349,7 +351,7 @@ let tests () =
           parsed
           |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netcoreapp2.1" } "the F# console"
 
-        if (isOSX ()) then
+        if (isOSX () && suiteConfig.SkipKnownFailure) then
           let errorOnOsx =
             """
          check sources.

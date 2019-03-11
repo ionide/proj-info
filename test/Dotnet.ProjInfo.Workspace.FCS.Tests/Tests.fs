@@ -138,7 +138,9 @@ let expectP2PKeyIsTargetPath po =
   for (tar, fcsPO, poDPW) in allP2P po do
     Expect.equal tar poDPW.ExtraProjectInfo.TargetPath (sprintf "p2p key is TargetPath, fsc projet options was '%A'" fcsPO)
 
-let tests () =
+open TestsConfig
+
+let tests (suiteConfig: TestSuiteConfig) =
  
   let prepareTestsAssets = lazy(
       let logger = Log.create "Tests Assets"
