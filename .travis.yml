@@ -11,11 +11,6 @@ script:
   - dotnet pack -v n
   - dotnet test -v n
 
-env:
-  matrix:
-    - ''
-    - UnstableTests=true
-
 matrix:
   include:
     - os: linux
@@ -23,8 +18,13 @@ matrix:
       sudo: required
     - os: osx
       osx_image: xcode9
-
-matrix:
+    - os: linux
+      dist: trusty
+      sudo: required
+      env: UnstableTests=true
+    - os: osx
+      osx_image: xcode9
+      env: UnstableTests=true
   allow_failures:
     # unstable tests may fail
     - env: UnstableTests=true
