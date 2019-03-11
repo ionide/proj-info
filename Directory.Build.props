@@ -1,7 +1,7 @@
 <Project ToolsVersion="15.0">
 
   <PropertyGroup>
-    <Version Condition=" '$(Version)' == '' ">0.32.1$(VersionSuffix)</Version>
+    <Version Condition=" '$(Version)' == '' ">0.33.0$(VersionSuffix)</Version>
   </PropertyGroup>
 
   <PropertyGroup>
