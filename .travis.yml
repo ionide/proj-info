@@ -9,7 +9,7 @@ install:
 
 script:
   - dotnet pack -v n
-  - dotnet test -v n
+  - dotnet test -v n -p:UnstableTests=$UnstableTests
 
 matrix:
   include:
