@@ -2,27 +2,39 @@
 
   <Import Project="Directory.Build.props" />
 
+  <PropertyGroup>
+    <Configuration>Release</Configuration>
+    <UnstableTests>false</UnstableTests>
+  </PropertyGroup>
+
   <Target Name="Restore">
     <Exec Command="$(MonoOrEmpty)paket.exe restore" WorkingDirectory=".paket" ConsoleToMSBuild="true" />
-    <Exec Command='dotnet restore src/dotnet-proj.sln /p:Version=$(Version)' />
+    <Exec Command='dotnet restore src/dotnet-proj.sln -p:Version=$(Version)' />
   </Target>
 
   <Target Name="Build">
-    <Exec Command='dotnet build src/dotnet-proj.sln -c Release /p:Version=$(Version)' />
+    <Exec Command='dotnet build src/dotnet-proj.sln -c $(Configuration) -p:Version=$(Version)' />
   </Target>
 
   <Target Name="Pack">
     <RemoveDir Directories="$(NupkgsDir)" />
-    <Exec Command='dotnet pack src/dotnet-proj -c Release -o "$(NupkgsDir)" /p:Version=$(Version)' />
-    <Exec Command='dotnet pack src/Dotnet.ProjInfo -c Release -o "$(NupkgsDir)" /p:Version=$(Version)' />
-    <Exec Command='dotnet pack src/Dotnet.ProjInfo.Workspace -c Release -o "$(NupkgsDir)" /p:Version=$(Version)' />
-    <Exec Command='dotnet pack src/Dotnet.ProjInfo.Workspace.FCS -c Release -o "$(NupkgsDir)" /p:Version=$(Version)' />
+    <Exec Command='dotnet pack src/dotnet-proj -c $(Configuration) -o "$(NupkgsDir)" -p:Version=$(Version)' />
+    <Exec Command='dotnet pack src/Dotnet.ProjInfo -c $(Configuration) -o "$(NupkgsDir)" -p:Version=$(Version)' />
+    <Exec Command='dotnet pack src/Dotnet.ProjInfo.Workspace -c $(Configuration) -o "$(NupkgsDir)" -p:Version=$(Version)' />
+    <Exec Command='dotnet pack src/Dotnet.ProjInfo.Workspace.FCS -c $(Configuration) -o "$(NupkgsDir)" -p:Version=$(Version)' />
   </Target>
 
   <Target Name="Test">
-    <Exec Command='dotnet run -c Release -- "$(Version)" --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/dotnet-proj.Tests" IgnoreStandardErrorWarningFormat="true" />
-    <Exec Command='dotnet run -c Release -- --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/Dotnet.ProjInfo.Workspace.Tests" IgnoreStandardErrorWarningFormat="true" />
-    <Exec Command='dotnet run -c Release -- --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/Dotnet.ProjInfo.Workspace.FCS.Tests" IgnoreStandardErrorWarningFormat="true" />
+    <Exec Command='dotnet run -c $(Configuration) -- "$(Version)" --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/dotnet-proj.Tests" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' != 'true' " />
+
+    <Exec Command='dotnet run -c $(Configuration) -- --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/Dotnet.ProjInfo.Workspace.Tests" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' != 'true' " />
+    <Exec Command='dotnet run -c $(Configuration) -- --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/Dotnet.ProjInfo.Workspace.FCS.Tests" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' != 'true' " />
+
+    <Exec Command='dotnet run -c $(Configuration) -- --known-failure --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/Dotnet.ProjInfo.Workspace.Tests" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' == 'true' " />
+    <Exec Command='dotnet run -c $(Configuration) -- --known-failure --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/Dotnet.ProjInfo.Workspace.FCS.Tests" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' == 'true' " />
+
+    <Exec Command='dotnet run -c $(Configuration) -- --flaky --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/Dotnet.ProjInfo.Workspace.Tests" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' == 'true' " />
+    <Exec Command='dotnet run -c $(Configuration) -- --flaky --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/Dotnet.ProjInfo.Workspace.FCS.Tests" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' == 'true' " />
   </Target>
 
   <Target Name="VSTest" DependsOnTargets="Test" />

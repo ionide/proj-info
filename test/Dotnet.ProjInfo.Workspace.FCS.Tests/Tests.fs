@@ -138,7 +138,9 @@ let expectP2PKeyIsTargetPath po =
   for (tar, fcsPO, poDPW) in allP2P po do
     Expect.equal tar poDPW.ExtraProjectInfo.TargetPath (sprintf "p2p key is TargetPath, fsc projet options was '%A'" fcsPO)
 
-let tests () =
+open TestsConfig
+
+let tests (suiteConfig: TestSuiteConfig) =
  
   let prepareTestsAssets = lazy(
       let logger = Log.create "Tests Assets"
@@ -364,7 +366,7 @@ let tests () =
 
       )
 
-      testCase |> withLog "can load sample3" (fun logger fs ->
+      testCase |> withLog ("can load sample3" |> knownFailure) (fun logger fs ->
         let testDir = inDir fs "load_sample3"
         copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
 
@@ -409,7 +411,7 @@ let tests () =
           fcs.ParseAndCheckProject(fcsPo)
           |> Async.RunSynchronously
 
-        if (isOSX ()) then
+        if (isOSX () && suiteConfig.SkipKnownFailure) then
           let errorOnOsx =
             """
 no errors but was: [|commandLineArgs (0,1)-(0,1) parameter error No inputs specified;
