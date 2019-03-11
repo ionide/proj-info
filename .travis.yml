@@ -1,6 +1,9 @@
 language: csharp
 
-mono: 5.18.0
+mono:
+  - 5.18.0 # stable channel
+  - 5.16.0 # vs channel
+
 dotnet: 2.1.401
 
 install:
