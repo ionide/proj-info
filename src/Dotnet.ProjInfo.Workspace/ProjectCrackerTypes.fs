@@ -76,7 +76,7 @@ and ProjectReference =
 
 type [<RequireQualifiedAccess>] WorkspaceProjectState =
     | Loading of string * ((string * string) list)
-    | Loaded of ProjectOptions * string list * Map<string,string>
+    | Loaded of ProjectOptions * Map<string,string>
     | Failed of string * GetProjectOptionsErrors
 
 module ProjectRecognizer =

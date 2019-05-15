@@ -288,25 +288,7 @@ module ProjectCrackerDotnetSdk =
       try
         let po, log, additionalProjs = getProjectOptionsFromProjectFile msbuildPath notifyState cache parseAsSdk file
 
-        let compileFiles =
-            let sources = FscArguments.compileFiles po.OtherOptions
-            match po with
-            | ProjectExtraInfoBySdk extraInfo ->
-                match extraInfo.ProjectSdkType with
-                | ProjectSdkType.Verbose _ ->
-                    //compatibility with old behaviour (projectcracker), so test output is exactly the same
-                    //the temp source files (like generated assemblyinfo.fs) are not added to sources
-                    let isTempFile (name: string) =
-                        let tempPath = Path.GetTempPath()
-                        let s = name.ToLower()
-                        s.StartsWith(tempPath.ToLower())
-                    sources
-                    |> List.filter (not << isTempFile)
-                | ProjectSdkType.DotnetSdk _ ->
-                    sources
-            | _ -> sources
-
-        Ok (po, Seq.toList compileFiles, (log |> Map.ofList), additionalProjs)
+        Ok (po, (log |> Map.ofList), additionalProjs)
       with
         | ProjectInspectException d -> Error d
         | e -> Error (GenericError(file, e.Message))

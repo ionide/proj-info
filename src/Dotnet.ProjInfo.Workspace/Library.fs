@@ -86,10 +86,7 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
                         Error (GetProjectOptionsErrors.GenericError(proj, "not found"))
 
             match loader notify cache project with
-            | Ok (po, sources, props, additionalProjs) ->
-                // TODO sources and props are wrong, because not project specific. but of root proj
-                let loaded po = WorkspaceProjectState.Loaded (po, sources, props)
-
+            | Ok (po, props, additionalProjs) ->
                 let rec visit (p: ProjectOptions) = seq {
                     yield p
                     for p2pRef in p.ReferencedProjects do
@@ -102,7 +99,8 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
                     parsedProjects.AddOrUpdate(getKey proj, proj, fun _ _ -> proj) |> ignore
 
                 for proj in visit po do
-                    notify (loaded proj)
+                    WorkspaceProjectState.Loaded (proj, props)
+                    |> notify
 
             | Error e ->
                 let failed = WorkspaceProjectState.Failed (project, e)
@@ -163,3 +161,39 @@ type NetFWInfo private (msbuildPath) =
 
     static member Create(config: NetFWInfoConfig) =
         NetFWInfo(config.MSBuildHost)
+
+type ProjectViewerTree =
+    { Name: string;
+      Items: ProjectViewerItem list }
+and [<RequireQualifiedAccess>] ProjectViewerItem =
+    | Compile of string
+
+type ProjectViewer () =
+
+    member __.Render(proj: ProjectOptions) =
+
+        let compileFiles =
+            let sources = proj.SourceFiles
+            match proj.ExtraProjectInfo.ProjectSdkType with
+            | ProjectSdkType.Verbose _ ->
+                //compatibility with old behaviour (projectcracker), so test output is exactly the same
+                //the temp source files (like generated assemblyinfo.fs) are not added to sources
+                let isTempFile (name: string) =
+                    let tempPath = Path.GetTempPath()
+                    let s = name.ToLower()
+                    s.StartsWith(tempPath.ToLower())
+                sources
+                |> List.filter (fun p -> not(isTempFile p))
+            | ProjectSdkType.DotnetSdk _ ->
+                //the generated assemblyinfo.fs are not shown as sources
+                let isGeneratedAssemblyinfo (name: string) =
+                    let projName = proj.ProjectFileName |> Path.GetFileNameWithoutExtension
+                    //TODO check is in `obj` dir for the tfm
+                    //TODO better, get the name from fsproj
+                    //TODO cs too
+                    name.EndsWith(sprintf "%s.AssemblyInfo.fs" projName)
+                sources
+                |> List.filter (fun p -> not(isGeneratedAssemblyinfo p))
+
+        { ProjectViewerTree.Name = proj.ProjectFileName |> Path.GetFileNameWithoutExtension
+          Items = compileFiles |> List.map ProjectViewerItem.Compile }
