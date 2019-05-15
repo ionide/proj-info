@@ -229,7 +229,7 @@ module ProjectCrackerDotnetSdk =
 
             let isSourceFile : (string -> bool) =
                 if Path.GetExtension(file) = ".fsproj" then
-                    (fun n -> n.EndsWith ".fs" || n.EndsWith ".fsx" || n.EndsWith ".fsi")
+                    FscArguments.isCompileFile
                 else
                     (fun n -> n.EndsWith ".cs")
 
