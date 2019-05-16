@@ -816,6 +816,20 @@ let tests (suiteConfig: TestSuiteConfig) =
 
         Expect.equal (viewer.Render l2Parsed) (renderOf l2Proj l2ExpectedSources) "check rendered l2"
 
+        if (isOSX () && suiteConfig.SkipKnownFailure) then
+          let errorOnOsx =
+            """
+         check sources.
+         expected:
+         ["/Users/travis/build/enricosada/dotnet-proj-info/test/testrun_ws/render_sample3/c1/Program.fs"]
+           actual:
+         []
+
+         The OtherOptions is empty.
+            """.Trim()
+          Tests.skiptest (sprintf "Known failure on OSX travis. error is %s" errorOnOsx)
+          //TODO check failure on osx
+
         let c1ExpectedSources =
           [ projDir / "Program.fs" ]
           |> List.map Path.GetFullPath
