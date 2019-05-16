@@ -13,8 +13,7 @@ script:
 matrix:
   include:
     - os: linux
-      dist: trusty
-      sudo: required
+      dist: xenial
       mono: 5.16.0
       env: UnstableTests=false
     - os: osx
@@ -22,8 +21,7 @@ matrix:
       mono: 5.16.0
       env: UnstableTests=false
     - os: linux
-      dist: trusty
-      sudo: required
+      dist: xenial
       mono: 5.16.0
       env: UnstableTests=true
     - os: osx
@@ -31,8 +29,7 @@ matrix:
       mono: 5.16.0
       env: UnstableTests=true
     - os: linux
-      dist: trusty
-      sudo: required
+      dist: xenial  
       mono: 5.18.0
       env: UnstableTests=false
     - os: osx
@@ -42,3 +39,5 @@ matrix:
   allow_failures:
     # unstable tests may fail
     - env: UnstableTests=true
+    - dist: xenial
+      mono: 5.18.0
