@@ -39,3 +39,5 @@ matrix:
   allow_failures:
     # unstable tests may fail
     - env: UnstableTests=true
+    - dist: xenial
+      mono: 5.18.0
