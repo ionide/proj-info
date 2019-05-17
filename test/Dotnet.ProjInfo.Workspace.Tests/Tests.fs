@@ -101,7 +101,7 @@ module ExpectNotification =
   let loaded (name: string) =
     let isLoaded n =
       match n with
-      | WorkspaceProjectState.Loaded (po, _, _) when po.ProjectFileName.EndsWith(name) -> true
+      | WorkspaceProjectState.Loaded (po, _) when po.ProjectFileName.EndsWith(name) -> true
       | _ -> false
     sprintf "loaded %s" name, isLoaded
 
@@ -122,7 +122,7 @@ module ExpectNotification =
         let minimal_info =
           match n with
           | WorkspaceProjectState.Loading (path, _) -> sprintf "loading %s " path
-          | WorkspaceProjectState.Loaded (po, _, _) -> sprintf "loaded %s" po.ProjectFileName
+          | WorkspaceProjectState.Loaded (po, _) -> sprintf "loaded %s" po.ProjectFileName
           | WorkspaceProjectState.Failed (path, _) -> sprintf "failed %s" path
         Expect.isTrue (f n) (sprintf "expected %s but was %s" name minimal_info) )
 
@@ -243,6 +243,8 @@ let tests (suiteConfig: TestSuiteConfig) =
         [ loading "l1.fsproj"; loaded "l1.fsproj" ]
         |> expectNotifications (watcher.Notifications)
 
+        let [_; WorkspaceProjectState.Loaded(l1Loaded,_)] = watcher.Notifications
+
         let parsed = loader.Projects
 
         Expect.equal parsed.Length 1 "lib"
@@ -257,6 +259,8 @@ let tests (suiteConfig: TestSuiteConfig) =
             (Path.GetTempPath()) / ".NETFramework,Version=v4.6.1.AssemblyAttributes.fs" ]
 
         Expect.equal l1Parsed.SourceFiles expectedSources "check sources"
+
+        Expect.equal l1Parsed l1Loaded "notificaton and parsed should be the same"
       )
 
       testCase |> withLog "can load sample2" (fun logger fs ->
@@ -278,6 +282,8 @@ let tests (suiteConfig: TestSuiteConfig) =
         [ loading "n1.fsproj"; loaded "n1.fsproj" ]
         |> expectNotifications (watcher.Notifications)
 
+        let [_; WorkspaceProjectState.Loaded(n1Loaded,_)] = watcher.Notifications
+
         let parsed = loader.Projects
 
         Expect.equal parsed.Length 1 "console and lib"
@@ -292,6 +298,8 @@ let tests (suiteConfig: TestSuiteConfig) =
           |> List.map Path.GetFullPath
 
         Expect.equal n1Parsed.SourceFiles expectedSources "check sources"
+
+        Expect.equal n1Parsed n1Loaded "notificaton and parsed should be the same"
       )
 
       testCase |> withLog ("can load sample3" |> knownFailure) (fun logger fs ->
@@ -319,6 +327,8 @@ let tests (suiteConfig: TestSuiteConfig) =
         [ loading "c1.fsproj"; loading "l1.csproj"; loading "l2.fsproj"; loaded "c1.fsproj"; loaded "l1.csproj"; loaded "l2.fsproj";  ]
         |> expectNotifications (watcher.Notifications)
 
+        let [_; _; _; WorkspaceProjectState.Loaded(c1Loaded,_); WorkspaceProjectState.Loaded(l1Loaded,_); WorkspaceProjectState.Loaded(l2Loaded,_)] = watcher.Notifications
+
         let parsed = loader.Projects
 
         Expect.equal parsed.Length 3 (sprintf "console (F#) and lib (F#) and lib (C#), but was %A" (parsed |> Array.map (fun x -> x.Key)))
@@ -329,7 +339,7 @@ let tests (suiteConfig: TestSuiteConfig) =
 
         let l1ExpectedSources =
           [ l1Dir / "obj/Debug/netstandard2.0/l1.AssemblyInfo.cs"
-            l1Dir / "Class1.fs" ]
+            l1Dir / "Class1.cs" ]
           |> List.map Path.GetFullPath
 
         // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
@@ -373,6 +383,9 @@ let tests (suiteConfig: TestSuiteConfig) =
 
         Expect.equal c1Parsed.SourceFiles c1ExpectedSources "check sources"
 
+        Expect.equal l1Parsed l1Loaded "l1 notificaton and parsed should be the same"
+        Expect.equal l2Parsed l2Loaded "l2 notificaton and parsed should be the same"
+        Expect.equal c1Parsed c1Loaded "c1 notificaton and parsed should be the same"
       )
 
       testCase |> withLog "can load sample4" (fun logger fs ->
@@ -398,6 +411,8 @@ let tests (suiteConfig: TestSuiteConfig) =
         [ loading "m1.fsproj"; loading "m1.fsproj"; loaded "m1.fsproj" ]
         |> expectNotifications (watcher.Notifications)
 
+        let [_; _; WorkspaceProjectState.Loaded(m1Loaded,_)] = watcher.Notifications
+
         let parsed = loader.Projects
 
         Expect.equal parsed.Length 1 (sprintf "multi-tfm lib (F#), but was %A" (parsed |> Array.map (fun x -> x.Key)))
@@ -412,6 +427,8 @@ let tests (suiteConfig: TestSuiteConfig) =
           |> List.map Path.GetFullPath
 
         Expect.equal m1Parsed.SourceFiles m1ExpectedSources "check sources"
+
+        Expect.equal m1Parsed m1Loaded "m1 notificaton and parsed should be the same"
       )
 
       testCase |> withLog "can load sample5" (fun logger fs ->
@@ -433,6 +450,8 @@ let tests (suiteConfig: TestSuiteConfig) =
         [ loading "l2.csproj"; loaded "l2.csproj" ]
         |> expectNotifications (watcher.Notifications)
 
+        let [_; WorkspaceProjectState.Loaded(l2Loaded,_)] = watcher.Notifications
+
         let parsed = loader.Projects
 
         Expect.equal parsed.Length 1 "lib"
@@ -441,7 +460,7 @@ let tests (suiteConfig: TestSuiteConfig) =
           parsed
           |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "a C# lib"
 
-        let l2ExpectedSources =
+        let _l2ExpectedSources =
           [ projDir / "obj/Debug/netstandard2.0/l2.AssemblyInfo.cs"
             projDir / "Class1.cs" ]
           |> List.map Path.GetFullPath
@@ -449,6 +468,8 @@ let tests (suiteConfig: TestSuiteConfig) =
         // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
         // Expect.equal l2Parsed.SourceFiles l2ExpectedSources "check sources"
         Expect.equal l2Parsed.SourceFiles [] "check sources"
+
+        Expect.equal l2Parsed l2Loaded "l2 notificaton and parsed should be the same"
       )
 
       testCase |> withLog "can load sln" (fun logger fs ->
@@ -661,6 +682,226 @@ let tests (suiteConfig: TestSuiteConfig) =
       )
     ]
 
+  let view =
+
+    let createLoader logger =
+        let msbuildLocator = MSBuildLocator()
+        let config = LoaderConfig.Default msbuildLocator
+        logConfig logger config
+        let loader = Loader.Create(config)
+        loader
+
+    let renderOf sampleProj sources =
+        { ProjectViewerTree.Name = sampleProj.ProjectFile |> Path.GetFileNameWithoutExtension
+          Items = sources |> List.map ProjectViewerItem.Compile }
+
+    testList "view" [
+
+      testCase |> withLog "can render sample1" (fun logger fs ->
+        let testDir = inDir fs "render_sample1"
+        let sampleProj = ``sample1 OldSdk library``
+        copyDirFromAssets fs sampleProj.ProjDir testDir
+
+        let projPath = testDir/ (sampleProj.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
+
+        fs.cd projDir
+        nuget fs ["restore"; "-PackagesDirectory"; "packages"]
+        |> checkExitCodeZero
+
+        fs.cd testDir
+
+        // msbuild fs [projPath; "/t:Build"]
+        // |> checkExitCodeZero
+
+        let loader = createLoader logger
+
+        loader.LoadProjects [projPath]
+
+        let parsed = loader.Projects
+        
+        let l1Parsed =
+          parsed
+          |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "net461" } "a lib"
+
+        let viewer = ProjectViewer ()
+
+        let rendered = viewer.Render l1Parsed
+
+        let expectedSources =
+          [ projDir / "AssemblyInfo.fs"
+            projDir / "Library.fs" ]
+
+        Expect.equal rendered (renderOf sampleProj expectedSources) "check rendered project"
+      )
+
+      testCase |> withLog "can render sample2" (fun logger fs ->
+        let testDir = inDir fs "render_sample2"
+        let sampleProj = ``sample2 NetSdk library``
+        copyDirFromAssets fs sampleProj.ProjDir testDir
+
+        let projPath = testDir/ (sampleProj.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
+
+        dotnet fs ["restore"; projPath]
+        |> checkExitCodeZero
+
+        let loader = createLoader logger
+
+        loader.LoadProjects [projPath]
+
+        let parsed = loader.Projects
+        
+        let n1Parsed =
+          parsed
+          |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "first is a lib"
+
+        let viewer = ProjectViewer ()
+
+        let rendered = viewer.Render n1Parsed
+
+        let expectedSources =
+          [ projDir / "Library.fs" ]
+          |> List.map Path.GetFullPath
+
+        Expect.equal rendered (renderOf sampleProj expectedSources) "check rendered project"
+      )
+
+      testCase |> withLog ("can render sample3" |> knownFailure) (fun logger fs ->
+        let testDir = inDir fs "render_sample3"
+        let c1Proj = ``sample3 Netsdk projs``
+        copyDirFromAssets fs c1Proj.ProjDir testDir
+
+        let projPath = testDir/ (c1Proj.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
+
+        let (l1Proj, l1, l1Dir) :: (l2Proj, l2, l2Dir) :: [] =
+          c1Proj.ProjectReferences
+          |> List.map (fun p2p -> p2p, Path.GetFullPath (testDir/ p2p.ProjectFile) )
+          |> List.map (fun (p2p, path) -> p2p, path, Path.GetDirectoryName(path))
+
+        dotnet fs ["build"; projPath]
+        |> checkExitCodeZero
+
+        let loader = createLoader logger
+
+        loader.LoadProjects [projPath]
+
+        let parsed = loader.Projects
+
+        let l1Parsed =
+          parsed
+          |> expectFind l1 { ProjectKey.ProjectPath = l1; TargetFramework = "netstandard2.0" } "the C# lib"
+
+        let l2Parsed =
+          parsed
+          |> expectFind l2 { ProjectKey.ProjectPath = l2; TargetFramework = "netstandard2.0" } "the F# lib"
+
+        let c1Parsed =
+          parsed
+          |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netcoreapp2.1" } "the F# console"
+
+        let viewer = ProjectViewer ()
+
+        let _l1ExpectedSources =
+          [ l1Dir / "Class1.fs" ]
+          |> List.map Path.GetFullPath
+
+        // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
+        Expect.equal (viewer.Render l1Parsed) (renderOf l1Proj []) "check rendered l1"
+
+        let l2ExpectedSources =
+          [ l2Dir / "Library.fs" ]
+          |> List.map Path.GetFullPath
+
+        Expect.equal (viewer.Render l2Parsed) (renderOf l2Proj l2ExpectedSources) "check rendered l2"
+
+        if (isOSX () && suiteConfig.SkipKnownFailure) then
+          let errorOnOsx =
+            """
+         check sources.
+         expected:
+         ["/Users/travis/build/enricosada/dotnet-proj-info/test/testrun_ws/render_sample3/c1/Program.fs"]
+           actual:
+         []
+
+         The OtherOptions is empty.
+            """.Trim()
+          Tests.skiptest (sprintf "Known failure on OSX travis. error is %s" errorOnOsx)
+          //TODO check failure on osx
+
+        let c1ExpectedSources =
+          [ projDir / "Program.fs" ]
+          |> List.map Path.GetFullPath
+
+        Expect.equal (viewer.Render c1Parsed) (renderOf c1Proj c1ExpectedSources) "check rendered c1"
+      )
+
+      testCase |> withLog "can render sample4" (fun logger fs ->
+        let testDir = inDir fs "render_sample4"
+        let m1Proj = ``sample4 NetSdk multi tfm``
+        copyDirFromAssets fs m1Proj.ProjDir testDir
+
+        let projPath = testDir/ (m1Proj.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
+
+        dotnet fs ["restore"; projPath]
+        |> checkExitCodeZero
+
+        for (tfm, _) in m1Proj.TargetFrameworks |> Map.toList do
+          printfn "tfm: %s" tfm
+
+        let loader = createLoader logger
+
+        loader.LoadProjects [projPath]
+
+        let parsed = loader.Projects
+
+        let m1Parsed =
+          parsed
+          |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "the F# console"
+
+        let viewer = ProjectViewer ()
+
+        let m1ExpectedSources =
+          [ projDir / "LibraryA.fs" ]
+          |> List.map Path.GetFullPath
+
+        Expect.equal (viewer.Render m1Parsed) (renderOf m1Proj m1ExpectedSources) "check rendered m1"
+      )
+
+      testCase |> withLog "can render sample5" (fun logger fs ->
+        let testDir = inDir fs "render_sample5"
+        let l2Proj = ``sample5 NetSdk CSharp library``
+        copyDirFromAssets fs l2Proj.ProjDir testDir
+
+        let projPath = testDir/ (l2Proj.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
+
+        dotnet fs ["restore"; projPath]
+        |> checkExitCodeZero
+
+        let loader = createLoader logger
+
+        loader.LoadProjects [projPath]
+
+        let parsed = loader.Projects
+
+        let l2Parsed =
+          parsed
+          |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "a C# lib"
+
+        let viewer = ProjectViewer ()
+
+        let l2ExpectedSources =
+          [ projDir / "Class1.cs" ]
+          |> List.map Path.GetFullPath
+
+        // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
+        Expect.equal (viewer.Render l2Parsed) (renderOf l2Proj []) "check rendered l2"
+      )
+    ]
+
   let msbuild =
 
     testList "msbuild" [
@@ -694,6 +935,6 @@ let tests (suiteConfig: TestSuiteConfig) =
       )
     ]
 
-  [ valid; invalid; fsx; netfw; msbuild ]
+  [ valid; invalid; fsx; netfw; msbuild; view ]
   |> testList "workspace"
   |> testSequenced

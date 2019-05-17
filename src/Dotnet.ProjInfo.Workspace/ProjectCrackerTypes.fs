@@ -76,7 +76,7 @@ and ProjectReference =
 
 type [<RequireQualifiedAccess>] WorkspaceProjectState =
     | Loading of string * ((string * string) list)
-    | Loaded of ProjectOptions * string list * Map<string,string>
+    | Loaded of ProjectOptions * Map<string,string>
     | Failed of string * GetProjectOptionsErrors
 
 module ProjectRecognizer =
@@ -128,11 +128,8 @@ module FscArguments =
       |> Option.map (makeAbs projDir)
 
   let isCompileFile (s:string) =
-      s.EndsWith(".fs") || s.EndsWith (".fsi")
-
-  let compileFiles =
-      //TODO filter the one without initial -
-      List.filter isCompileFile
+      //TODO check if is not an option, check prefix `-` ?
+      s.EndsWith(".fs") || s.EndsWith (".fsi") || s.EndsWith (".fsx")
 
   let references =
       //TODO valid also --reference:
