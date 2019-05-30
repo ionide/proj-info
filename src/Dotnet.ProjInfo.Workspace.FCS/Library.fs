@@ -103,7 +103,8 @@ type FsxBinder (netFwInfo: NetFWInfo, checker: FCS_Checker) =
     member this.GetProjectOptionsFromScriptBy(tfm, file, source) = async {
       let dummy : FSharpCompilerServiceChecker.CheckerGetProjectOptionsFromScript<FCS_ProjectOptions, _> =
         fun (file, source, otherFlags, assumeDotNetFramework) ->
-          checker.GetProjectOptionsFromScript(file, source, otherFlags = otherFlags, assumeDotNetFramework = assumeDotNetFramework)
+          let sourceText = FSharp.Compiler.Text.SourceText.ofString source
+          checker.GetProjectOptionsFromScript(file, sourceText, otherFlags = otherFlags, assumeDotNetFramework = assumeDotNetFramework)
 
       let! (rawOptions, mapper) =
         netFwInfo.GetProjectOptionsFromScript(dummy, tfm, file, source)

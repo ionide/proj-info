@@ -520,7 +520,8 @@ let foo = 1+1"
         expectNoErrors result
 
         let parseFileResults, checkFileResults = 
-            fcs.ParseAndCheckFileInProject(file, 0, input, projOptions) 
+            let inputText = FSharp.Compiler.Text.SourceText.ofString input
+            fcs.ParseAndCheckFileInProject(file, 0, inputText, projOptions) 
             |> Async.RunSynchronously
 
         let res =
