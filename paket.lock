@@ -12,7 +12,7 @@ NUGET
     Expecto.TestResults (8.9)
       Expecto (>= 8.9)
       FSharp.Core (>= 4.3.4)
-    FSharp.Compiler.Service (28.0)
+    FSharp.Compiler.Service (29.0)
       FSharp.Core (>= 4.6.2)
       System.Collections.Immutable (>= 1.5)
       System.Diagnostics.Process (>= 4.1) - restriction: || (== netcoreapp2.1) (== netstandard2.0)
