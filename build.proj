@@ -34,14 +34,19 @@
     <TestArgs Include="--flaky --fail-on-focused-tests --summary" Condition=" '$(UnstableTests)' == 'true' " />
   </ItemGroup>
 
-  <Target Name="TestLibsNet">
+  <Target Name="TestLibsNetCore">
     <Exec Command='dotnet run -p test/Dotnet.ProjInfo.Workspace.Tests -f netcoreapp2.1 -c $(Configuration) -- %(TestArgs.Identity)' IgnoreStandardErrorWarningFormat="true" />
     <Exec Command='dotnet run -p test/Dotnet.ProjInfo.Workspace.FCS.Tests -f netcoreapp2.1 -c $(Configuration) -- %(TestArgs.Identity)' IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
-  <Target Name="TestLibsNetCore">
-    <Exec Command='$(MonoOrEmpty) test/Dotnet.ProjInfo.Workspace.Tests/bin/$(Configuration)/net461/Dotnet.ProjInfo.Workspace.Tests.exe %(TestArgs.Identity)' IgnoreStandardErrorWarningFormat="true" />
-    <Exec Command='$(MonoOrEmpty) test/Dotnet.ProjInfo.Workspace.FCS.Tests/bin/$(Configuration)/net461/Dotnet.ProjInfo.Workspace.FCS.Tests.exe %(TestArgs.Identity)' IgnoreStandardErrorWarningFormat="true" />
+  <Target Name="TestLibsNet">
+    <PropertyGroup>
+      <WorkspaceTestsExePath>$([System.IO.Path]::GetFullPath("test/Dotnet.ProjInfo.Workspace.Tests/bin/$(Configuration)/net461/Dotnet.ProjInfo.Workspace.Tests.exe"))</WorkspaceTestsExePath>
+      <WorkspaceFCSTestsExePath>$([System.IO.Path]::GetFullPath("test/Dotnet.ProjInfo.Workspace.FCS.Tests/bin/$(Configuration)/net461/Dotnet.ProjInfo.Workspace.FCS.Tests.exe"))</WorkspaceFCSTestsExePath>
+    </PropertyGroup>
+
+    <Exec Command='$(MonoOrEmpty) "$(WorkspaceTestsExePath)" %(TestArgs.Identity)' IgnoreStandardErrorWarningFormat="true" />
+    <Exec Command='$(MonoOrEmpty) "$(WorkspaceFCSTestsExePath)" %(TestArgs.Identity)' IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
   <Target Name="Test" DependsOnTargets="TestTool;TestLibsNet;TestLibsNetCore" />
