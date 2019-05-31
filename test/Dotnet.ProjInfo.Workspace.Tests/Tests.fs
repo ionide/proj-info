@@ -145,8 +145,12 @@ let findByPath path parsed =
      | None -> failwithf "key '%s' not found in %A" path (parsed |> Array.map (fun kv -> kv.Key))
 
 let isOSX () =
+#if NET461
+  System.Environment.OSVersion.Platform = PlatformID.MacOSX
+#else
   System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
       System.Runtime.InteropServices.OSPlatform.OSX)
+#endif
 
 open TestsConfig
 
@@ -189,7 +193,7 @@ let tests (suiteConfig: TestSuiteConfig) =
     outDir
 
   let asLines (s: string) =
-    s.Split(Environment.NewLine) |> List.ofArray
+    s.Split([| Environment.NewLine |], StringSplitOptions.None) |> List.ofArray
 
   let stdOutLines (cmd: Command) =
     cmd.Result.StandardOutput

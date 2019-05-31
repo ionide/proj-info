@@ -24,18 +24,27 @@
     <Exec Command='dotnet pack src/Dotnet.ProjInfo.Workspace.FCS -c $(Configuration) -o "$(NupkgsDir)" -p:Version=$(Version)' />
   </Target>
 
-  <Target Name="Test">
+  <Target Name="TestTool">
     <Exec Command='dotnet run -c $(Configuration) -- "$(Version)" --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/dotnet-proj.Tests" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' != 'true' " />
-
-    <Exec Command='dotnet run -c $(Configuration) -- --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/Dotnet.ProjInfo.Workspace.Tests" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' != 'true' " />
-    <Exec Command='dotnet run -c $(Configuration) -- --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/Dotnet.ProjInfo.Workspace.FCS.Tests" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' != 'true' " />
-
-    <Exec Command='dotnet run -c $(Configuration) -- --known-failure --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/Dotnet.ProjInfo.Workspace.Tests" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' == 'true' " />
-    <Exec Command='dotnet run -c $(Configuration) -- --known-failure --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/Dotnet.ProjInfo.Workspace.FCS.Tests" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' == 'true' " />
-
-    <Exec Command='dotnet run -c $(Configuration) -- --flaky --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/Dotnet.ProjInfo.Workspace.Tests" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' == 'true' " />
-    <Exec Command='dotnet run -c $(Configuration) -- --flaky --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/Dotnet.ProjInfo.Workspace.FCS.Tests" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' == 'true' " />
   </Target>
+
+  <ItemGroup>
+    <TestTFM Include="netcoreapp2.1" />
+    <TestTFM Include="net461" />
+  </ItemGroup>
+
+  <Target Name="TestLibs">
+    <Exec Command='dotnet run -p test/Dotnet.ProjInfo.Workspace.Tests -f %(TestTFM.Identity) -c $(Configuration) -- --fail-on-focused-tests --summary' IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' != 'true' " />
+    <Exec Command='dotnet run -p test/Dotnet.ProjInfo.Workspace.FCS.Tests -f %(TestTFM.Identity) -c $(Configuration) -- --fail-on-focused-tests --summary' IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' != 'true' " />
+
+    <Exec Command='dotnet run -p test/Dotnet.ProjInfo.Workspace.Tests -f %(TestTFM.Identity) -c $(Configuration) -- --known-failure --fail-on-focused-tests --summary' IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' == 'true' " />
+    <Exec Command='dotnet run -p test/Dotnet.ProjInfo.Workspace.FCS.Tests -f %(TestTFM.Identity) -c $(Configuration) -- --known-failure --fail-on-focused-tests --summary' IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' == 'true' " />
+
+    <Exec Command='dotnet run -p test/Dotnet.ProjInfo.Workspace.Tests -f %(TestTFM.Identity) -c $(Configuration) -- --flaky --fail-on-focused-tests --summary' IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' == 'true' " />
+    <Exec Command='dotnet run -p test/Dotnet.ProjInfo.Workspace.FCS.Tests -f %(TestTFM.Identity) -c $(Configuration) -- --flaky --fail-on-focused-tests --summary' IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' == 'true' " />
+  </Target>
+
+  <Target Name="Test" DependsOnTargets="TestTool;TestLibs" />
 
   <Target Name="VSTest" DependsOnTargets="Test" />
 
