@@ -29,22 +29,22 @@
   </Target>
 
   <ItemGroup>
-    <TestTFM Include="netcoreapp2.1" />
-    <TestTFM Include="net461" />
+    <TestArgs Include="--fail-on-focused-tests --summary" Condition=" '$(UnstableTests)' != 'true' " />
+    <TestArgs Include="--known-failure --fail-on-focused-tests --summary" Condition=" '$(UnstableTests)' == 'true' " />
+    <TestArgs Include="--flaky --fail-on-focused-tests --summary" Condition=" '$(UnstableTests)' == 'true' " />
   </ItemGroup>
 
-  <Target Name="TestLibs">
-    <Exec Command='dotnet run -p test/Dotnet.ProjInfo.Workspace.Tests -f %(TestTFM.Identity) -c $(Configuration) -- --fail-on-focused-tests --summary' IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' != 'true' " />
-    <Exec Command='dotnet run -p test/Dotnet.ProjInfo.Workspace.FCS.Tests -f %(TestTFM.Identity) -c $(Configuration) -- --fail-on-focused-tests --summary' IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' != 'true' " />
-
-    <Exec Command='dotnet run -p test/Dotnet.ProjInfo.Workspace.Tests -f %(TestTFM.Identity) -c $(Configuration) -- --known-failure --fail-on-focused-tests --summary' IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' == 'true' " />
-    <Exec Command='dotnet run -p test/Dotnet.ProjInfo.Workspace.FCS.Tests -f %(TestTFM.Identity) -c $(Configuration) -- --known-failure --fail-on-focused-tests --summary' IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' == 'true' " />
-
-    <Exec Command='dotnet run -p test/Dotnet.ProjInfo.Workspace.Tests -f %(TestTFM.Identity) -c $(Configuration) -- --flaky --fail-on-focused-tests --summary' IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' == 'true' " />
-    <Exec Command='dotnet run -p test/Dotnet.ProjInfo.Workspace.FCS.Tests -f %(TestTFM.Identity) -c $(Configuration) -- --flaky --fail-on-focused-tests --summary' IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' == 'true' " />
+  <Target Name="TestLibsNet">
+    <Exec Command='dotnet run -p test/Dotnet.ProjInfo.Workspace.Tests -f netcoreapp2.1 -c $(Configuration) -- %(TestArgs.Identity)' IgnoreStandardErrorWarningFormat="true" />
+    <Exec Command='dotnet run -p test/Dotnet.ProjInfo.Workspace.FCS.Tests -f netcoreapp2.1 -c $(Configuration) -- %(TestArgs.Identity)' IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
-  <Target Name="Test" DependsOnTargets="TestTool;TestLibs" />
+  <Target Name="TestLibsNetCore">
+    <Exec Command='$(MonoOrEmpty) test/Dotnet.ProjInfo.Workspace.Tests/bin/$(Configuration)/net461/Dotnet.ProjInfo.Workspace.Tests.exe -- %(TestArgs.Identity)' IgnoreStandardErrorWarningFormat="true" />
+    <Exec Command='$(MonoOrEmpty) test/Dotnet.ProjInfo.Workspace.FCS.Tests/bin/$(Configuration)/net461/Dotnet.ProjInfo.Workspace.FCS.Tests.exe -- %(TestArgs.Identity)' IgnoreStandardErrorWarningFormat="true" />
+  </Target>
+
+  <Target Name="Test" DependsOnTargets="TestTool;TestLibsNet;TestLibsNetCore" />
 
   <Target Name="VSTest" DependsOnTargets="Test" />
 
