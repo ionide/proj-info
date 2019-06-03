@@ -45,7 +45,10 @@
       <WorkspaceFCSTestsExePath>$([System.IO.Path]::GetFullPath("test/Dotnet.ProjInfo.Workspace.FCS.Tests/bin/$(Configuration)/net461/Dotnet.ProjInfo.Workspace.FCS.Tests.exe"))</WorkspaceFCSTestsExePath>
     </PropertyGroup>
 
+    <Exec Command='dotnet build test/Dotnet.ProjInfo.Workspace.Tests -f net461 -c $(Configuration) -p:Version=$(Version)' />
     <Exec Command='$(MonoOrEmpty) "$(WorkspaceTestsExePath)" %(TestArgs.Identity)' IgnoreStandardErrorWarningFormat="true" />
+
+    <Exec Command='dotnet build test/Dotnet.ProjInfo.Workspace.FCS.Tests -f net461 -c $(Configuration) -p:Version=$(Version)' />
     <Exec Command='$(MonoOrEmpty) "$(WorkspaceFCSTestsExePath)" %(TestArgs.Identity)' IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
