@@ -147,6 +147,7 @@ let findByPath path parsed =
 let isOSX () =
 #if NET461
   System.Environment.OSVersion.Platform = PlatformID.MacOSX
+  || File.Exists "/usr/bin/osascript" // osascript is the AppleScript interpreter on OS X
 #else
   System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
       System.Runtime.InteropServices.OSPlatform.OSX)
