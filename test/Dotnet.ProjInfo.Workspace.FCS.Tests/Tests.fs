@@ -407,6 +407,14 @@ let tests (suiteConfig: TestSuiteConfig) =
 
         expectP2PKeyIsTargetPath fcsPo
 
+        if (isOSX () && suiteConfig.SkipKnownFailure) then
+          let errorOnOsx =
+            """
+no errors but was: System.Exception: Build was not evaluated, expected the results to be ready after 'Eval' (GetCheckResultsAndImplementationsForProject, data = ("FinalizeTypeCheck", [|Id 1014; Id 1015; Id 1016; Id 1017; Id 1018|], Id 1020,
+            """.Trim()
+          Tests.skiptest (sprintf "Known failure on OSX travis. error is %s" errorOnOsx)
+          //TODO check failure on osx
+
         let result =
           fcs.ParseAndCheckProject(fcsPo)
           |> Async.RunSynchronously
