@@ -76,8 +76,15 @@ let shellExecRun (logger: Logger) workDir cmd (args: string list) =
         >> setField "error" cmd.Result.StandardError)
     cmd
 
+let isWindows () =
+#if NET461
+    System.Environment.OSVersion.Platform = System.PlatformID.Win32NT
+#else  
+  RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+#endif
+
 let shellExecRunNET (logger: Logger) workDir cmd (args: string list) =
-    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) then
+    if (isWindows ()) then
       shellExecRun logger workDir cmd args
     else
       shellExecRun logger workDir "mono" (cmd :: args)
