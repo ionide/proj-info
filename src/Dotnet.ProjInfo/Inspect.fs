@@ -120,6 +120,7 @@ type GetResult =
      | P2PRefs of string list
      | ResolvedP2PRefs of ResolvedP2PRefsInfo list
      | Properties of (string * string) list
+     | Items of Map<string, string list>
      | ResolvedNETRefs of string list
      | InstalledNETFw of string list
 and ResolvedP2PRefsInfo = { ProjectReferenceFullPath: string; TargetFramework: string option; Others: (string * string) list }
@@ -313,6 +314,58 @@ let getProperties props =
     template, args, (fun () -> outFile
                                |> bindSkipped parsePropertiesOut
                                |> Result.map Properties)
+
+
+let parseItemsArgsOut outFile =
+    let groupByKeyValue =
+        List.groupBy fst
+        >> Map.ofList
+        >> Map.map (fun _ items -> items |> List.map snd)
+
+    outFile
+    |> parsePropertiesOut
+    |> Result.map groupByKeyValue
+    |> Result.map Items
+
+[<RequireQualifiedAccess>]
+type GetItemsModifier =
+    | Identity
+    | FullPath
+    | Custom of string
+
+let private getItemsModifierMSBuildProperty modifier =
+    match modifier with
+    | GetItemsModifier.Identity -> "Identity"
+    | GetItemsModifier.FullPath -> "FullPath"
+    | GetItemsModifier.Custom c -> c
+
+let getItems tag itemName modifier dependsOnTargets =
+    let dependsOnTargetsProperty = dependsOnTargets |> String.concat ";"
+    let itemModifier = getItemsModifierMSBuildProperty modifier
+    let template =
+        String.Format("""
+  <Target Name="_Inspect_Items"
+          Condition=" '$(IsCrossTargetingBuild)' != 'true' "
+          DependsOnTargets="{0}">
+    <Message Text="{3}=%({1}.{2})" Importance="High" />
+    <WriteLinesToFile
+            Condition=" '$(_Inspect_Items_OutFile)' != '' "
+            File="$(_Inspect_Items_OutFile)"
+            Lines="@({1} -> '{3}=%({2})')"
+            Overwrite="true" 
+            Encoding="UTF-8"/>
+    <!-- WriteLinesToFile doesnt create the file if @({1}) is empty -->
+    <Touch
+        Condition=" '$(_Inspect_Items_OutFile)' != '' "
+        Files="$(_Inspect_Items_OutFile)"
+        AlwaysCreate="True" />
+  </Target>
+                      """, dependsOnTargetsProperty, itemName, itemModifier, tag).Trim()
+    let outFile = getNewTempFilePath "Items.txt"
+    let args =
+        [ Target "_Inspect_Items"
+          Property ("_Inspect_Items_OutFile", outFile) ]
+    template, args, (fun () -> bindSkipped parseItemsArgsOut outFile)
 
 let parseResolvedP2PRefOut outFile =
     /// Example:

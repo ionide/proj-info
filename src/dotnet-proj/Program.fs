@@ -7,6 +7,7 @@ type CLIArguments =
     | [<CliPrefix(CliPrefix.None)>] Fsc_Args of ParseResults<FscArgsCLIArguments>
     | [<CliPrefix(CliPrefix.None)>] Csc_Args of ParseResults<CscArgsCLIArguments>
     | [<CliPrefix(CliPrefix.None)>] P2p of ParseResults<P2pCLIArguments>
+    | [<CliPrefix(CliPrefix.None)>] Item of ParseResults<ItemCLIArguments>
     | [<CliPrefix(CliPrefix.None)>] Net_Fw of ParseResults<NetFwCLIArguments>
     | [<CliPrefix(CliPrefix.None)>] Net_Fw_Ref of ParseResults<NetFwRefCLIArguments>
 with
@@ -18,6 +19,7 @@ with
             | Fsc_Args _ -> "get fsc arguments"
             | Csc_Args _ -> "get csc arguments"
             | P2p _ -> "get project references"
+            | Item _ -> "get items"
             | Net_Fw _ -> "list the installed .NET Frameworks"
             | Net_Fw_Ref _ -> "get the reference path of given .NET Framework assembly"
 and MSBuildHostPicker =
@@ -47,6 +49,31 @@ with
             | MSBuild _ -> """MSBuild path (default "msbuild")"""
             | DotnetCli _ -> """Dotnet CLI path (default "dotnet")"""
             | MSBuild_Host _ -> "the Msbuild host, if auto then oldsdk=MSBuild dotnetSdk=DotnetCLI"
+and ItemCLIArguments =
+    | [<MainCommand; Unique>] Project of string
+    | [<AltCommandLine("-get")>] GetItem of string
+    | [<AltCommandLine("-p")>] Property of string list
+    | [<AltCommandLine("-f")>] Framework of string
+    | [<AltCommandLine("-r")>] Runtime of string
+    | [<AltCommandLine("-c")>] Configuration of string
+    | [<AltCommandLine("-d")>] Depends_On of string
+    | MSBuild of string
+    | DotnetCli of string
+    | MSBuild_Host of MSBuildHostPicker
+with
+    interface IArgParserTemplate with
+        member s.Usage =
+            match s with
+            | Project _ -> "the MSBuild project file"
+            | Framework _ -> "target framework, the TargetFramework msbuild property"
+            | Runtime _ -> "target runtime, the RuntimeIdentifier msbuild property"
+            | Configuration _ -> "configuration to use (like Debug), the Configuration msbuild property"
+            | GetItem _ -> "msbuild item to get (allow multiple)"
+            | Property _ -> "msbuild property to use (allow multiple)"
+            | MSBuild _ -> """MSBuild path (default "msbuild")"""
+            | DotnetCli _ -> """Dotnet CLI path (default "dotnet")"""
+            | MSBuild_Host _ -> "the Msbuild host, if auto then oldsdk=MSBuild dotnetSdk=DotnetCLI"
+            | Depends_On _ -> "the Msbuild host, if auto then oldsdk=MSBuild dotnetSdk=DotnetCLI"
 and FscArgsCLIArguments =
     | [<MainCommand; Unique>] Project of string
     | [<AltCommandLine("-p")>] Property of string list
@@ -295,6 +322,62 @@ let propMain log (results: ParseResults<PropCLIArguments>) = attempt {
     return projPath, getProjectInfoBySdk, cmd, (msbuildHost dotnetHostPicker), globalArgs
     }
 
+let itemMain log (results: ParseResults<ItemCLIArguments>) = attempt {
+
+    let! projPath =
+        results.TryGetResult <@ ItemCLIArguments.Project @>
+        |> validateProj log
+
+    let! (isDotnetSdk, _, getProjectInfoBySdk) = analizeProj projPath
+
+    let globalArgs =
+        [ results.TryGetResult <@ ItemCLIArguments.Framework @>, if isDotnetSdk then "TargetFramework" else "TargetFrameworkVersion"
+          results.TryGetResult <@ ItemCLIArguments.Runtime @>, "RuntimeIdentifier"
+          results.TryGetResult <@ ItemCLIArguments.Configuration @>, "Configuration" ]
+        |> List.choose (fun (a,p) -> a |> Option.map (fun x -> (p,x)))
+        |> List.map (MSBuild.MSbuildCli.Property)
+
+    let msbuildPath = results.GetResult(<@ ItemCLIArguments.MSBuild @>, defaultValue = "msbuild")
+    let dotnetPath = results.GetResult(<@ ItemCLIArguments.DotnetCli @>, defaultValue = "dotnet")
+    let dotnetHostPicker = results.GetResult(<@ ItemCLIArguments.MSBuild_Host @>, defaultValue = MSBuildHostPicker.Auto)
+
+    let parseItemPath (path: string) =
+        match path.Split('.') |> List.ofArray with
+        | [p] -> p, GetItemsModifier.Identity
+        | [p; m] ->
+            let modifier =
+                match m.ToLower() with
+                | "identity" -> GetItemsModifier.Identity
+                | "fullpath" -> GetItemsModifier.FullPath
+                | custom -> GetItemsModifier.Custom custom
+            p, modifier
+        | _ -> failwithf "Unexpected item path '%s'. Expected format is 'ItemName' or 'ItemName.Metadata' (like Compile.Identity or Compile.FullPath)" path
+
+    let itemPath = results.GetResult <@ ItemCLIArguments.GetItem @>
+
+    let item, modifier = parseItemPath itemPath
+
+    let dependsOn = results.GetResults <@ ItemCLIArguments.Depends_On @>
+
+    let cmd () = getItems itemPath item modifier dependsOn
+
+    let rec msbuildHost host =
+        match host with
+        | MSBuildHostPicker.MSBuild ->
+            MSBuildExePath.Path msbuildPath
+        | MSBuildHostPicker.DotnetMSBuild ->
+            MSBuildExePath.DotnetMsbuild dotnetPath
+        | MSBuildHostPicker.Auto ->
+            if isDotnetSdk then
+                msbuildHost MSBuildHostPicker.DotnetMSBuild
+            else
+                msbuildHost MSBuildHostPicker.MSBuild
+        | x ->
+            failwithf "Unexpected msbuild host '%A'" x
+
+    return projPath, getProjectInfoBySdk, cmd, (msbuildHost dotnetHostPicker), globalArgs
+    }
+
 let fscArgsMain log (results: ParseResults<FscArgsCLIArguments>) = attempt {
 
     let! projPath =
@@ -507,6 +590,8 @@ let realMain argv = attempt {
         match results.TryGetSubCommand () with
         | Some (Prop subCmd) ->
             propMain log subCmd
+        | Some (Item subCmd) ->
+            itemMain log subCmd
         | Some (Fsc_Args subCmd) ->
             fscArgsMain log subCmd
         | Some (Csc_Args subCmd) ->
@@ -548,6 +633,11 @@ let realMain argv = attempt {
         | CscArgs args -> args
         | P2PRefs args -> args
         | Properties args -> args |> List.map (fun (x,y) -> sprintf "%s=%s" x y)
+        | Items args ->
+            args
+            |> Map.toList
+            |> List.collect (fun (k,x) -> x |> List.map (fun y -> k,y ))
+            |> List.map (fun (x,y) -> sprintf "%s=%s" x y)
         | ResolvedP2PRefs args ->
             let optionalTfm t =
                 t |> Option.map (sprintf " (%s)") |> Option.defaultValue ""
