@@ -349,15 +349,13 @@ let itemMain log (results: ParseResults<ItemCLIArguments>) = attempt {
                 match m.ToLower() with
                 | "identity" -> GetItemsModifier.Identity
                 | "fullpath" -> GetItemsModifier.FullPath
-                | custom -> GetItemsModifier.Custom custom
+                | _ -> GetItemsModifier.Custom m
             p, modifier
         | _ -> failwithf "Unexpected item path '%s'. Expected format is 'ItemName' or 'ItemName.Metadata' (like Compile.Identity or Compile.FullPath)" path
 
     let items =
         results.GetResults <@ ItemCLIArguments.GetItem @>
-        |> List.map (fun itemPath ->
-            let item, modifier = parseItemPath itemPath
-            itemPath, item, modifier)
+        |> List.map parseItemPath
 
     let dependsOn = results.GetResults <@ ItemCLIArguments.Depends_On @>
 
@@ -636,10 +634,10 @@ let realMain argv = attempt {
         | P2PRefs args -> args
         | Properties args -> args |> List.map (fun (x,y) -> sprintf "%s=%s" x y)
         | Items args ->
-            args
-            |> Map.toList
-            |> List.collect (fun (k,x) -> x |> List.map (fun y -> k,y ))
-            |> List.map (fun (x,y) -> sprintf "%s=%s" x y)
+            [ for item in args do
+                yield sprintf "%s=%s" item.Name item.Identity
+                for (metadata, value) in item.Metadata do
+                    yield sprintf "%s.%s=%s" item.Name (getItemsModifierMSBuildProperty metadata) value ]
         | ResolvedP2PRefs args ->
             let optionalTfm t =
                 t |> Option.map (sprintf " (%s)") |> Option.defaultValue ""

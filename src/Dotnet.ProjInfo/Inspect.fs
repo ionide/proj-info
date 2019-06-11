@@ -114,13 +114,24 @@ let writeTargetFile log templates targetFileDestPath =
 
     Ok targetFileDestPath
 
+[<RequireQualifiedAccess>]
+type GetItemsModifier =
+    | Identity
+    | FullPath
+    | Custom of string
+
+type GetItemResult =
+    { Name: string
+      Identity: string
+      Metadata: (GetItemsModifier * string) list }
+
 type GetResult =
      | FscArgs of string list
      | CscArgs of string list
      | P2PRefs of string list
      | ResolvedP2PRefs of ResolvedP2PRefsInfo list
      | Properties of (string * string) list
-     | Items of Map<string, string list>
+     | Items of GetItemResult list
      | ResolvedNETRefs of string list
      | InstalledNETFw of string list
 and ResolvedP2PRefsInfo = { ProjectReferenceFullPath: string; TargetFramework: string option; Others: (string * string) list }
@@ -316,31 +327,77 @@ let getProperties props =
                                |> Result.map Properties)
 
 
+let getItemsModifierMSBuildProperty modifier =
+    match modifier with
+    | GetItemsModifier.Identity -> "Identity"
+    | GetItemsModifier.FullPath -> "FullPath"
+    | GetItemsModifier.Custom c -> c
+
+let parseItemsModifierMSBuildProperty modifier =
+    match modifier with
+    | "Identity" -> GetItemsModifier.Identity 
+    | "FullPath" -> GetItemsModifier.FullPath 
+    | c -> GetItemsModifier.Custom c
+
+let parseItemPath (s: string) =
+    //TODO safer, using splitAt function
+    let x = s.Split('.') in x.[0], parseItemsModifierMSBuildProperty x.[1]
+
 let parseItemsArgsOut outFile =
-    let groupByKeyValue =
-        List.groupBy fst
-        >> Map.ofList
-        >> Map.map (fun _ items -> items |> List.map snd)
+    let groupByKeyValue (items: (string * string) list) =
+        let getItem flatInfo =
+            flatInfo
+            |> List.groupBy (fun (name,_,_) -> name)
+            |> List.map (fun (itemName, data) ->
+                let metadata = data |> List.map (fun (_, k, v) -> k,v)
+                let identity, others =
+                    metadata
+                    |> List.partition (fun (m,_) -> m = GetItemsModifier.Identity)
+                    |> fun (ids, others) -> List.head ids, others // check identity exists
+                { GetItemResult.Name = itemName
+                  Identity = snd identity
+                  Metadata = others }
+                )
+
+        items
+        |> List.map (fun (k, v) -> parseItemPath k, v) // parse Compile.Identity
+        |> List.groupBy (fun ((name, _), _) -> name) // by name, like Compile
+        // group by item
+        |> List.collect (fun (_, items) -> items |> List.groupBy (fun (k, _) -> k) |> List.map (fun (k, v) -> k, v |> List.indexed |> List.map (fun (i, ((n,m), v)) -> i,n,m,v)))
+        |> List.collect snd
+        |> List.groupBy (fun (i,_,_,_) -> i)
+        |> List.map snd
+        |> List.map (List.map (fun (_,n,m,v) -> n,m,v))
+        // map the items
+        |> List.collect getItem
 
     outFile
     |> parsePropertiesOut
     |> Result.map groupByKeyValue
     |> Result.map Items
 
-[<RequireQualifiedAccess>]
-type GetItemsModifier =
-    | Identity
-    | FullPath
-    | Custom of string
-
-let private getItemsModifierMSBuildProperty modifier =
-    match modifier with
-    | GetItemsModifier.Identity -> "Identity"
-    | GetItemsModifier.FullPath -> "FullPath"
-    | GetItemsModifier.Custom c -> c
-
 let getItems items dependsOnTargets =
     let dependsOnTargetsProperty = dependsOnTargets |> String.concat ";"
+
+    let formatTag itemName modifier = sprintf "%s.%s" itemName (getItemsModifierMSBuildProperty modifier)
+
+    let additionalItemsToGetIdentity =
+        let hasIdentity itemsForName =
+            itemsForName
+            |> List.map snd
+            |> List.contains GetItemsModifier.Identity
+
+        items
+        |> List.groupBy (fun (_itemName, _) -> _itemName)
+        |> List.filter (fun (itemName, itemsForName) -> not (hasIdentity itemsForName))
+        |> List.map fst
+        |> List.map (fun itemName ->
+            let modifier = GetItemsModifier.Identity
+            itemName, modifier)
+
+    let allItems =
+        List.append additionalItemsToGetIdentity items
+        |> List.sortBy (fun (itemName, modifier) -> formatTag itemName modifier)
 
     let templateSections =
         [ //header
@@ -350,17 +407,17 @@ let getItems items dependsOnTargets =
           DependsOnTargets="{0}">
                               """, dependsOnTargetsProperty)
 
-          for (tag, itemName, modifier) in items do
+          for (itemName, modifier) in allItems do
               let itemModifier = getItemsModifierMSBuildProperty modifier
               yield String.Format("""
-              <Message Text="{2}=%({0}.{1})" Importance="High" />
+              <Message Text="{0}.{1}=%({0}.{1})" Importance="High" />
               <WriteLinesToFile
                       Condition=" '$(_Inspect_Items_OutFile)' != '' "
                       File="$(_Inspect_Items_OutFile)"
-                      Lines="@({0} -> '{2}=%({1})')"
+                      Lines="@({0} -> '{0}.{1}=%({1})')"
                       Overwrite="false"
                       Encoding="UTF-8"/>
-                                  """, itemName, itemModifier, tag).Trim()
+                                  """, itemName, itemModifier).Trim()
 
           yield """
         <!-- WriteLinesToFile doesnt create the file if an item list is empty -->
