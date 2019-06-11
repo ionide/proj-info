@@ -353,13 +353,15 @@ let itemMain log (results: ParseResults<ItemCLIArguments>) = attempt {
             p, modifier
         | _ -> failwithf "Unexpected item path '%s'. Expected format is 'ItemName' or 'ItemName.Metadata' (like Compile.Identity or Compile.FullPath)" path
 
-    let itemPath = results.GetResult <@ ItemCLIArguments.GetItem @>
-
-    let item, modifier = parseItemPath itemPath
+    let items =
+        results.GetResults <@ ItemCLIArguments.GetItem @>
+        |> List.map (fun itemPath ->
+            let item, modifier = parseItemPath itemPath
+            itemPath, item, modifier)
 
     let dependsOn = results.GetResults <@ ItemCLIArguments.Depends_On @>
 
-    let cmd () = getItems itemPath item modifier dependsOn
+    let cmd () = getItems items dependsOn
 
     let rec msbuildHost host =
         match host with

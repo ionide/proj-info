@@ -339,28 +339,44 @@ let private getItemsModifierMSBuildProperty modifier =
     | GetItemsModifier.FullPath -> "FullPath"
     | GetItemsModifier.Custom c -> c
 
-let getItems tag itemName modifier dependsOnTargets =
+let getItems items dependsOnTargets =
     let dependsOnTargetsProperty = dependsOnTargets |> String.concat ";"
-    let itemModifier = getItemsModifierMSBuildProperty modifier
-    let template =
-        String.Format("""
+
+    let templateSections =
+        [ //header
+          yield String.Format("""
   <Target Name="_Inspect_Items"
           Condition=" '$(IsCrossTargetingBuild)' != 'true' "
           DependsOnTargets="{0}">
-    <Message Text="{3}=%({1}.{2})" Importance="High" />
-    <WriteLinesToFile
+                              """, dependsOnTargetsProperty)
+
+          for (tag, itemName, modifier) in items do
+              let itemModifier = getItemsModifierMSBuildProperty modifier
+              yield String.Format("""
+              <Message Text="{2}=%({0}.{1})" Importance="High" />
+              <WriteLinesToFile
+                      Condition=" '$(_Inspect_Items_OutFile)' != '' "
+                      File="$(_Inspect_Items_OutFile)"
+                      Lines="@({0} -> '{2}=%({1})')"
+                      Overwrite="false"
+                      Encoding="UTF-8"/>
+                                  """, itemName, itemModifier, tag).Trim()
+
+          yield """
+        <!-- WriteLinesToFile doesnt create the file if an item list is empty -->
+        <Touch
             Condition=" '$(_Inspect_Items_OutFile)' != '' "
-            File="$(_Inspect_Items_OutFile)"
-            Lines="@({1} -> '{3}=%({2})')"
-            Overwrite="true" 
-            Encoding="UTF-8"/>
-    <!-- WriteLinesToFile doesnt create the file if @({1}) is empty -->
-    <Touch
-        Condition=" '$(_Inspect_Items_OutFile)' != '' "
-        Files="$(_Inspect_Items_OutFile)"
-        AlwaysCreate="True" />
-  </Target>
-                      """, dependsOnTargetsProperty, itemName, itemModifier, tag).Trim()
+            Files="$(_Inspect_Items_OutFile)"
+            AlwaysCreate="True" />
+        </Target>
+                """
+        ]
+
+    let template =
+        templateSections
+        |> List.map (fun s -> s.Trim())
+        |> String.concat (Environment.NewLine)
+
     let outFile = getNewTempFilePath "Items.txt"
     let args =
         [ Target "_Inspect_Items"
