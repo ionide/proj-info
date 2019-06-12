@@ -549,6 +549,22 @@ let tests (suiteConfig: TestSuiteConfig) =
 
       )
 
+      testCase |> withLog "can build sample8" (fun _ fs ->
+        let testDir = inDir fs "sanity_check_sample8"
+        let sample = ``sample8 NetSdk Explorer``
+        copyDirFromAssets fs sample.ProjDir testDir
+
+        let projPath = testDir/ (sample.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
+
+        dotnet fs ["build"; projPath]
+        |> checkExitCodeZero
+
+        let tfm = sample.TargetFrameworks |> Map.toList |> List.map fst |> List.head
+        let outputPath = projDir/"bin"/"Debug"/tfm/ sample.AssemblyName + ".dll"
+        Expect.isTrue (File.Exists outputPath) (sprintf "output assembly '%s' not found" outputPath)
+      )
+
     ]
 
   let invalid =
@@ -698,7 +714,7 @@ let tests (suiteConfig: TestSuiteConfig) =
 
     let renderOf sampleProj sources =
         { ProjectViewerTree.Name = sampleProj.ProjectFile |> Path.GetFileNameWithoutExtension
-          Items = sources |> List.map ProjectViewerItem.Compile }
+          Items = sources |> List.map (fun (path, link) -> ProjectViewerItem.Compile (path, { ProjectViewerItemConfig.Link = link })) }
 
     testList "view" [
 
@@ -734,8 +750,9 @@ let tests (suiteConfig: TestSuiteConfig) =
         let rendered = viewer.Render l1Parsed
 
         let expectedSources =
-          [ projDir / "AssemblyInfo.fs"
-            projDir / "Library.fs" ]
+          [ projDir / "AssemblyInfo.fs", "AssemblyInfo.fs"
+            projDir / "Library.fs", "Library.fs" ]
+          |> List.map (fun (p,l) -> Path.GetFullPath p, l)
 
         Expect.equal rendered (renderOf sampleProj expectedSources) "check rendered project"
       )
@@ -766,8 +783,8 @@ let tests (suiteConfig: TestSuiteConfig) =
         let rendered = viewer.Render n1Parsed
 
         let expectedSources =
-          [ projDir / "Library.fs" ]
-          |> List.map Path.GetFullPath
+          [ projDir / "Library.fs", "Library.fs" ]
+          |> List.map (fun (p,l) -> Path.GetFullPath p, l)
 
         Expect.equal rendered (renderOf sampleProj expectedSources) "check rendered project"
       )
@@ -809,15 +826,15 @@ let tests (suiteConfig: TestSuiteConfig) =
         let viewer = ProjectViewer ()
 
         let _l1ExpectedSources =
-          [ l1Dir / "Class1.fs" ]
-          |> List.map Path.GetFullPath
+          [ l1Dir / "Class1.fs", "Class1.fs" ]
+          |> List.map (fun (p,l) -> Path.GetFullPath p, l)
 
         // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
         Expect.equal (viewer.Render l1Parsed) (renderOf l1Proj []) "check rendered l1"
 
         let l2ExpectedSources =
-          [ l2Dir / "Library.fs" ]
-          |> List.map Path.GetFullPath
+          [ l2Dir / "Library.fs", "Library.fs" ]
+          |> List.map (fun (p,l) -> Path.GetFullPath p, l)
 
         Expect.equal (viewer.Render l2Parsed) (renderOf l2Proj l2ExpectedSources) "check rendered l2"
 
@@ -836,8 +853,8 @@ let tests (suiteConfig: TestSuiteConfig) =
           //TODO check failure on osx
 
         let c1ExpectedSources =
-          [ projDir / "Program.fs" ]
-          |> List.map Path.GetFullPath
+          [ projDir / "Program.fs", "Program.fs" ]
+          |> List.map (fun (p,l) -> Path.GetFullPath p, l)
 
         Expect.equal (viewer.Render c1Parsed) (renderOf c1Proj c1ExpectedSources) "check rendered c1"
       )
@@ -869,8 +886,8 @@ let tests (suiteConfig: TestSuiteConfig) =
         let viewer = ProjectViewer ()
 
         let m1ExpectedSources =
-          [ projDir / "LibraryA.fs" ]
-          |> List.map Path.GetFullPath
+          [ projDir / "LibraryA.fs", "LibraryA.fs" ]
+          |> List.map (fun (p,l) -> Path.GetFullPath p, l)
 
         Expect.equal (viewer.Render m1Parsed) (renderOf m1Proj m1ExpectedSources) "check rendered m1"
       )
@@ -899,11 +916,45 @@ let tests (suiteConfig: TestSuiteConfig) =
         let viewer = ProjectViewer ()
 
         let l2ExpectedSources =
-          [ projDir / "Class1.cs" ]
-          |> List.map Path.GetFullPath
+          [ projDir / "Class1.cs", "Class1.cs" ]
+          |> List.map (fun (p,l) -> Path.GetFullPath p, l)
 
         // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
         Expect.equal (viewer.Render l2Parsed) (renderOf l2Proj []) "check rendered l2"
+      )
+
+      ftestCase |> withLog "can render sample8" (fun logger fs ->
+        let testDir = inDir fs "render_sample8"
+        let sampleProj = ``sample8 NetSdk Explorer``
+        copyDirFromAssets fs sampleProj.ProjDir testDir
+
+        let projPath = testDir/ (sampleProj.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
+
+        dotnet fs ["restore"; projPath]
+        |> checkExitCodeZero
+
+        let loader = createLoader logger
+
+        loader.LoadProjects [projPath]
+
+        let parsed = loader.Projects
+        
+        let n1Parsed =
+          parsed
+          |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "first is a lib"
+
+        let viewer = ProjectViewer ()
+
+        let rendered = viewer.Render n1Parsed
+
+        let expectedSources =
+          [ projDir / "LibraryA.fs", "Component/TheLibraryA.fs"
+            projDir / "LibraryC.fs", "LibraryC.fs"
+            projDir / "LibraryB.fs", "Component/Auth/TheLibraryB.fs" ]
+          |> List.map (fun (p,l) -> Path.GetFullPath p, l)
+
+        Expect.equal rendered (renderOf sampleProj expectedSources) "check rendered project"
       )
     ]
 

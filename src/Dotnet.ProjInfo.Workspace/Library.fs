@@ -166,7 +166,9 @@ type ProjectViewerTree =
     { Name: string;
       Items: ProjectViewerItem list }
 and [<RequireQualifiedAccess>] ProjectViewerItem =
-    | Compile of string
+    | Compile of string * ProjectViewerItemConfig
+and ProjectViewerItemConfig =
+    { Link: string }
 
 type ProjectViewer () =
 
@@ -196,4 +198,4 @@ type ProjectViewer () =
                 |> List.filter (fun p -> not(isGeneratedAssemblyinfo p))
 
         { ProjectViewerTree.Name = proj.ProjectFileName |> Path.GetFileNameWithoutExtension
-          Items = compileFiles |> List.map ProjectViewerItem.Compile }
+          Items = compileFiles |> List.map(fun p -> ProjectViewerItem.Compile(p, { ProjectViewerItemConfig.Link = p })) }
