@@ -34,33 +34,52 @@ module VisualTree =
             relativePath
 
     let getVisualPath linkMetadata fullpathMetadata identity projPath =
+        let normalizeLink (linkPath: string) =
+            // always use / as path separator for link, regardless of OS, because is a virtual path
+            linkPath.Replace('\\','/')
+
         match linkMetadata, fullpathMetadata with
+        | Some "", None
         | None, None ->
             //TODO fullpath was expected, something is wrong. log it
             identity, identity
         | Some l, None ->
             //TODO fullpath was expected, something is wrong. log it
-            l, identity
+            (normalizeLink l), identity
+        | Some "", Some path
         | None, Some path ->
             //TODO if is not contained in project dir, just show name, to
             //behave like VS
             let relativeToPrjDir = path |> visualPathVSBehaviour projPath
             relativeToPrjDir, path
         | Some l, Some path ->
-            l, path
+            (normalizeLink l), path
 
-    let getProjectItem projPath (p: GetItemResult) : ProjectItem =
-        let tryFindMetadata modifier =
-            p.Metadata
-            |> List.tryFind (fun (m, _) -> m = modifier)
-            |> Option.map snd
+    let tryFindMetadata modifier p =
+        p.Metadata
+        |> List.tryFind (fun (m, _) -> m = modifier)
+        |> Option.map snd
 
-        let linkMetadata = tryFindMetadata (GetItemsModifier.Custom("Link"))
-        let fullpathMetadata = tryFindMetadata (GetItemsModifier.FullPath)
+    let getCompileProjectItem (projItems: GetItemResult list) projPath sourceFile =
 
-        let projDir = Path.GetDirectoryName(projPath)
+        let isCompileItemWithFullpath fullpath (p: GetItemResult) =
+            if p.Name = "Compile" then
+                match p |> tryFindMetadata (GetItemsModifier.FullPath) with
+                | None -> false
+                | Some fullpathMetadata -> fullpathMetadata = fullpath
+            else
+                false
 
-        let (name, fullpath) = projDir |> getVisualPath linkMetadata fullpath p.Identity 
+        let item = projItems |> List.tryFind (isCompileItemWithFullpath sourceFile)
+        match item with
+        | None -> 
+            let (name, fullpath) = projPath |> getVisualPath None (Some sourceFile) sourceFile
 
-        ProjectItem.Compile (name, fullpath)
+            ProjectItem.Compile (name, fullpath)
+        | Some p ->
+            let linkMetadata = p |> tryFindMetadata (GetItemsModifier.Custom("Link"))
+            let fullpathMetadata = p |> tryFindMetadata (GetItemsModifier.FullPath)
 
+            let (name, fullpath) = projPath |> getVisualPath linkMetadata fullpathMetadata p.Identity 
+
+            ProjectItem.Compile (name, fullpath)

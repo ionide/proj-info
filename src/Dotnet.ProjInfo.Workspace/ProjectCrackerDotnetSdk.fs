@@ -143,7 +143,7 @@ module ProjectCrackerDotnetSdk =
 
             let infoResult =
                 file
-                |> inspect loggedMessages.Enqueue msbuildExec [getFscArgs; getP2PRefs; gp] (additionalArgs @ globalArgs)
+                |> inspect loggedMessages.Enqueue msbuildExec [getFscArgs; getP2PRefs; gp; getItems] (additionalArgs @ globalArgs)
 
             infoResult, (loggedMessages.ToArray() |> Array.toList)
 
@@ -240,31 +240,9 @@ module ProjectCrackerDotnetSdk =
                 rspNormalized
                 |> List.partition isSourceFile
 
-            let getProjectItem (p: GetItemResult) : ProjectItem =
-                let tryFindMetadata modifier =
-                    p.Metadata
-                    |> List.tryFind (fun (m, _) -> m = modifier)
-                    |> Option.map snd
-
-                let linkMetadata = tryFindMetadata (GetItemsModifier.Custom("Link"))
-                let fullpathMetadata = tryFindMetadata (GetItemsModifier.FullPath)
-
-                let (name, fullpath) =
-                    match linkMetadata, fullpathMetadata with
-                    | None, None ->
-                        //TODO fullpath was expected, something is wrong. log it
-                        p.Identity, p.Identity
-                    | None, Some path ->
-                        //TODO if is not contained in project dir, just show name, to
-                        //behave like VS
-                        let relativeToPrjDir = path
-                        relativeToPrjDir, path
-                    | Some l, Some path ->
-                        l, path
-                    | Some l, None ->
-                        //TODO fullpath was expected, something is wrong. log it
-                        l, p.Identity
-                ProjectItem.Compile (name, fullpath)
+            let compileItems =
+                sourceFiles
+                |> List.map (VisualTree.getCompileProjectItem projItems file)
 
             let po =
                 {
@@ -280,7 +258,7 @@ module ProjectCrackerDotnetSdk =
                     OtherOptions = otherOptions
                     ReferencedProjects = p2pProjects |> List.map (fun (_,y,_,_) -> { ProjectReference.ProjectFileName = y.ProjectFileName; TargetFramework = y.TargetFramework })
                     LoadTime = DateTime.Now
-                    Items = projItems |> List.map getProjectItem
+                    Items = compileItems
                     ExtraProjectInfo =
                         {
                             TargetPath = tar

@@ -923,7 +923,7 @@ let tests (suiteConfig: TestSuiteConfig) =
         Expect.equal (viewer.Render l2Parsed) (renderOf l2Proj []) "check rendered l2"
       )
 
-      ftestCase |> withLog "can render sample8" (fun logger fs ->
+      testCase |> withLog "can render sample8" (fun logger fs ->
         let testDir = inDir fs "render_sample8"
         let sampleProj = ``sample8 NetSdk Explorer``
         copyDirFromAssets fs sampleProj.ProjDir testDir

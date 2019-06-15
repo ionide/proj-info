@@ -175,7 +175,7 @@ type ProjectViewer () =
     member __.Render(proj: ProjectOptions) =
 
         let compileFiles =
-            let sources = proj.SourceFiles
+            let sources = proj.Items
             match proj.ExtraProjectInfo.ProjectSdkType with
             | ProjectSdkType.Verbose _ ->
                 //compatibility with old behaviour (projectcracker), so test output is exactly the same
@@ -185,7 +185,8 @@ type ProjectViewer () =
                     let s = name.ToLower()
                     s.StartsWith(tempPath.ToLower())
                 sources
-                |> List.filter (fun p -> not(isTempFile p))
+                |> List.choose (function ProjectItem.Compile(name, fullpath) -> Some (name, fullpath))
+                |> List.filter (fun (_,p) -> not(isTempFile p))
             | ProjectSdkType.DotnetSdk _ ->
                 //the generated assemblyinfo.fs are not shown as sources
                 let isGeneratedAssemblyinfo (name: string) =
@@ -195,7 +196,9 @@ type ProjectViewer () =
                     //TODO cs too
                     name.EndsWith(sprintf "%s.AssemblyInfo.fs" projName)
                 sources
-                |> List.filter (fun p -> not(isGeneratedAssemblyinfo p))
+                |> List.choose (function ProjectItem.Compile(name, fullpath) -> Some (name, fullpath))
+                |> List.filter (fun (_,p) -> not(isGeneratedAssemblyinfo p))
 
         { ProjectViewerTree.Name = proj.ProjectFileName |> Path.GetFileNameWithoutExtension
-          Items = compileFiles |> List.map(fun p -> ProjectViewerItem.Compile(p, { ProjectViewerItemConfig.Link = p })) }
+          Items = compileFiles
+                  |> List.map(fun (name, fullpath) -> ProjectViewerItem.Compile(fullpath, { ProjectViewerItemConfig.Link = name })) }
