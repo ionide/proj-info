@@ -13,6 +13,7 @@
     <Compile Include="CompilerServiceInterface.fs" />
     <Compile Include="ProjectCrackerTypes.fs" />
     <Compile Include="..\..\paket-files\Microsoft\visualfsharp\src\fsharp\FSharp.Build\Fsc.fs" />
+    <Compile Include="VisualTree.fs" />
     <Compile Include="ProjectCrackerDotnetSdk.fs" />
     <Compile Include="InspectSln.fs" />
     <Compile Include="MSbuildInfo.fs" />
