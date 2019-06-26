@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="LibraryA.fs">
+      <Link>Component/TheLibraryA.fs</Link>
+    </Compile>
+    <Compile Include="LibraryC.fs" />
+    <Compile Include="LibraryB.fs">
+      <Link>Component\Auth\TheLibraryB.fs</Link>
+    </Compile>
+  </ItemGroup>
+
+</Project>

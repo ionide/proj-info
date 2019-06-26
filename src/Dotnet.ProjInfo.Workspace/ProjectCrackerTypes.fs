@@ -67,12 +67,15 @@ type ProjectOptions =
         ReferencedProjects: ProjectReference list
         LoadTime: DateTime
         ExtraProjectInfo: ExtraProjectInfoData
+        Items: ProjectItem list
     }
 and ProjectReference =
     {
         ProjectFileName: string
         TargetFramework: string
     }
+and ProjectItem =
+    | Compile of name: string * fullpath: string
 
 type [<RequireQualifiedAccess>] WorkspaceProjectState =
     | Loading of string * ((string * string) list)

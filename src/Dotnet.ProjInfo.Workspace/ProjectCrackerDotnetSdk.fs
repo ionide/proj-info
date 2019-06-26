@@ -2,6 +2,7 @@ namespace Dotnet.ProjInfo.Workspace
 
 open System
 open System.IO
+open Dotnet.ProjInfo.Inspect
 
 module MSBuildPrj = Dotnet.ProjInfo.Inspect
 
@@ -10,7 +11,7 @@ exception ProjectInspectException of GetProjectOptionsErrors
 type NavigateProjectSM =
     | NoCrossTargeting of NoCrossTargetingData
     | CrossTargeting of string list
-and NoCrossTargetingData = { FscArgs: string list; P2PRefs: MSBuildPrj.ResolvedP2PRefsInfo list; Properties: Map<string,string> }
+and NoCrossTargetingData = { FscArgs: string list; P2PRefs: MSBuildPrj.ResolvedP2PRefsInfo list; Properties: Map<string,string>; Items: MSBuildPrj.GetItemResult list }
 
 module MSBuildKnownProperties =
     let TargetFramework = "TargetFramework"
@@ -116,6 +117,8 @@ module ProjectCrackerDotnetSdk =
             ]
         let gp () = Dotnet.ProjInfo.Inspect.getProperties (["TargetPath"; "IsCrossTargetingBuild"; "TargetFrameworks"] @ additionalInfo)
 
+        let getItems () = Dotnet.ProjInfo.Inspect.getItems [("Compile", GetItemsModifier.FullPath); ("Compile", GetItemsModifier.Custom("Link"))] []
+
         let results, log =
             let loggedMessages = System.Collections.Concurrent.ConcurrentQueue<string>()
 
@@ -140,15 +143,15 @@ module ProjectCrackerDotnetSdk =
 
             let infoResult =
                 file
-                |> inspect loggedMessages.Enqueue msbuildExec [getFscArgs; getP2PRefs; gp] (additionalArgs @ globalArgs)
+                |> inspect loggedMessages.Enqueue msbuildExec [getFscArgs; getP2PRefs; gp; getItems] (additionalArgs @ globalArgs)
 
             infoResult, (loggedMessages.ToArray() |> Array.toList)
 
         let todo =
             match results with
-            | MsbuildOk [getFscArgsResult; getP2PRefsResult; gpResult] ->
-                match getFscArgsResult, getP2PRefsResult, gpResult with
-                | MsbuildError(MSBuildPrj.MSBuildSkippedTarget), MsbuildError(MSBuildPrj.MSBuildSkippedTarget), MsbuildOk (MSBuildPrj.GetResult.Properties props) ->
+            | MsbuildOk [getFscArgsResult; getP2PRefsResult; gpResult; gpItemResult] ->
+                match getFscArgsResult, getP2PRefsResult, gpResult, gpItemResult with
+                | MsbuildError(MSBuildPrj.MSBuildSkippedTarget), MsbuildError(MSBuildPrj.MSBuildSkippedTarget), MsbuildOk (MSBuildPrj.GetResult.Properties props), MsbuildError(MSBuildPrj.MSBuildSkippedTarget) ->
                     // Projects with multiple target frameworks, fails if the target framework is not choosen
                     let prop key = props |> Map.ofList |> Map.tryFind key
 
@@ -157,8 +160,8 @@ module ProjectCrackerDotnetSdk =
                         CrossTargeting tfms
                     | _ ->
                         failwithf "error getting msbuild info: some targets skipped, found props: %A" props
-                | MsbuildOk (MSBuildPrj.GetResult.FscArgs fa), MsbuildOk (MSBuildPrj.GetResult.ResolvedP2PRefs p2p), MsbuildOk (MSBuildPrj.GetResult.Properties p) ->
-                    NoCrossTargeting { FscArgs = fa; P2PRefs = p2p; Properties = p |> Map.ofList }
+                | MsbuildOk (MSBuildPrj.GetResult.FscArgs fa), MsbuildOk (MSBuildPrj.GetResult.ResolvedP2PRefs p2p), MsbuildOk (MSBuildPrj.GetResult.Properties p), MsbuildOk (MSBuildPrj.GetResult.Items pi) ->
+                    NoCrossTargeting { FscArgs = fa; P2PRefs = p2p; Properties = p |> Map.ofList; Items = pi }
                 | r ->
                     failwithf "error getting msbuild info: %A" r
             | MsbuildOk r ->
@@ -189,7 +192,7 @@ module ProjectCrackerDotnetSdk =
             file |> projInfo [MSBuildKnownProperties.TargetFramework, tfm]
         | CrossTargeting [] ->
             failwithf "Unexpected, found cross targeting but empty target frameworks list"
-        | NoCrossTargeting { FscArgs = rsp; P2PRefs = p2ps; Properties = props } ->
+        | NoCrossTargeting { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } ->
 
             //TODO cache projects info of p2p ref
             let p2pProjects =
@@ -237,6 +240,10 @@ module ProjectCrackerDotnetSdk =
                 rspNormalized
                 |> List.partition isSourceFile
 
+            let compileItems =
+                sourceFiles
+                |> List.map (VisualTree.getCompileProjectItem projItems file)
+
             let po =
                 {
                     ProjectId = Some file
@@ -251,6 +258,7 @@ module ProjectCrackerDotnetSdk =
                     OtherOptions = otherOptions
                     ReferencedProjects = p2pProjects |> List.map (fun (_,y,_,_) -> { ProjectReference.ProjectFileName = y.ProjectFileName; TargetFramework = y.TargetFramework })
                     LoadTime = DateTime.Now
+                    Items = compileItems
                     ExtraProjectInfo =
                         {
                             TargetPath = tar
