@@ -1,0 +1,43 @@
+language: csharp
+
+dotnet: 2.1.401
+
+install:
+  # workaround for missing .net 4.6.1 targing pack
+  - export FrameworkPathOverride=$(dirname $(which mono))/../lib/mono/4.6.1-api/
+
+script:
+  - dotnet pack -v n
+  - dotnet test -v n -p:UnstableTests=$UnstableTests
+
+matrix:
+  include:
+    - os: linux
+      dist: xenial
+      mono: 5.16.0
+      env: UnstableTests=false
+    - os: osx
+      osx_image: xcode9
+      mono: 5.16.0
+      env: UnstableTests=false
+    - os: linux
+      dist: xenial
+      mono: 5.16.0
+      env: UnstableTests=true
+    - os: osx
+      osx_image: xcode9
+      mono: 5.16.0
+      env: UnstableTests=true
+    - os: linux
+      dist: xenial  
+      mono: 5.18.0
+      env: UnstableTests=false
+    - os: osx
+      osx_image: xcode9
+      mono: 5.18.0
+      env: UnstableTests=false
+  allow_failures:
+    # unstable tests may fail
+    - env: UnstableTests=true
+    - dist: xenial
+      mono: 5.18.0

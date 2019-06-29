@@ -1,7 +1,0 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
-  <ItemGroup>
-    <DotNetCliToolReference Include="dotnet-proj-info" Version="0.6.0" />
-  </ItemGroup>
-
-</Project>

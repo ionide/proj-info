@@ -229,12 +229,15 @@ FakesAssemblies/
 **/*.Server/ModelManifest.xml
 _Pvt_Extensions
 
-# Paket dependency manager
-.paket/paket.exe
-
 # FAKE - F# Make
 .fake/
 
 # Repo-specific files
 
 .dotnetsdk
+/paket-files/
+/test/testrun/
+/test/testrun_ws/
+msbuild.binlog
+/test/testrun_ws_fcs/
+/.ionide/

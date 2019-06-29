@@ -1,20 +1,37 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>netstandard1.6;net45</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;net461</TargetFrameworks>
     <Description>Get msbuild info</Description>
-    <AssemblyName>Dotnet.ProjInfo.Matthid</AssemblyName>
+    <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
   </PropertyGroup>
-
   <ItemGroup>
-    <Compile Include="..\dotnet-proj-info\Inspect.fs" />
+    <Compile Include="Resources.fs" />
+    <Compile Include="ExternalFSharp\MissingApi.fs" />
+    <Compile Include="ExternalFSharp\FscConfig.fs" />
+    <Compile Include="Inspect.fs" />
+    <Compile Include="NETFrameworkInfoFromMSBuild.fs" />
+    <Compile Include="NETFramework.fs" />
   </ItemGroup>
-
   <ItemGroup>
-    <PackageReference Include="FSharp.Core" Condition=" '$(TargetFramework)' == 'netstandard1.6' " Version="4.1.*" />
-    <PackageReference Include="FSharp.Core" Condition=" '$(TargetFramework)' == 'net45' " Version="4.0.0.1" />
+    <ProjectReference Include="..\Dotnet.ProjInfo.Helpers\Dotnet.ProjInfo.Helpers.csproj" PrivateAssets="All" />
   </ItemGroup>
-
-  <Import Project="..\PackagesInfo.props" />
-
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\paket-files\Microsoft\visualfsharp\src\fsharp\FSharp.Build\Microsoft.FSharp.Targets">
+      <LogicalName>Microsoft.FSharp.Targets</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\EnvironmentInfo.proj">
+      <LogicalName>EnvironmentInfo.proj</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+  <!-- HACK: p2p of type project, not package (ref https://github.com/NuGet/Home/issues/3891 ) -->
+  <PropertyGroup>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeP2POutput</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+  <Target Name="IncludeP2POutput">
+    <ItemGroup>
+      <BuildOutputInPackage Include="$(MSBuildProjectDirectory)/$(OutputPath)Dotnet.ProjInfo.Helpers.dll" />
+    </ItemGroup>
+  </Target>
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

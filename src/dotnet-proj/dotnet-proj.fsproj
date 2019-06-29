@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
+    <Description>Get info from msbuild projects</Description>
+    <Summary>Get info from msbuild projects</Summary>
+    <PackAsTool>true</PackAsTool>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\paket-files\Microsoft\visualfsharp\src\fsharp\FSharp.Build\Fsc.fs" />
+    <Compile Include="Railway.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Dotnet.ProjInfo\Dotnet.ProjInfo.fsproj" />
+    <ProjectReference Include="..\Dotnet.ProjInfo.Helpers\Dotnet.ProjInfo.Helpers.csproj" PrivateAssets="All" />
+  </ItemGroup>
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
+</Project>

@@ -1,42 +1,91 @@
 # Examples usage of tool
 
-First restore the sample the packages and the tool
+First install the tool
 
-```
-dotnet restore tools
-dotnet restore c1
-```
-
-**NOTE** Because is a dotnet cli command, must be executed from same directory of project
-     where is declared. The project can be passed, if not it search the working directory
-     for a project (single .*proj)
-
-```
-cd tools
+```bash
+dotnet tool install -g dotnet-proj
 ```
 
-and
+See help with
 
 ```
-dotnet proj-info ..\c1\c1.fsproj --project-refs
+dotnet proj --help
+```
+
+## .NET Sdk projects
+
+In
+
+```
+cd sdk2
+```
+
+Some examples of commands i, like
+
+```bash
+dotnet proj p2p c1/c1.fsproj
 ```
 
 or
 
-```
-dotnet proj-info ..\c1\c1.fsproj --fsc-args
+```bash
+dotnet proj fsc-args c1/c1.fsproj
+dotnet proj csc-args l2/l2.csproj
 ```
 
 or
 
-```
-dotnet proj-info ..\c1\c1.fsproj --get-property OutputType Version Configuration
+```bash
+dotnet proj prop c1/c1.fsproj -get OutputType -get Version -get Configuration
 ```
 
 It's possibile to pass usual .NET Core Tools arguments (like `-c`, `-f`, `-r`).
 
-See `--help` for more info
+```bash
+dotnet proj prop c1/c1.fsproj -get OutputType -c Release
+```
+
+And by default search for projects in current directory
 
 ```
-dotnet proj-info ..\l1\l1.fsproj --gp MyCustomProp OutputType Version Configuration -c Release
+cd l1
+dotnet proj fsc-args -c Release
+```
+
+## Old Sdk projects (verbose fsproj)
+
+**NOTE** require `msbuild` in PATH (like in VS Command Prompt), or pass `--msbuild` with full path to msbuild
+
+In
+
+```
+cd oldsdk
+```
+
+Like before
+
+```
+dotnet proj fsc-args l1/l1.fsproj
+```
+
+You can specify the msbuild to use
+
+```
+dotnet proj prop l1/l1.fsproj -get DocumentationFile --msbuild "C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\MSBuild\15.0\Bin\MSBuild.exe"
+```
+
+## .NET info
+
+**NOTE** require `msbuild` in PATH (like in VS Command Prompt), or pass `--msbuild` with full path to msbuild
+
+Run
+
+```
+dotnet proj net-fw
+```
+
+You can specify the msbuild to use
+
+```
+dotnet proj net-fw-ref System.Xml -f v3.5 --msbuild "C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\MSBuild\15.0\Bin\MSBuild.exe"
 ```

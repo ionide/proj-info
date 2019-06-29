@@ -1,0 +1,43 @@
+image:
+  - Visual Studio 2017
+
+before_build:
+  - ps: >-
+      $buildId = $env:APPVEYOR_BUILD_NUMBER.PadLeft(5, '0');
+      $versionSuffixPR = "-PR$($env:APPVEYOR_PULL_REQUEST_NUMBER)-$buildId";
+      $branchName = "$env:APPVEYOR_REPO_BRANCH".Replace("_","");
+      $versionSuffixBRANCH = "-$branchName-$buildId";
+      $env:VersionSuffix = if ("$env:APPVEYOR_REPO_TAG" -eq "true") { "" } else { if ("$env:APPVEYOR_PULL_REQUEST_NUMBER") { $versionSuffixPR } else { $versionSuffixBRANCH } };
+
+build_script:
+  - cmd: echo vs %VersionSuffix%"
+  - cmd: dotnet pack -v n
+  - cmd: dotnet test -v n
+
+artifacts:
+  - path: bin\nupkg\*.nupkg
+    name: nupkgs
+    type: NuGetPackage
+
+on_finish:
+  - ps: >-
+      $testResults = @(
+         '.\bin\test_results\TestResults.xml'
+      );
+      Foreach ($path in $testResults) {
+        If (Test-Path $path) {
+          (New-Object 'System.Net.WebClient').UploadFile("https://ci.appveyor.com/api/testresults/nunit/$env:APPVEYOR_JOB_ID", (Resolve-Path $path));
+        }
+      }
+
+deploy:
+
+  - provider: GitHub
+    release: $(appveyor_repo_tag_name)
+    description: '$(appveyor_repo_tag_name)'
+    auth_token:
+      secure: 9hUHxeECpKQbd2Hou+HGoMOBVgfUkFw/ObBfEdgrqjNh7+Wh5Nm1k7oWrBeVx5q/
+    artifact: /.*\.nupkg/
+    draft: true
+    on:
+      APPVEYOR_REPO_TAG: true

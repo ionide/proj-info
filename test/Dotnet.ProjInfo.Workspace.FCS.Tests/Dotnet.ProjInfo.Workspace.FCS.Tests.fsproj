@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>netcoreapp2.1;net461</TargetFrameworks>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\dotnet-proj.Tests\FileUtils.fs" />
+    <Compile Include="..\dotnet-proj.Tests\TestAssets.fs" />
+    <Compile Include="..\Dotnet.ProjInfo.Workspace.Tests\TestsConfig.fs" />
+    <Compile Include="Tests.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Dotnet.ProjInfo.Workspace.FCS\Dotnet.ProjInfo.Workspace.FCS.fsproj" />
+  </ItemGroup>
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
+</Project>
