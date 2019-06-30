@@ -163,7 +163,7 @@ type Errors =
     | GenericError of string
     | RaisedException of System.Exception * string
     | ExecutionError of GetProjectInfoErrors<ShellCommandResult>
-and ShellCommandResult = ShellCommandResult of workingDir: string * exePath: string * args: string
+and ShellCommandResult = ShellCommandResult of workingDir: string * exePath: string * args: string * output: seq<bool*string>
 
 let parseArgsCommandLine argv =
     try
@@ -182,8 +182,7 @@ open System.IO
 let runCmd log workingDir exePath args =
     log (sprintf "running '%s %s'" exePath (args |> String.concat " "))
 
-    let logOut = System.Collections.Concurrent.ConcurrentQueue<string>()
-    let logErr = System.Collections.Concurrent.ConcurrentQueue<string>()
+    let logOutput = System.Collections.Concurrent.ConcurrentQueue<bool*string>()
 
     let runProcess (workingDir: string) (exePath: string) (args: string) =
         let psi = System.Diagnostics.ProcessStartInfo()
@@ -209,9 +208,9 @@ let runCmd log workingDir exePath args =
         use p = new System.Diagnostics.Process()
         p.StartInfo <- psi
 
-        p.OutputDataReceived.Add(fun ea -> logOut.Enqueue (ea.Data))
+        p.OutputDataReceived.Add(fun ea -> logOutput.Enqueue (false, ea.Data))
 
-        p.ErrorDataReceived.Add(fun ea -> logErr.Enqueue (ea.Data))
+        p.ErrorDataReceived.Add(fun ea -> logOutput.Enqueue (true, ea.Data))
 
         p.Start() |> ignore
         p.BeginOutputReadLine()
@@ -220,19 +219,23 @@ let runCmd log workingDir exePath args =
 
         let exitCode = p.ExitCode
 
-        exitCode, (workingDir, exePath, args)
+        exitCode
 
-    let exitCode, result = runProcess workingDir exePath (args |> String.concat " ")
+    let args = args |> String.concat " "
+    let exitCode = runProcess workingDir exePath args
+    let output = logOutput.ToArray()
 
     log "output:"
-    logOut.ToArray()
-    |> Array.iter log
+    output
+        |> Seq.choose (fun (isErr, line) -> if isErr then None else Some line)
+        |> Seq.iter log
 
     log "error:"
-    logErr.ToArray()
-    |> Array.iter log
+    output
+        |> Seq.choose (fun (isErr, line) -> if isErr then Some line else None)
+        |> Seq.iter log
 
-    exitCode, (ShellCommandResult result)
+    exitCode, (ShellCommandResult (workingDir, exePath, args, output))
 
 let validateProj log projOpt = attempt {
     let scanDirForProj workDir =
@@ -689,8 +692,14 @@ let main argv =
             printfn "%s:" message
             printfn "%A" ex
             6
-        | ExecutionError (MSBuildFailed (i, r)) ->
-            printfn "%i %A" i r
+        | ExecutionError (MSBuildFailed (i, ShellCommandResult(wd, exePath, args, output))) ->
+            printfn "msbuild exit code: %i" i
+            printfn "command line was: %s> %s %s" wd exePath args
+            output
+                |> Seq.iter (fun (isErr, line) ->
+                    if isErr then
+                        printfn "stderr: %s" line
+                    else printfn "stdout: %s" line)
             7
         | ExecutionError (UnexpectedMSBuildResult r) ->
             printfn "%A" r
