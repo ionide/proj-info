@@ -45,6 +45,7 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
 
     let event1 = new Event<_>()
     let parsedProjects = ConcurrentDictionary<_, _>()
+    let lastProjectError = ConcurrentDictionary<_, _>()
 
     let getKey (po: ProjectOptions) =
         { ProjectKey.ProjectPath = po.ProjectFileName
@@ -55,6 +56,11 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
 
     member __.Projects
         with get () = parsedProjects.ToArray()
+
+    member __.LastError proj =
+        match lastProjectError.TryGetValue(proj) with
+        | true, v -> Some v
+        | false, _ -> None
 
     member this.MSBuildPath
         with get () : Dotnet.ProjInfo.Inspect.MSBuildExePath = msbuildPath
@@ -104,6 +110,7 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
 
             | Error e ->
                 let failed = WorkspaceProjectState.Failed (project, e)
+                lastProjectError.AddOrUpdate(project, e, fun _ _ -> e) |> ignore
                 notify failed
 
     member this.LoadSln(slnPath: string) =

@@ -54,8 +54,23 @@ and ProjectOutputType =
 
 
 type GetProjectOptionsErrors =
-     | ProjectNotRestored of string
-     | GenericError of string * string
+    // projFile is duplicated in WorkspaceProjectState???
+    | ProjectNotRestored of projFile:string
+    | LanguageNotSupported of projFile:string
+    | ProjectNotLoaded of projFile:string
+    | MissingExtraProjectInfos of projFile:string
+    | InvalidExtraProjectInfos of projFile:string * error:string
+    | ReferencesNotLoaded of projFile:string * referenceErrors:seq<string*GetProjectOptionsErrors>
+    | GenericError of projFile:string * string
+    member x.ProjFile =
+        match x with
+        | ProjectNotRestored projFile
+        | LanguageNotSupported projFile
+        | ProjectNotLoaded projFile
+        | MissingExtraProjectInfos projFile
+        | InvalidExtraProjectInfos (projFile, _)
+        | ReferencesNotLoaded (projFile, _)
+        | GenericError (projFile, _) -> projFile
 
 type ProjectOptions =
     {

@@ -140,6 +140,12 @@ let expectP2PKeyIsTargetPath po =
 
 open TestsConfig
 
+module Result =
+  let get r =
+    match r with
+    | Result.Ok o -> o
+    | Result.Error err -> failwithf "Error: %A" err 
+
 let tests (suiteConfig: TestSuiteConfig) =
  
   let prepareTestsAssets = lazy(
@@ -249,7 +255,7 @@ let tests (suiteConfig: TestSuiteConfig) =
 
         logProjectOptions logger fcsPoOpt
 
-        let fcsPo = fcsPoOpt |> Option.get
+        let fcsPo = fcsPoOpt |> Result.get
 
         Expect.all (allFCSProjects fcsPo) (fun p -> p.ProjectId |> Option.isNone) "all ProjectId are None"
 
@@ -306,7 +312,7 @@ let tests (suiteConfig: TestSuiteConfig) =
 
         logProjectOptions logger fcsPoOpt
 
-        let fcsPo = fcsPoOpt |> Option.get
+        let fcsPo = fcsPoOpt |> Result.get
 
         Expect.isFalse (fcsPo.SourceFiles |> Array.contains (Path.GetTempPath()/".NETFramework,Version=v4.6.1.AssemblyAttributes.fs")) (sprintf "check doesnt exists the generated tfm assemblyinfo file, but was %A" fcsPo.SourceFiles)
         Expect.equal fcsPo.SourceFiles [| projDir/"AssemblyInfo.fs"; projDir/"Library.fs" |] "check exact sourcefiles"
@@ -333,7 +339,7 @@ let tests (suiteConfig: TestSuiteConfig) =
 
         logProjectOptions logger fcsPoOpt
 
-        let fcsPo = fcsPoOpt |> Option.get
+        let fcsPo = fcsPoOpt |> Result.get
 
         Expect.all (allFCSProjects fcsPo) (fun p -> p.ProjectId |> Option.isNone) "all ProjectId are None"
 
@@ -388,7 +394,7 @@ let tests (suiteConfig: TestSuiteConfig) =
 
         logProjectOptions logger fcsPoOpt
 
-        let fcsPo = fcsPoOpt |> Option.get
+        let fcsPo = fcsPoOpt |> Result.get
 
         Expect.all (allFCSProjects fcsPo) (fun p -> p.ProjectId |> Option.isNone) "all ProjectId are None"
 
@@ -464,7 +470,7 @@ no errors but was: [|commandLineArgs (0,1)-(0,1) parameter error No inputs speci
 
         logProjectOptions logger fcsPoOpt
 
-        let fcsPo = fcsPoOpt |> Option.get
+        let fcsPo = fcsPoOpt |> Result.get
 
         Expect.all (allFCSProjects fcsPo) (fun p -> p.ProjectId |> Option.isNone) "all ProjectId are None"
 
