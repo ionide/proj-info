@@ -151,7 +151,7 @@ module ProjectCrackerDotnetSdk =
             match results with
             | MsbuildOk [getFscArgsResult; getP2PRefsResult; gpResult; gpItemResult] ->
                 match getFscArgsResult, getP2PRefsResult, gpResult, gpItemResult with
-                | MsbuildError(MSBuildPrj.MSBuildSkippedTarget), MsbuildError(MSBuildPrj.MSBuildSkippedTarget), MsbuildOk (MSBuildPrj.GetResult.Properties props), MsbuildError(MSBuildPrj.MSBuildSkippedTarget) ->
+                | MsbuildError(MSBuildPrj.MSBuildSkippedTarget), MsbuildError(MSBuildPrj.MSBuildSkippedTarget), MsbuildOk (MSBuildPrj.GetResult.Properties props), _ ->
                     // Projects with multiple target frameworks, fails if the target framework is not choosen
                     let prop key = props |> Map.ofList |> Map.tryFind key
 
