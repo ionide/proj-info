@@ -18,7 +18,7 @@ module MSBuildInfo =
       |> fun detected -> if detected = null then @"C:\Program Files (x86)\" else detected
 
   let private vsSkus = ["Community"; "Professional"; "Enterprise"; "BuildTools"]
-  let private vsVersions = ["2017"]
+  let private vsVersions = ["2017"; "2019"]
   let cartesian a b =
     [ for a' in a do
         for b' in b do
