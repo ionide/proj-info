@@ -192,7 +192,7 @@ module ProjectCrackerDotnetSdk =
         let p = file |> getProjInfoOf additionalMSBuildProps
         cache.AddOrUpdate(key, p, fun _ _ -> p)
 
-  let private getProjectOptionsFromProjectFile projInfoFromMsbuild projInfoCached parseAsSdk (file : string) =
+  let private getProjectOptionsFromProjectFile projInfoFromMsbuild projInfoCached parseAsSdk (rootProjFile : string) =
 
     let rec projInfoOf additionalMSBuildProps file : ParsedProject =
 
@@ -294,7 +294,7 @@ module ProjectCrackerDotnetSdk =
             (tar, po, log, additionalProjects)
 
 
-    let _, po, log, additionalProjs = projInfoCached projInfoOf [] file
+    let _, po, log, additionalProjs = projInfoCached projInfoOf [] rootProjFile
     (po, log, additionalProjs)
 
   let private (|ProjectExtraInfoBySdk|_|) po =
