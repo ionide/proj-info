@@ -195,7 +195,7 @@ module ProjectCrackerDotnetSdk =
 
   let rec private projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk additionalMSBuildProps file : ParsedProject =
 
-    let follow = projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk
+    let follow = projInfoCached (projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk)
 
     let projDir = Path.GetDirectoryName file
 
@@ -207,7 +207,7 @@ module ProjectCrackerDotnetSdk =
     | CrossTargeting (tfm :: _) ->
         // Atm setting a preferenece is not supported in FSAC
         // As workaround, lets choose the first of the target frameworks and use that
-        file |> projInfoCached follow [MSBuildKnownProperties.TargetFramework, tfm]
+        file |> follow [MSBuildKnownProperties.TargetFramework, tfm]
     | CrossTargeting [] ->
         failwithf "Unexpected, found cross targeting but empty target frameworks list"
     | NoCrossTargeting { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } ->
@@ -223,7 +223,7 @@ module ProjectCrackerDotnetSdk =
                     p2p.TargetFramework
                     |> Option.map (fun tfm -> MSBuildKnownProperties.TargetFramework, tfm)
                     |> Option.toList
-                p2p.ProjectReferenceFullPath |> projInfoCached follow followP2pArgs )
+                p2p.ProjectReferenceFullPath |> follow followP2pArgs )
 
         let tar =
             match props |> Map.tryFind "TargetPath" with
