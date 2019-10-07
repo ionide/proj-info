@@ -310,7 +310,7 @@ module ProjectCrackerDotnetSdk =
         // single tfm in <TargetFrameworks>, maybe log because is strange, should just be <TargetFramework>
         file |> follow [MSBuildKnownProperties.TargetFramework, tfm]
     | CrossTargeting (firstTfm :: secondTfm :: othersTfms) ->
-        let tfm = crosstargetingStrategy file firstTfm secondTfm othersTfms
+        let tfm = crosstargetingStrategy file (firstTfm, secondTfm, othersTfms)
         //TODO check tfm is contained in tfms
         file |> follow [MSBuildKnownProperties.TargetFramework, tfm]
     | NoCrossTargeting noCrossTargetingData ->
@@ -342,7 +342,7 @@ module ProjectCrackerDotnetSdk =
 
   module CrosstargetingStrategies =
 
-      let firstTargetFramework _file firstTfm _secondTfm _othersTfms =
+      let firstTargetFramework _file (firstTfm, _secondTfm, _othersTfms) =
         // Atm setting a preferenece is not supported in FSAC
         // As workaround, lets choose the first of the target frameworks and use that
         firstTfm
