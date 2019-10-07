@@ -195,102 +195,102 @@ module ProjectCrackerDotnetSdk =
 
   let rec private projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk additionalMSBuildProps file : ParsedProject =
 
-        let projDir = Path.GetDirectoryName file
+    let projDir = Path.GetDirectoryName file
 
-        let todo =
-            projInfoFromMsbuild parseAsSdk additionalMSBuildProps file
-            |> mapMSBuildResults
+    let todo =
+        projInfoFromMsbuild parseAsSdk additionalMSBuildProps file
+        |> mapMSBuildResults
 
-        match todo with
-        | CrossTargeting (tfm :: _) ->
-            // Atm setting a preferenece is not supported in FSAC
-            // As workaround, lets choose the first of the target frameworks and use that
-            file |> projInfoCached (projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk) [MSBuildKnownProperties.TargetFramework, tfm]
-        | CrossTargeting [] ->
-            failwithf "Unexpected, found cross targeting but empty target frameworks list"
-        | NoCrossTargeting { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } ->
+    match todo with
+    | CrossTargeting (tfm :: _) ->
+        // Atm setting a preferenece is not supported in FSAC
+        // As workaround, lets choose the first of the target frameworks and use that
+        file |> projInfoCached (projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk) [MSBuildKnownProperties.TargetFramework, tfm]
+    | CrossTargeting [] ->
+        failwithf "Unexpected, found cross targeting but empty target frameworks list"
+    | NoCrossTargeting { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } ->
 
-            //TODO cache projects info of p2p ref
-            let p2pProjects =
-                p2ps
-                // TODO before was no follow. now follow other projects too
-                // do not follow others lang project, is not supported by FCS anyway
-                // |> List.filter (fun p2p -> p2p.ProjectReferenceFullPath.ToLower().EndsWith(".fsproj"))
-                |> List.map (fun p2p ->
-                    let followP2pArgs =
-                        p2p.TargetFramework
-                        |> Option.map (fun tfm -> MSBuildKnownProperties.TargetFramework, tfm)
-                        |> Option.toList
-                    p2p.ProjectReferenceFullPath |> projInfoCached (projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk) followP2pArgs )
+        //TODO cache projects info of p2p ref
+        let p2pProjects =
+            p2ps
+            // TODO before was no follow. now follow other projects too
+            // do not follow others lang project, is not supported by FCS anyway
+            // |> List.filter (fun p2p -> p2p.ProjectReferenceFullPath.ToLower().EndsWith(".fsproj"))
+            |> List.map (fun p2p ->
+                let followP2pArgs =
+                    p2p.TargetFramework
+                    |> Option.map (fun tfm -> MSBuildKnownProperties.TargetFramework, tfm)
+                    |> Option.toList
+                p2p.ProjectReferenceFullPath |> projInfoCached (projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk) followP2pArgs )
 
-            let tar =
-                match props |> Map.tryFind "TargetPath" with
-                | Some t -> t
-                | None -> failwith "error, 'TargetPath' property not found"
+        let tar =
+            match props |> Map.tryFind "TargetPath" with
+            | Some t -> t
+            | None -> failwith "error, 'TargetPath' property not found"
 
-            let rspNormalized =
-                //workaround, arguments in rsp can use relative paths
-                rsp |> List.map (FscArguments.useFullPaths projDir)
+        let rspNormalized =
+            //workaround, arguments in rsp can use relative paths
+            rsp |> List.map (FscArguments.useFullPaths projDir)
 
-            let sdkTypeData, log =
-                match parseAsSdk with
-                | ProjectParsingSdk.DotnetSdk ->
-                    let extraInfo = getExtraInfo props
-                    ProjectSdkType.DotnetSdk(extraInfo), []
-                | ProjectParsingSdk.VerboseSdk ->
-                    //compatibility with old behaviour, so output is exactly the same
-                    let mergedLog =
-                        [ yield (file, "")
-                          yield! p2pProjects |> List.collect (fun (_,_,x,_) -> x) ]
-                    
-                    let extraInfo = getExtraInfoVerboseSdk props
-                    ProjectSdkType.Verbose(extraInfo), mergedLog
+        let sdkTypeData, log =
+            match parseAsSdk with
+            | ProjectParsingSdk.DotnetSdk ->
+                let extraInfo = getExtraInfo props
+                ProjectSdkType.DotnetSdk(extraInfo), []
+            | ProjectParsingSdk.VerboseSdk ->
+                //compatibility with old behaviour, so output is exactly the same
+                let mergedLog =
+                    [ yield (file, "")
+                      yield! p2pProjects |> List.collect (fun (_,_,x,_) -> x) ]
+                
+                let extraInfo = getExtraInfoVerboseSdk props
+                ProjectSdkType.Verbose(extraInfo), mergedLog
 
-            let isSourceFile : (string -> bool) =
-                if Path.GetExtension(file) = ".fsproj" then
-                    FscArguments.isCompileFile
-                else
-                    (fun n -> n.EndsWith ".cs")
+        let isSourceFile : (string -> bool) =
+            if Path.GetExtension(file) = ".fsproj" then
+                FscArguments.isCompileFile
+            else
+                (fun n -> n.EndsWith ".cs")
 
-            let sourceFiles, otherOptions =
-                rspNormalized
-                |> List.partition isSourceFile
+        let sourceFiles, otherOptions =
+            rspNormalized
+            |> List.partition isSourceFile
 
-            let compileItems =
-                sourceFiles
-                |> List.map (VisualTree.getCompileProjectItem projItems file)
+        let compileItems =
+            sourceFiles
+            |> List.map (VisualTree.getCompileProjectItem projItems file)
 
-            let po =
-                {
-                    ProjectId = Some file
-                    ProjectFileName = file
-                    TargetFramework = 
-                        match sdkTypeData with
-                        | ProjectSdkType.DotnetSdk t ->
-                            t.TargetFramework
-                        | ProjectSdkType.Verbose v ->
-                            v.TargetFrameworkVersion |> Dotnet.ProjInfo.NETFramework.netifyTargetFrameworkVersion
-                    SourceFiles = sourceFiles
-                    OtherOptions = otherOptions
-                    ReferencedProjects = p2pProjects |> List.map (fun (_,y,_,_) -> { ProjectReference.ProjectFileName = y.ProjectFileName; TargetFramework = y.TargetFramework })
-                    LoadTime = DateTime.Now
-                    Items = compileItems
-                    ExtraProjectInfo =
-                        {
-                            TargetPath = tar
-                            ExtraProjectInfoData.ProjectSdkType = sdkTypeData
-                            ExtraProjectInfoData.ProjectOutputType = FscArguments.outType rspNormalized
-                        }
-                }
+        let po =
+            {
+                ProjectId = Some file
+                ProjectFileName = file
+                TargetFramework = 
+                    match sdkTypeData with
+                    | ProjectSdkType.DotnetSdk t ->
+                        t.TargetFramework
+                    | ProjectSdkType.Verbose v ->
+                        v.TargetFrameworkVersion |> Dotnet.ProjInfo.NETFramework.netifyTargetFrameworkVersion
+                SourceFiles = sourceFiles
+                OtherOptions = otherOptions
+                ReferencedProjects = p2pProjects |> List.map (fun (_,y,_,_) -> { ProjectReference.ProjectFileName = y.ProjectFileName; TargetFramework = y.TargetFramework })
+                LoadTime = DateTime.Now
+                Items = compileItems
+                ExtraProjectInfo =
+                    {
+                        TargetPath = tar
+                        ExtraProjectInfoData.ProjectSdkType = sdkTypeData
+                        ExtraProjectInfoData.ProjectOutputType = FscArguments.outType rspNormalized
+                    }
+            }
 
-            let additionalProjects : ProjectOptions list =
-                let rec getAdditionalProjs (_,parsedP2P,_,parsedP2PDeps) =
-                    [ yield parsedP2P
-                      yield! parsedP2PDeps ]
+        let additionalProjects : ProjectOptions list =
+            let rec getAdditionalProjs (_,parsedP2P,_,parsedP2PDeps) =
+                [ yield parsedP2P
+                  yield! parsedP2PDeps ]
 
-                p2pProjects |> List.collect getAdditionalProjs
+            p2pProjects |> List.collect getAdditionalProjs
 
-            (tar, po, log, additionalProjects)
+        (tar, po, log, additionalProjects)
 
 
   let private getProjectOptionsFromProjectFile projInfoFromMsbuild projInfoCached parseAsSdk (rootProjFile : string) =
