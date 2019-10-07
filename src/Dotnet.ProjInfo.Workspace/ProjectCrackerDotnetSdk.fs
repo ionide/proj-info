@@ -185,6 +185,15 @@ module ProjectCrackerDotnetSdk =
 
   let private getProjectOptionsFromProjectFile projInfoFromMsbuild (cache: ParsedProjectCache) parseAsSdk (file : string) =
 
+    let projInfoCached projInfoOf additionalMSBuildProps file : ParsedProject =
+        let key = sprintf "%s;%A" file additionalMSBuildProps
+        match cache.TryGetValue(key) with
+        | true, alreadyParsed ->
+            alreadyParsed
+        | false, _ ->
+            let p = file |> projInfoOf additionalMSBuildProps
+            cache.AddOrUpdate(key, p, fun _ _ -> p)
+
     let rec projInfoOf additionalMSBuildProps file : ParsedProject =
 
         let projDir = Path.GetDirectoryName file
@@ -197,7 +206,7 @@ module ProjectCrackerDotnetSdk =
         | CrossTargeting (tfm :: _) ->
             // Atm setting a preferenece is not supported in FSAC
             // As workaround, lets choose the first of the target frameworks and use that
-            file |> projInfoCached [MSBuildKnownProperties.TargetFramework, tfm]
+            file |> projInfoCached projInfoOf [MSBuildKnownProperties.TargetFramework, tfm]
         | CrossTargeting [] ->
             failwithf "Unexpected, found cross targeting but empty target frameworks list"
         | NoCrossTargeting { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } ->
@@ -213,7 +222,7 @@ module ProjectCrackerDotnetSdk =
                         p2p.TargetFramework
                         |> Option.map (fun tfm -> MSBuildKnownProperties.TargetFramework, tfm)
                         |> Option.toList
-                    p2p.ProjectReferenceFullPath |> projInfoCached followP2pArgs )
+                    p2p.ProjectReferenceFullPath |> projInfoCached projInfoOf followP2pArgs )
 
             let tar =
                 match props |> Map.tryFind "TargetPath" with
@@ -284,17 +293,8 @@ module ProjectCrackerDotnetSdk =
 
             (tar, po, log, additionalProjects)
 
-    and projInfoCached additionalMSBuildProps file : ParsedProject =
-        let key = sprintf "%s;%A" file additionalMSBuildProps
-        match cache.TryGetValue(key) with
-        | true, alreadyParsed ->
-            alreadyParsed
-        | false, _ ->
-            let p = file |> projInfoOf additionalMSBuildProps
-            cache.AddOrUpdate(key, p, fun _ _ -> p)
 
-
-    let _, po, log, additionalProjs = projInfoCached [] file
+    let _, po, log, additionalProjs = projInfoCached projInfoOf [] file
     (po, log, additionalProjs)
 
   let private (|ProjectExtraInfoBySdk|_|) po =
