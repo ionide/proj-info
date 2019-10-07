@@ -306,6 +306,7 @@ module ProjectCrackerDotnetSdk =
     match todo with
     | CrossTargeting (firstTfm :: othersTfms) ->
         let tfm = crosstargetingChooser file firstTfm othersTfms
+        //TODO check tfm is contained in tfms
         file |> follow [MSBuildKnownProperties.TargetFramework, tfm]
     | CrossTargeting [] ->
         failwithf "Unexpected, found cross targeting but empty target frameworks list"
