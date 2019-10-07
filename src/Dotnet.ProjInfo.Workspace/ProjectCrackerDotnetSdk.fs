@@ -193,24 +193,11 @@ module ProjectCrackerDotnetSdk =
         cache.AddOrUpdate(key, p, fun _ _ -> p)
 
 
-  let rec private projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk additionalMSBuildProps file : ParsedProject =
+  let private visitSingleTfmProj (follow: (string * string) list -> string -> ParsedProject) parseAsSdk (projData: NoCrossTargetingData) file =
 
-    let follow = projInfoCached (projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk)
+        let { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } = projData
 
-    let projDir = Path.GetDirectoryName file
-
-    let todo =
-        projInfoFromMsbuild parseAsSdk additionalMSBuildProps file
-        |> mapMSBuildResults
-
-    match todo with
-    | CrossTargeting (tfm :: _) ->
-        // Atm setting a preferenece is not supported in FSAC
-        // As workaround, lets choose the first of the target frameworks and use that
-        file |> follow [MSBuildKnownProperties.TargetFramework, tfm]
-    | CrossTargeting [] ->
-        failwithf "Unexpected, found cross targeting but empty target frameworks list"
-    | NoCrossTargeting { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } ->
+        let projDir = Path.GetDirectoryName file
 
         //TODO cache projects info of p2p ref
         let p2pProjects =
@@ -293,6 +280,25 @@ module ProjectCrackerDotnetSdk =
             p2pProjects |> List.collect getAdditionalProjs
 
         (tar, po, log, additionalProjects)
+
+
+  let rec private projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk additionalMSBuildProps file : ParsedProject =
+
+    let follow = projInfoCached (projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk)
+
+    let todo =
+        projInfoFromMsbuild parseAsSdk additionalMSBuildProps file
+        |> mapMSBuildResults
+
+    match todo with
+    | CrossTargeting (tfm :: _) ->
+        // Atm setting a preferenece is not supported in FSAC
+        // As workaround, lets choose the first of the target frameworks and use that
+        file |> follow [MSBuildKnownProperties.TargetFramework, tfm]
+    | CrossTargeting [] ->
+        failwithf "Unexpected, found cross targeting but empty target frameworks list"
+    | NoCrossTargeting { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } ->
+        visitSingleTfmProj follow parseAsSdk { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } file
 
 
   let private getProjectOptionsFromProjectFile projInfoFromMsbuild projInfoCached parseAsSdk (rootProjFile : string) =
