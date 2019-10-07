@@ -69,15 +69,14 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
         with get () : Dotnet.ProjInfo.Inspect.MSBuildExePath = msbuildNetSdkPath
 
     member this.LoadProjects(projects: string list) =
+        this.LoadProjects(projects, CrosstargetingStrategies.firstTargetFramework)
+
+    member this.LoadProjects(projects: string list, crosstargetingStrategy: CrosstargetingStrategy) =
+
         let cache = ProjectCrackerDotnetSdk.ParsedProjectCache()
         
         let notify arg =
             event1.Trigger(this, arg)
-
-        let crosstargetingStrategy =
-            // Atm setting a preferenece is not supported
-            // As workaround, lets choose the first of the target frameworks and use that
-            CrosstargetingStrategies.firstTargetFramework
 
         for project in projects do
 
@@ -119,12 +118,15 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
                 notify failed
 
     member this.LoadSln(slnPath: string) =
+        this.LoadSln(slnPath, CrosstargetingStrategies.firstTargetFramework)
+
+    member this.LoadSln(slnPath: string, crosstargetingStrategy: CrosstargetingStrategy) =
 
         match InspectSln.tryParseSln slnPath with
         | Choice1Of2 (_, slnData) ->
             let projs = InspectSln.loadingBuildOrder slnData
 
-            this.LoadProjects(projs)
+            this.LoadProjects(projs, crosstargetingStrategy)
         | Choice2Of2 d ->
             failwithf "cannot load the sln: %A" d
 
