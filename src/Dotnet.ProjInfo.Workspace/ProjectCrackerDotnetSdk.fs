@@ -71,7 +71,7 @@ module ProjectCrackerDotnetSdk =
   type ParsedProject = string * ProjectOptions * ((string * string) list) * (ProjectOptions list)
   type ParsedProjectCache = Collections.Concurrent.ConcurrentDictionary<string, ParsedProject>
 
-  let private projInfoFromMsbuild msbuildPath notifyState parseAsSdk additionalMSBuildProps file =
+  let private execProjInfoFromMsbuild msbuildPath notifyState parseAsSdk additionalMSBuildProps file =
     let projDir = Path.GetDirectoryName file
 
     notifyState (WorkspaceProjectState.Loading (file, additionalMSBuildProps))
@@ -183,14 +183,14 @@ module ProjectCrackerDotnetSdk =
     | _ ->
         failwithf "error getting msbuild info: internal error"
 
-  let private getProjectOptionsFromProjectFile msbuildPath notifyState (cache: ParsedProjectCache) parseAsSdk (file : string) =
+  let private getProjectOptionsFromProjectFile projInfoFromMsbuild (cache: ParsedProjectCache) parseAsSdk (file : string) =
 
     let rec projInfoOf additionalMSBuildProps file : ParsedProject =
 
         let projDir = Path.GetDirectoryName file
 
         let todo =
-            projInfoFromMsbuild msbuildPath notifyState parseAsSdk additionalMSBuildProps file
+            projInfoFromMsbuild parseAsSdk additionalMSBuildProps file
             |> mapMSBuildResults
 
         match todo with
@@ -302,7 +302,7 @@ module ProjectCrackerDotnetSdk =
 
   let private loadBySdk msbuildPath notifyState (cache: ParsedProjectCache) parseAsSdk file =
       try
-        let po, log, additionalProjs = getProjectOptionsFromProjectFile msbuildPath notifyState cache parseAsSdk file
+        let po, log, additionalProjs = getProjectOptionsFromProjectFile (execProjInfoFromMsbuild msbuildPath notifyState) cache parseAsSdk file
 
         Ok (po, (log |> Map.ofList), additionalProjs)
       with
