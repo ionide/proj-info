@@ -183,7 +183,7 @@ module ProjectCrackerDotnetSdk =
     | _ ->
         failwithf "error getting msbuild info: internal error"
 
-  let projInfoCached (cache: ParsedProjectCache) getProjInfoOf additionalMSBuildProps file : ParsedProject =
+  let asProjInfoCached (cache: ParsedProjectCache) getProjInfoOf additionalMSBuildProps file : ParsedProject =
     let key = sprintf "%s;%A" file additionalMSBuildProps
     match cache.TryGetValue(key) with
     | true, alreadyParsed ->
@@ -302,7 +302,7 @@ module ProjectCrackerDotnetSdk =
 
   let private loadBySdk msbuildPath notifyState (cache: ParsedProjectCache) parseAsSdk file =
       try
-        let po, log, additionalProjs = getProjectOptionsFromProjectFile (execProjInfoFromMsbuild msbuildPath notifyState) (projInfoCached cache) parseAsSdk file
+        let po, log, additionalProjs = getProjectOptionsFromProjectFile (execProjInfoFromMsbuild msbuildPath notifyState) (asProjInfoCached cache) parseAsSdk file
 
         Ok (po, (log |> Map.ofList), additionalProjs)
       with
