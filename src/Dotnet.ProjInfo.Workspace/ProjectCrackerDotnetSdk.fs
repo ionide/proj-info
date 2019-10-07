@@ -145,52 +145,53 @@ module ProjectCrackerDotnetSdk =
     infoResult, (loggedMessages.ToArray() |> Array.toList)
 
 
+  let mapMSBuildResults (results, log) =
+    match results with
+    | MsbuildOk [getFscArgsResult; getP2PRefsResult; gpResult; gpItemResult] ->
+        match getFscArgsResult, getP2PRefsResult, gpResult, gpItemResult with
+        | MsbuildError(MSBuildPrj.MSBuildSkippedTarget), MsbuildError(MSBuildPrj.MSBuildSkippedTarget), MsbuildOk (MSBuildPrj.GetResult.Properties props), _ ->
+            // Projects with multiple target frameworks, fails if the target framework is not choosen
+            let prop key = props |> Map.ofList |> Map.tryFind key
+
+            match prop "IsCrossTargetingBuild", prop "TargetFrameworks" with
+            | Some (MSBuildPrj.MSBuild.ConditionEquals "true"), Some (MSBuildPrj.MSBuild.StringList tfms) ->
+                CrossTargeting tfms
+            | _ ->
+                failwithf "error getting msbuild info: some targets skipped, found props: %A" props
+        | MsbuildOk (MSBuildPrj.GetResult.FscArgs fa), MsbuildOk (MSBuildPrj.GetResult.ResolvedP2PRefs p2p), MsbuildOk (MSBuildPrj.GetResult.Properties p), MsbuildOk (MSBuildPrj.GetResult.Items pi) ->
+            NoCrossTargeting { FscArgs = fa; P2PRefs = p2p; Properties = p |> Map.ofList; Items = pi }
+        | r ->
+            failwithf "error getting msbuild info: %A" r
+    | MsbuildOk r ->
+        failwithf "error getting msbuild info: internal error, more info returned than expected %A" r
+    | MsbuildError r ->
+        match r with
+        | Dotnet.ProjInfo.Inspect.GetProjectInfoErrors.MSBuildSkippedTarget ->
+            failwithf "Unexpected MSBuild result, all targets skipped"
+        | Dotnet.ProjInfo.Inspect.GetProjectInfoErrors.UnexpectedMSBuildResult(r) ->
+            failwithf "Unexpected MSBuild result %s" r
+        | Dotnet.ProjInfo.Inspect.GetProjectInfoErrors.MSBuildFailed(exitCode, (workDir, exePath, args)) ->
+            let logMsg = [ yield "Log: "; yield! log ] |> String.concat (Environment.NewLine)
+            let msbuildErrorMsg =
+                [ sprintf "MSBuild failed with exitCode %i" exitCode
+                  sprintf "Working Directory: '%s'" workDir
+                  sprintf "Exe Path: '%s'" exePath
+                  sprintf "Args: '%s'" args ]
+                |> String.concat " "
+
+            failwithf "%s%s%s" msbuildErrorMsg (Environment.NewLine) logMsg
+    | _ ->
+        failwithf "error getting msbuild info: internal error"
+
   let private getProjectOptionsFromProjectFile msbuildPath notifyState (cache: ParsedProjectCache) parseAsSdk (file : string) =
 
     let rec projInfoOf additionalMSBuildProps file : ParsedProject =
 
         let projDir = Path.GetDirectoryName file
 
-        let results, log =
-            projInfoFromMsbuild msbuildPath notifyState parseAsSdk additionalMSBuildProps file
-
         let todo =
-            match results with
-            | MsbuildOk [getFscArgsResult; getP2PRefsResult; gpResult; gpItemResult] ->
-                match getFscArgsResult, getP2PRefsResult, gpResult, gpItemResult with
-                | MsbuildError(MSBuildPrj.MSBuildSkippedTarget), MsbuildError(MSBuildPrj.MSBuildSkippedTarget), MsbuildOk (MSBuildPrj.GetResult.Properties props), _ ->
-                    // Projects with multiple target frameworks, fails if the target framework is not choosen
-                    let prop key = props |> Map.ofList |> Map.tryFind key
-
-                    match prop "IsCrossTargetingBuild", prop "TargetFrameworks" with
-                    | Some (MSBuildPrj.MSBuild.ConditionEquals "true"), Some (MSBuildPrj.MSBuild.StringList tfms) ->
-                        CrossTargeting tfms
-                    | _ ->
-                        failwithf "error getting msbuild info: some targets skipped, found props: %A" props
-                | MsbuildOk (MSBuildPrj.GetResult.FscArgs fa), MsbuildOk (MSBuildPrj.GetResult.ResolvedP2PRefs p2p), MsbuildOk (MSBuildPrj.GetResult.Properties p), MsbuildOk (MSBuildPrj.GetResult.Items pi) ->
-                    NoCrossTargeting { FscArgs = fa; P2PRefs = p2p; Properties = p |> Map.ofList; Items = pi }
-                | r ->
-                    failwithf "error getting msbuild info: %A" r
-            | MsbuildOk r ->
-                failwithf "error getting msbuild info: internal error, more info returned than expected %A" r
-            | MsbuildError r ->
-                match r with
-                | Dotnet.ProjInfo.Inspect.GetProjectInfoErrors.MSBuildSkippedTarget ->
-                    failwithf "Unexpected MSBuild result, all targets skipped"
-                | Dotnet.ProjInfo.Inspect.GetProjectInfoErrors.UnexpectedMSBuildResult(r) ->
-                    failwithf "Unexpected MSBuild result %s" r
-                | Dotnet.ProjInfo.Inspect.GetProjectInfoErrors.MSBuildFailed(exitCode, (workDir, exePath, args)) ->
-                    let logMsg = [ yield "Log: "; yield! log ] |> String.concat (Environment.NewLine)
-                    let msbuildErrorMsg =
-                        [ sprintf "MSBuild failed with exitCode %i" exitCode
-                          sprintf "Working Directory: '%s'" workDir
-                          sprintf "Exe Path: '%s'" exePath
-                          sprintf "Args: '%s'" args ]
-                        |> String.concat " "
-
-                    failwithf "%s%s%s" msbuildErrorMsg (Environment.NewLine) logMsg
-            | _ ->
-                failwithf "error getting msbuild info: internal error"
+            projInfoFromMsbuild msbuildPath notifyState parseAsSdk additionalMSBuildProps file
+            |> mapMSBuildResults
 
         match todo with
         | CrossTargeting (tfm :: _) ->
