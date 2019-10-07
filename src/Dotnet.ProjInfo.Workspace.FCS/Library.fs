@@ -6,7 +6,7 @@ open System.Collections.Generic
 type FCS_ProjectOptions = FSharp.Compiler.SourceCodeServices.FSharpProjectOptions
 type FCS_Checker = FSharp.Compiler.SourceCodeServices.FSharpChecker
 
-module FscArguments =
+module internal FscArguments =
 
     let isTempFile (name: string) =
         let tempPath = System.IO.Path.GetTempPath()
