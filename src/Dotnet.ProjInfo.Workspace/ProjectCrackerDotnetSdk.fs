@@ -192,9 +192,8 @@ module ProjectCrackerDotnetSdk =
         let p = file |> getProjInfoOf additionalMSBuildProps
         cache.AddOrUpdate(key, p, fun _ _ -> p)
 
-  let private getProjectOptionsFromProjectFile projInfoFromMsbuild projInfoCached parseAsSdk (rootProjFile : string) =
 
-    let rec projInfoOf additionalMSBuildProps file : ParsedProject =
+  let rec private projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk additionalMSBuildProps file : ParsedProject =
 
         let projDir = Path.GetDirectoryName file
 
@@ -206,7 +205,7 @@ module ProjectCrackerDotnetSdk =
         | CrossTargeting (tfm :: _) ->
             // Atm setting a preferenece is not supported in FSAC
             // As workaround, lets choose the first of the target frameworks and use that
-            file |> projInfoCached projInfoOf [MSBuildKnownProperties.TargetFramework, tfm]
+            file |> projInfoCached (projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk) [MSBuildKnownProperties.TargetFramework, tfm]
         | CrossTargeting [] ->
             failwithf "Unexpected, found cross targeting but empty target frameworks list"
         | NoCrossTargeting { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } ->
@@ -222,7 +221,7 @@ module ProjectCrackerDotnetSdk =
                         p2p.TargetFramework
                         |> Option.map (fun tfm -> MSBuildKnownProperties.TargetFramework, tfm)
                         |> Option.toList
-                    p2p.ProjectReferenceFullPath |> projInfoCached projInfoOf followP2pArgs )
+                    p2p.ProjectReferenceFullPath |> projInfoCached (projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk) followP2pArgs )
 
             let tar =
                 match props |> Map.tryFind "TargetPath" with
@@ -294,7 +293,9 @@ module ProjectCrackerDotnetSdk =
             (tar, po, log, additionalProjects)
 
 
-    let _, po, log, additionalProjs = projInfoCached projInfoOf [] rootProjFile
+  let private getProjectOptionsFromProjectFile projInfoFromMsbuild projInfoCached parseAsSdk (rootProjFile : string) =
+
+    let _, po, log, additionalProjs = projInfoCached (projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk) [] rootProjFile
     (po, log, additionalProjs)
 
   let private (|ProjectExtraInfoBySdk|_|) po =
