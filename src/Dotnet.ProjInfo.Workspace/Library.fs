@@ -74,7 +74,10 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
         let notify arg =
             event1.Trigger(this, arg)
 
-        let crosstargetingStrategy = ProjectCrackerDotnetSdk.CrosstargetingStrategies.firstTargetFramework
+        let crosstargetingStrategy =
+            // Atm setting a preferenece is not supported
+            // As workaround, lets choose the first of the target frameworks and use that
+            ProjectCrackerDotnetSdk.CrosstargetingStrategies.firstTargetFramework
 
         for project in projects do
 

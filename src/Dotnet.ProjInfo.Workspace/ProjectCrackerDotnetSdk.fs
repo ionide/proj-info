@@ -343,6 +343,4 @@ module ProjectCrackerDotnetSdk =
   module CrosstargetingStrategies =
 
       let firstTargetFramework _file (firstTfm, _secondTfm, _othersTfms) =
-        // Atm setting a preferenece is not supported in FSAC
-        // As workaround, lets choose the first of the target frameworks and use that
         firstTfm
