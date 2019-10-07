@@ -292,8 +292,8 @@ module ProjectCrackerDotnetSdk =
     match todo with
     | CrossTargeting tfms ->
         failwithf "Unexpected, found cross targeting %A but expecting a single tfm for props %A" tfms additionalMSBuildProps
-    | NoCrossTargeting { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } ->
-        visitSingleTfmProj follow parseAsSdk { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } file
+    | NoCrossTargeting noCrossTargetingData ->
+        visitSingleTfmProj follow parseAsSdk noCrossTargetingData file
 
   let private projInfoCrossTargeting projInfoFromMsbuild projInfoCached parseAsSdk additionalMSBuildProps file : ParsedProject =
 
@@ -310,8 +310,8 @@ module ProjectCrackerDotnetSdk =
         file |> follow [MSBuildKnownProperties.TargetFramework, tfm]
     | CrossTargeting [] ->
         failwithf "Unexpected, found cross targeting but empty target frameworks list"
-    | NoCrossTargeting { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } ->
-        visitSingleTfmProj follow parseAsSdk { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } file
+    | NoCrossTargeting noCrossTargetingData ->
+        visitSingleTfmProj follow parseAsSdk noCrossTargetingData file
 
 
   let private getProjectOptionsFromProjectFile projInfoFromMsbuild projInfoCached parseAsSdk (rootProjFile : string) =
