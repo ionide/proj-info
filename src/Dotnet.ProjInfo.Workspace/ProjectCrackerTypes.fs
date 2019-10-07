@@ -124,7 +124,7 @@ module ProjectRecognizer =
             getProjectType sr 3
 
 
-module FscArguments =
+module internal FscArguments =
 
   open CommonHelpers
 

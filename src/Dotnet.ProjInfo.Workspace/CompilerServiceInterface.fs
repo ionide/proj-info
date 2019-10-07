@@ -1,6 +1,6 @@
 namespace Dotnet.ProjInfo.Workspace
 
-module FSharpCompilerServiceCheckerHelper =
+module internal FSharpCompilerServiceCheckerHelper =
 
   open System.IO
 

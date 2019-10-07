@@ -8,15 +8,15 @@ module MSBuildPrj = Dotnet.ProjInfo.Inspect
 
 exception ProjectInspectException of GetProjectOptionsErrors
 
-type NavigateProjectSM =
-    | NoCrossTargeting of NoCrossTargetingData
-    | CrossTargeting of string list
-and NoCrossTargetingData = { FscArgs: string list; P2PRefs: MSBuildPrj.ResolvedP2PRefsInfo list; Properties: Map<string,string>; Items: MSBuildPrj.GetItemResult list }
-
 module MSBuildKnownProperties =
     let TargetFramework = "TargetFramework"
 
-module ProjectCrackerDotnetSdk =
+module internal ProjectCrackerDotnetSdk =
+
+  type NavigateProjectSM =
+      | NoCrossTargeting of NoCrossTargetingData
+      | CrossTargeting of string list
+  and NoCrossTargetingData = { FscArgs: string list; P2PRefs: MSBuildPrj.ResolvedP2PRefsInfo list; Properties: Map<string,string>; Items: MSBuildPrj.GetItemResult list }
 
   open DotnetProjInfoInspectHelpers
 
