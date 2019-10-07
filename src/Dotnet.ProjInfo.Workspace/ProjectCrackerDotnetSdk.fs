@@ -290,12 +290,8 @@ module ProjectCrackerDotnetSdk =
         |> mapMSBuildResults
 
     match todo with
-    | CrossTargeting (tfm :: _) ->
-        // Atm setting a preferenece is not supported in FSAC
-        // As workaround, lets choose the first of the target frameworks and use that
-        file |> follow [MSBuildKnownProperties.TargetFramework, tfm]
-    | CrossTargeting [] ->
-        failwithf "Unexpected, found cross targeting but empty target frameworks list"
+    | CrossTargeting tfms ->
+        failwithf "Unexpected, found cross targeting %A but expecting a single tfm for props %A" tfms additionalMSBuildProps
     | NoCrossTargeting { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } ->
         visitSingleTfmProj follow parseAsSdk { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } file
 
