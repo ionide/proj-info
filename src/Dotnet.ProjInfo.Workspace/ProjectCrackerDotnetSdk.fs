@@ -308,11 +308,11 @@ module ProjectCrackerDotnetSdk =
         failwithf "Unexpected, found cross targeting but empty target frameworks list"
     | CrossTargeting [tfm] ->
         // single tfm in <TargetFrameworks>, maybe log because is strange, should just be <TargetFramework>
-        file |> follow [MSBuildKnownProperties.TargetFramework, tfm]
+        follow [MSBuildKnownProperties.TargetFramework, tfm] file
     | CrossTargeting (firstTfm :: secondTfm :: othersTfms) ->
         let tfm = crosstargetingStrategy file (firstTfm, secondTfm, othersTfms)
         //TODO check tfm is contained in tfms
-        file |> follow [MSBuildKnownProperties.TargetFramework, tfm]
+        follow [MSBuildKnownProperties.TargetFramework, tfm] file
     | NoCrossTargeting noCrossTargetingData ->
         visitSingleTfmProj follow parseAsSdk (file, noCrossTargetingData)
 
