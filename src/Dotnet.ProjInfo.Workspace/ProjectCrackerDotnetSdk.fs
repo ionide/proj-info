@@ -295,7 +295,7 @@ module ProjectCrackerDotnetSdk =
     | NoCrossTargeting noCrossTargetingData ->
         visitSingleTfmProj follow parseAsSdk noCrossTargetingData file
 
-  let private projInfoCrossTargeting crosstargetingChooser projInfoFromMsbuild projInfoCached parseAsSdk additionalMSBuildProps file : ParsedProject =
+  let private projInfoCrossTargeting crosstargetingStrategy projInfoFromMsbuild projInfoCached parseAsSdk additionalMSBuildProps file : ParsedProject =
 
     let follow = projInfoCached (projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk)
 
@@ -310,7 +310,7 @@ module ProjectCrackerDotnetSdk =
         // single tfm in <TargetFrameworks>, maybe log because is strange, should just be <TargetFramework>
         file |> follow [MSBuildKnownProperties.TargetFramework, tfm]
     | CrossTargeting (firstTfm :: secondTfm :: othersTfms) ->
-        let tfm = crosstargetingChooser file firstTfm secondTfm othersTfms
+        let tfm = crosstargetingStrategy file firstTfm secondTfm othersTfms
         //TODO check tfm is contained in tfms
         file |> follow [MSBuildKnownProperties.TargetFramework, tfm]
     | NoCrossTargeting noCrossTargetingData ->
