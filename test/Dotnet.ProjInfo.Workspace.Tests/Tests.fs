@@ -630,6 +630,62 @@ let tests (suiteConfig: TestSuiteConfig) =
         
         Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(projPath, (GetProjectOptionsErrors.ProjectNotRestored projPath))) "check error type"
       )
+
+
+      testCase |> withLog "crosstargeting strategy" (fun logger fs ->
+        let testDir = inDir fs "crosstarg_strategy"
+        copyDirFromAssets fs ``sample4 NetSdk multi tfm``.ProjDir testDir
+
+        let projPath = testDir/ (``sample4 NetSdk multi tfm``.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
+
+        dotnet fs ["restore"; projPath]
+        |> checkExitCodeZero
+
+        for (tfm, _) in ``sample4 NetSdk multi tfm``.TargetFrameworks |> Map.toList do
+          printfn "tfm: %s" tfm
+
+        let loader = createLoader logger
+
+        let watcher = watchNotifications logger loader
+
+        let mutable strategyCalled = 0
+
+        let strategy fsprojPath (firstTfm, secondTfm, othersTfms) =
+          System.Threading.Interlocked.Increment(& strategyCalled) |> ignore
+          Expect.equal fsprojPath projPath "proj path"
+          Expect.equal firstTfm "netstandard2.0" "invalid first tfm"
+          Expect.equal secondTfm "net461" "invalid second tfm"
+          Expect.equal othersTfms [] "invalid others tfm"
+          secondTfm
+
+        loader.LoadProjects([projPath], strategy)
+
+        //the additional loading is the cross targeting
+        [ loading "m1.fsproj"; loading "m1.fsproj"; loaded "m1.fsproj" ]
+        |> expectNotifications (watcher.Notifications)
+
+        let [_; _; WorkspaceProjectState.Loaded(m1Loaded,_)] = watcher.Notifications
+
+        Expect.equal strategyCalled 1 "strategy should be called once per project"
+
+        let parsed = loader.Projects
+
+        Expect.equal parsed.Length 1 (sprintf "multi-tfm lib (F#), but was %A" (parsed |> Array.map (fun x -> x.Key)))
+
+        let m1Parsed =
+          parsed
+          |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "net461" } "the F# console"
+
+        let m1ExpectedSources =
+          [ projDir / "obj/Debug/net461/m1.AssemblyInfo.fs"
+            projDir / "LibraryB.fs" ]
+          |> List.map Path.GetFullPath
+
+        Expect.equal m1Parsed.SourceFiles m1ExpectedSources "check sources"
+
+        Expect.equal m1Parsed m1Loaded "m1 notificaton and parsed should be the same"
+      )
     ]
 
   let fsx =
