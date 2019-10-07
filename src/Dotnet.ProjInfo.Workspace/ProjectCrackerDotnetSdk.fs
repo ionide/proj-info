@@ -341,5 +341,18 @@ type CrosstargetingStrategy = string -> (string * string * string list) -> strin
 
 module CrosstargetingStrategies =
 
-    let firstTargetFramework _file (firstTfm, _secondTfm, _othersTfms) =
+    let firstTargetFramework (_file: string) (firstTfm: string, _secondTfm: string, _othersTfms: string list) =
       firstTfm
+
+    let preferDotnetCore (_file: string) (firstTfm: string, secondTfm: string, othersTfms: string list) =
+      let tfms =
+        (firstTfm :: secondTfm :: othersTfms)
+        |> List.sortByDescending id // make recent versions first, if same tfm id
+
+      match tfms |> List.tryFind (fun s -> s.StartsWith("netcoreapp")) with
+      | Some netcoreappTfm -> netcoreappTfm
+      | None ->
+          match tfms |> List.tryFind (fun s -> s.StartsWith("netstandard")) with
+          | Some netstandardTfm -> netstandardTfm
+          | None ->
+                firstTfm

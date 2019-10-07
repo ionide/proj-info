@@ -69,7 +69,7 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
         with get () : Dotnet.ProjInfo.Inspect.MSBuildExePath = msbuildNetSdkPath
 
     member this.LoadProjects(projects: string list) =
-        this.LoadProjects(projects, CrosstargetingStrategies.firstTargetFramework)
+        this.LoadProjects(projects, CrosstargetingStrategies.preferDotnetCore)
 
     member this.LoadProjects(projects: string list, crosstargetingStrategy: CrosstargetingStrategy) =
 
@@ -118,7 +118,7 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
                 notify failed
 
     member this.LoadSln(slnPath: string) =
-        this.LoadSln(slnPath, CrosstargetingStrategies.firstTargetFramework)
+        this.LoadSln(slnPath, CrosstargetingStrategies.preferDotnetCore)
 
     member this.LoadSln(slnPath: string, crosstargetingStrategy: CrosstargetingStrategy) =
 
