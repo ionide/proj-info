@@ -71,81 +71,88 @@ module ProjectCrackerDotnetSdk =
   type ParsedProject = string * ProjectOptions * ((string * string) list) * (ProjectOptions list)
   type ParsedProjectCache = Collections.Concurrent.ConcurrentDictionary<string, ParsedProject>
 
+  let private projInfoFromMsbuild msbuildPath notifyState parseAsSdk additionalMSBuildProps file =
+    let projDir = Path.GetDirectoryName file
+
+    notifyState (WorkspaceProjectState.Loading (file, additionalMSBuildProps))
+
+    match parseAsSdk with
+    | ProjectParsingSdk.DotnetSdk ->
+        let projectAssetsJsonPath = Path.Combine(projDir, "obj", "project.assets.json")
+        if not(File.Exists(projectAssetsJsonPath)) then
+            raise (ProjectInspectException (ProjectNotRestored file))
+    | ProjectParsingSdk.VerboseSdk ->
+        ()
+
+    let getFscArgs =
+        match parseAsSdk with
+        | ProjectParsingSdk.DotnetSdk ->
+            Dotnet.ProjInfo.Inspect.getFscArgs
+        | ProjectParsingSdk.VerboseSdk ->
+            let asFscArgs props =
+                let fsc = Microsoft.FSharp.Build.Fsc()
+                Dotnet.ProjInfo.FakeMsbuildTasks.getResponseFileFromTask props fsc
+            Dotnet.ProjInfo.Inspect.getFscArgsOldSdk (asFscArgs >> Ok)
+
+    let getP2PRefs = Dotnet.ProjInfo.Inspect.getResolvedP2PRefs
+    let additionalInfo = //needed for extra
+        [ "OutputType"
+          "IsTestProject"
+          "TargetPath"
+          "Configuration"
+          "IsPackable"
+          MSBuildKnownProperties.TargetFramework
+          "TargetFrameworkIdentifier"
+          "TargetFrameworkVersion"
+          "MSBuildAllProjects"
+          "ProjectAssetsFile"
+          "RestoreSuccess"
+          "Configurations"
+          "TargetFrameworks"
+          "RunArguments"
+          "RunCommand"
+          "IsPublishable"
+        ]
+    let gp () = Dotnet.ProjInfo.Inspect.getProperties (["TargetPath"; "IsCrossTargetingBuild"; "TargetFrameworks"] @ additionalInfo)
+
+    let getItems () = Dotnet.ProjInfo.Inspect.getItems [("Compile", GetItemsModifier.FullPath); ("Compile", GetItemsModifier.Custom("Link"))] []
+
+    let loggedMessages = System.Collections.Concurrent.ConcurrentQueue<string>()
+
+    let runCmd exePath args = Utils.runProcess loggedMessages.Enqueue projDir exePath (args |> String.concat " ")
+
+    let msbuildExec =
+        Dotnet.ProjInfo.Inspect.msbuild msbuildPath runCmd
+
+    let additionalArgs = additionalMSBuildProps |> List.map (Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Property)
+
+    let inspect =
+        match parseAsSdk with
+        | ProjectParsingSdk.DotnetSdk ->
+            Dotnet.ProjInfo.Inspect.getProjectInfos
+        | ProjectParsingSdk.VerboseSdk ->
+            Dotnet.ProjInfo.Inspect.getProjectInfos // getProjectInfosOldSdk
+
+    let globalArgs =
+        match Environment.GetEnvironmentVariable("DOTNET_PROJ_INFO_MSBUILD_BL") with
+        | "1" -> Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Switch("bl") :: []
+        | _ -> []
+
+    let infoResult =
+        file
+        |> inspect loggedMessages.Enqueue msbuildExec [getFscArgs; getP2PRefs; gp; getItems] (additionalArgs @ globalArgs)
+
+    infoResult, (loggedMessages.ToArray() |> Array.toList)
+
+
   let private getProjectOptionsFromProjectFile msbuildPath notifyState (cache: ParsedProjectCache) parseAsSdk (file : string) =
 
     let rec projInfoOf additionalMSBuildProps file : ParsedProject =
+
         let projDir = Path.GetDirectoryName file
 
-        notifyState (WorkspaceProjectState.Loading (file, additionalMSBuildProps))
-
-        match parseAsSdk with
-        | ProjectParsingSdk.DotnetSdk ->
-            let projectAssetsJsonPath = Path.Combine(projDir, "obj", "project.assets.json")
-            if not(File.Exists(projectAssetsJsonPath)) then
-                raise (ProjectInspectException (ProjectNotRestored file))
-        | ProjectParsingSdk.VerboseSdk ->
-            ()
-
-        let getFscArgs =
-            match parseAsSdk with
-            | ProjectParsingSdk.DotnetSdk ->
-                Dotnet.ProjInfo.Inspect.getFscArgs
-            | ProjectParsingSdk.VerboseSdk ->
-                let asFscArgs props =
-                    let fsc = Microsoft.FSharp.Build.Fsc()
-                    Dotnet.ProjInfo.FakeMsbuildTasks.getResponseFileFromTask props fsc
-                Dotnet.ProjInfo.Inspect.getFscArgsOldSdk (asFscArgs >> Ok)
-
-        let getP2PRefs = Dotnet.ProjInfo.Inspect.getResolvedP2PRefs
-        let additionalInfo = //needed for extra
-            [ "OutputType"
-              "IsTestProject"
-              "TargetPath"
-              "Configuration"
-              "IsPackable"
-              MSBuildKnownProperties.TargetFramework
-              "TargetFrameworkIdentifier"
-              "TargetFrameworkVersion"
-              "MSBuildAllProjects"
-              "ProjectAssetsFile"
-              "RestoreSuccess"
-              "Configurations"
-              "TargetFrameworks"
-              "RunArguments"
-              "RunCommand"
-              "IsPublishable"
-            ]
-        let gp () = Dotnet.ProjInfo.Inspect.getProperties (["TargetPath"; "IsCrossTargetingBuild"; "TargetFrameworks"] @ additionalInfo)
-
-        let getItems () = Dotnet.ProjInfo.Inspect.getItems [("Compile", GetItemsModifier.FullPath); ("Compile", GetItemsModifier.Custom("Link"))] []
-
         let results, log =
-            let loggedMessages = System.Collections.Concurrent.ConcurrentQueue<string>()
-
-            let runCmd exePath args = Utils.runProcess loggedMessages.Enqueue projDir exePath (args |> String.concat " ")
-
-            let msbuildExec =
-                Dotnet.ProjInfo.Inspect.msbuild msbuildPath runCmd
-
-            let additionalArgs = additionalMSBuildProps |> List.map (Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Property)
-
-            let inspect =
-                match parseAsSdk with
-                | ProjectParsingSdk.DotnetSdk ->
-                    Dotnet.ProjInfo.Inspect.getProjectInfos
-                | ProjectParsingSdk.VerboseSdk ->
-                    Dotnet.ProjInfo.Inspect.getProjectInfos // getProjectInfosOldSdk
-
-            let globalArgs =
-                match Environment.GetEnvironmentVariable("DOTNET_PROJ_INFO_MSBUILD_BL") with
-                | "1" -> Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Switch("bl") :: []
-                | _ -> []
-
-            let infoResult =
-                file
-                |> inspect loggedMessages.Enqueue msbuildExec [getFscArgs; getP2PRefs; gp; getItems] (additionalArgs @ globalArgs)
-
-            infoResult, (loggedMessages.ToArray() |> Array.toList)
+            projInfoFromMsbuild msbuildPath notifyState parseAsSdk additionalMSBuildProps file
 
         let todo =
             match results with
