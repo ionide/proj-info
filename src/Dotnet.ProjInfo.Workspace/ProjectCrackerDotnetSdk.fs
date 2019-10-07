@@ -185,13 +185,13 @@ module ProjectCrackerDotnetSdk =
 
   let private getProjectOptionsFromProjectFile projInfoFromMsbuild (cache: ParsedProjectCache) parseAsSdk (file : string) =
 
-    let projInfoCached projInfoOf additionalMSBuildProps file : ParsedProject =
+    let projInfoCached getProjInfoOf additionalMSBuildProps file : ParsedProject =
         let key = sprintf "%s;%A" file additionalMSBuildProps
         match cache.TryGetValue(key) with
         | true, alreadyParsed ->
             alreadyParsed
         | false, _ ->
-            let p = file |> projInfoOf additionalMSBuildProps
+            let p = file |> getProjInfoOf additionalMSBuildProps
             cache.AddOrUpdate(key, p, fun _ _ -> p)
 
     let rec projInfoOf additionalMSBuildProps file : ParsedProject =
