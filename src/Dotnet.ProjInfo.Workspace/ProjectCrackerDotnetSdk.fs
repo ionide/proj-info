@@ -281,8 +281,25 @@ module ProjectCrackerDotnetSdk =
 
     (tar, po, log, additionalProjects)
 
-
   let rec private projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk additionalMSBuildProps file : ParsedProject =
+
+    let follow = projInfoCached (projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk)
+
+    let todo =
+        projInfoFromMsbuild parseAsSdk additionalMSBuildProps file
+        |> mapMSBuildResults
+
+    match todo with
+    | CrossTargeting (tfm :: _) ->
+        // Atm setting a preferenece is not supported in FSAC
+        // As workaround, lets choose the first of the target frameworks and use that
+        file |> follow [MSBuildKnownProperties.TargetFramework, tfm]
+    | CrossTargeting [] ->
+        failwithf "Unexpected, found cross targeting but empty target frameworks list"
+    | NoCrossTargeting { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } ->
+        visitSingleTfmProj follow parseAsSdk { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } file
+
+  let rec private projInfoCrossTargeting projInfoFromMsbuild projInfoCached parseAsSdk additionalMSBuildProps file : ParsedProject =
 
     let follow = projInfoCached (projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk)
 
@@ -303,7 +320,7 @@ module ProjectCrackerDotnetSdk =
 
   let private getProjectOptionsFromProjectFile projInfoFromMsbuild projInfoCached parseAsSdk (rootProjFile : string) =
 
-    let _, po, log, additionalProjs = projInfoCached (projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk) [] rootProjFile
+    let _, po, log, additionalProjs = projInfoCached (projInfoCrossTargeting projInfoFromMsbuild projInfoCached parseAsSdk) [] rootProjFile
     (po, log, additionalProjs)
 
   let private (|ProjectExtraInfoBySdk|_|) po =
