@@ -74,15 +74,17 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
         let notify arg =
             event1.Trigger(this, arg)
 
+        let crosstargetingStrategy = ProjectCrackerDotnetSdk.CrosstargetingStrategies.firstTargetFramework
+
         for project in projects do
 
             let loader =
                 if File.Exists project then
                     match project with
                     | NetCoreSdk ->
-                        ProjectCrackerDotnetSdk.load this.MSBuildNetSdkPath
+                        ProjectCrackerDotnetSdk.load crosstargetingStrategy this.MSBuildNetSdkPath
                     | Net45 ->
-                        ProjectCrackerDotnetSdk.loadVerboseSdk this.MSBuildPath
+                        ProjectCrackerDotnetSdk.loadVerboseSdk crosstargetingStrategy this.MSBuildPath
                     | NetCoreProjectJson | Unsupported ->
                         failwithf "unsupported project %s" project
                  else

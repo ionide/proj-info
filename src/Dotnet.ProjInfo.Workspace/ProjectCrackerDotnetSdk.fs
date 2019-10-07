@@ -304,22 +304,20 @@ module ProjectCrackerDotnetSdk =
         |> mapMSBuildResults
 
     match todo with
-    | CrossTargeting (firstTfm :: othersTfms) ->
-        let tfm = crosstargetingChooser file firstTfm othersTfms
-        //TODO check tfm is contained in tfms
-        file |> follow [MSBuildKnownProperties.TargetFramework, tfm]
     | CrossTargeting [] ->
         failwithf "Unexpected, found cross targeting but empty target frameworks list"
+    | CrossTargeting [tfm] ->
+        // single tfm in <TargetFrameworks>, maybe log because is strange, should just be <TargetFramework>
+        file |> follow [MSBuildKnownProperties.TargetFramework, tfm]
+    | CrossTargeting (firstTfm :: secondTfm :: othersTfms) ->
+        let tfm = crosstargetingChooser file firstTfm secondTfm othersTfms
+        //TODO check tfm is contained in tfms
+        file |> follow [MSBuildKnownProperties.TargetFramework, tfm]
     | NoCrossTargeting noCrossTargetingData ->
         visitSingleTfmProj follow parseAsSdk noCrossTargetingData file
 
 
-  let private getProjectOptionsFromProjectFile projInfoFromMsbuild projInfoCached parseAsSdk (rootProjFile : string) =
-
-    let crosstargetingChooser _file firstTfm othersTfms =
-        // Atm setting a preferenece is not supported in FSAC
-        // As workaround, lets choose the first of the target frameworks and use that
-        firstTfm
+  let private getProjectOptionsFromProjectFile crosstargetingChooser projInfoFromMsbuild projInfoCached parseAsSdk (rootProjFile : string) =
 
     let _, po, log, additionalProjs = projInfoCached (projInfoCrossTargeting crosstargetingChooser projInfoFromMsbuild projInfoCached parseAsSdk) [] rootProjFile
     (po, log, additionalProjs)
@@ -327,17 +325,24 @@ module ProjectCrackerDotnetSdk =
   let private (|ProjectExtraInfoBySdk|_|) po =
       Some po.ExtraProjectInfo
 
-  let private loadBySdk msbuildPath notifyState (cache: ParsedProjectCache) parseAsSdk file =
+  let private loadBySdk crosstargetingChooser msbuildPath notifyState (cache: ParsedProjectCache) parseAsSdk file =
       try
-        let po, log, additionalProjs = getProjectOptionsFromProjectFile (execProjInfoFromMsbuild msbuildPath notifyState) (asProjInfoCached cache) parseAsSdk file
+        let po, log, additionalProjs = getProjectOptionsFromProjectFile crosstargetingChooser (execProjInfoFromMsbuild msbuildPath notifyState) (asProjInfoCached cache) parseAsSdk file
 
         Ok (po, (log |> Map.ofList), additionalProjs)
       with
         | ProjectInspectException d -> Error d
         | e -> Error (GenericError(file, e.Message))
 
-  let load msbuildPath notifyState (cache: ParsedProjectCache) file =
-      loadBySdk msbuildPath notifyState cache ProjectParsingSdk.DotnetSdk file
+  let load crosstargetingChooser msbuildPath notifyState (cache: ParsedProjectCache) file =
+      loadBySdk crosstargetingChooser msbuildPath notifyState cache ProjectParsingSdk.DotnetSdk file
 
-  let loadVerboseSdk msbuildPath notifyState (cache: ParsedProjectCache) file =
-      loadBySdk msbuildPath notifyState cache ProjectParsingSdk.VerboseSdk file
+  let loadVerboseSdk crosstargetingChooser msbuildPath notifyState (cache: ParsedProjectCache) file =
+      loadBySdk crosstargetingChooser msbuildPath notifyState cache ProjectParsingSdk.VerboseSdk file
+
+  module CrosstargetingStrategies =
+
+      let firstTargetFramework _file firstTfm _secondTfm _othersTfms =
+        // Atm setting a preferenece is not supported in FSAC
+        // As workaround, lets choose the first of the target frameworks and use that
+        firstTfm
