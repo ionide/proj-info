@@ -322,9 +322,6 @@ module ProjectCrackerDotnetSdk =
     let _, po, log, additionalProjs = projInfoCached (projInfoCrossTargeting crosstargetingChooser projInfoFromMsbuild projInfoCached parseAsSdk) [] rootProjFile
     (po, log, additionalProjs)
 
-  let private (|ProjectExtraInfoBySdk|_|) po =
-      Some po.ExtraProjectInfo
-
   let private loadBySdk crosstargetingStrategy msbuildPath notifyState (cache: ParsedProjectCache) parseAsSdk file =
       try
         let po, log, additionalProjs = getProjectOptionsFromProjectFile crosstargetingStrategy (execProjInfoFromMsbuild msbuildPath notifyState) (asProjInfoCached cache) parseAsSdk file
