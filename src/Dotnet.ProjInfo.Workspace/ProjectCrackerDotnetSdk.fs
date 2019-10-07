@@ -337,7 +337,7 @@ module internal ProjectCrackerDotnetSdk =
   let loadVerboseSdk crosstargetingStrategy msbuildPath notifyState (cache: ParsedProjectCache) file =
       loadBySdk crosstargetingStrategy msbuildPath notifyState cache ProjectParsingSdk.VerboseSdk file
 
-  module CrosstargetingStrategies =
+module CrosstargetingStrategies =
 
-      let firstTargetFramework _file (firstTfm, _secondTfm, _othersTfms) =
-        firstTfm
+    let firstTargetFramework _file (firstTfm, _secondTfm, _othersTfms) =
+      firstTfm
