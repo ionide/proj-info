@@ -193,14 +193,14 @@ module ProjectCrackerDotnetSdk =
         cache.AddOrUpdate(key, p, fun _ _ -> p)
 
 
-  let private visitSingleTfmProj (follow: (string * string) list -> string -> ParsedProject) parseAsSdk (projData: NoCrossTargetingData) file =
+  let private visitSingleTfmProj follow parseAsSdk (file, projData) =
 
-    let { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } = projData
+    let { NoCrossTargetingData.FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } = projData
 
     let projDir = Path.GetDirectoryName file
 
     //TODO cache projects info of p2p ref
-    let p2pProjects =
+    let p2pProjects : ParsedProject list =
         p2ps
         // TODO before was no follow. now follow other projects too
         // do not follow others lang project, is not supported by FCS anyway
@@ -293,7 +293,7 @@ module ProjectCrackerDotnetSdk =
     | CrossTargeting tfms ->
         failwithf "Unexpected, found cross targeting %A but expecting a single tfm for props %A" tfms additionalMSBuildProps
     | NoCrossTargeting noCrossTargetingData ->
-        visitSingleTfmProj follow parseAsSdk noCrossTargetingData file
+        visitSingleTfmProj follow parseAsSdk (file, noCrossTargetingData)
 
   let private projInfoCrossTargeting crosstargetingStrategy projInfoFromMsbuild projInfoCached parseAsSdk additionalMSBuildProps file : ParsedProject =
 
@@ -314,7 +314,7 @@ module ProjectCrackerDotnetSdk =
         //TODO check tfm is contained in tfms
         file |> follow [MSBuildKnownProperties.TargetFramework, tfm]
     | NoCrossTargeting noCrossTargetingData ->
-        visitSingleTfmProj follow parseAsSdk noCrossTargetingData file
+        visitSingleTfmProj follow parseAsSdk (file, noCrossTargetingData)
 
 
   let private getProjectOptionsFromProjectFile crosstargetingChooser projInfoFromMsbuild projInfoCached parseAsSdk (rootProjFile : string) =
