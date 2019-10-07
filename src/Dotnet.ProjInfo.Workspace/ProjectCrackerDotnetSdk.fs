@@ -34,21 +34,21 @@ module internal ProjectCrackerDotnetSdk =
     let msbuildPropString prop =
         props |> Map.tryFind prop
 
-    { ProjectSdkTypeDotnetSdk.IsTestProject = msbuildPropBool "IsTestProject" |> Option.getOrElse false
-      Configuration = msbuildPropString "Configuration" |> Option.getOrElse ""
-      IsPackable = msbuildPropBool "IsPackable" |> Option.getOrElse false
-      TargetFramework = msbuildPropString MSBuildKnownProperties.TargetFramework |> Option.getOrElse ""
-      TargetFrameworkIdentifier = msbuildPropString "TargetFrameworkIdentifier" |> Option.getOrElse ""
-      TargetFrameworkVersion = msbuildPropString "TargetFrameworkVersion" |> Option.getOrElse ""
+    { ProjectSdkTypeDotnetSdk.IsTestProject = msbuildPropBool "IsTestProject" |> Option.defaultValue false
+      Configuration = msbuildPropString "Configuration" |> Option.defaultValue ""
+      IsPackable = msbuildPropBool "IsPackable" |> Option.defaultValue false
+      TargetFramework = msbuildPropString MSBuildKnownProperties.TargetFramework |> Option.defaultValue ""
+      TargetFrameworkIdentifier = msbuildPropString "TargetFrameworkIdentifier" |> Option.defaultValue ""
+      TargetFrameworkVersion = msbuildPropString "TargetFrameworkVersion" |> Option.defaultValue ""
 
-      MSBuildAllProjects = msbuildPropStringList "MSBuildAllProjects" |> Option.getOrElse []
-      MSBuildToolsVersion = msbuildPropString "MSBuildToolsVersion" |> Option.getOrElse ""
+      MSBuildAllProjects = msbuildPropStringList "MSBuildAllProjects" |> Option.defaultValue []
+      MSBuildToolsVersion = msbuildPropString "MSBuildToolsVersion" |> Option.defaultValue ""
 
-      ProjectAssetsFile = msbuildPropString "ProjectAssetsFile" |> Option.getOrElse ""
-      RestoreSuccess = msbuildPropBool "RestoreSuccess" |> Option.getOrElse false
+      ProjectAssetsFile = msbuildPropString "ProjectAssetsFile" |> Option.defaultValue ""
+      RestoreSuccess = msbuildPropBool "RestoreSuccess" |> Option.defaultValue false
 
-      Configurations = msbuildPropStringList "Configurations" |> Option.getOrElse []
-      TargetFrameworks = msbuildPropStringList "TargetFrameworks" |> Option.getOrElse []
+      Configurations = msbuildPropStringList "Configurations" |> Option.defaultValue []
+      TargetFrameworks = msbuildPropStringList "TargetFrameworks" |> Option.defaultValue []
 
       RunArguments = msbuildPropString "RunArguments"
       RunCommand = msbuildPropString "RunCommand"
@@ -63,8 +63,8 @@ module internal ProjectCrackerDotnetSdk =
     let msbuildPropString prop =
         props |> Map.tryFind prop
 
-    { Configuration = msbuildPropString "Configuration" |> Option.getOrElse ""
-      TargetFrameworkVersion = msbuildPropString "TargetFrameworkVersion" |> Option.getOrElse "" }
+    { Configuration = msbuildPropString "Configuration" |> Option.defaultValue ""
+      TargetFrameworkVersion = msbuildPropString "TargetFrameworkVersion" |> Option.defaultValue "" }
 
   type private ProjectParsingSdk = DotnetSdk | VerboseSdk
 

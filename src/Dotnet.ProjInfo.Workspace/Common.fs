@@ -18,14 +18,6 @@ module internal CommonHelpers =
       prefixes
       |> List.tryPick (fun prefix -> splitByPrefix prefix s)
 
-[<RequireQualifiedAccess>]
-module internal Option =
-
-  let getOrElse defaultValue option =
-    match option with
-    | None -> defaultValue
-    | Some x -> x
-
 module internal Utils =
 
   let runProcess (log: string -> unit) (workingDir: string) (exePath: string) (args: string) =
