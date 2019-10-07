@@ -295,7 +295,7 @@ module ProjectCrackerDotnetSdk =
     | NoCrossTargeting { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } ->
         visitSingleTfmProj follow parseAsSdk { FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } file
 
-  let rec private projInfoCrossTargeting projInfoFromMsbuild projInfoCached parseAsSdk additionalMSBuildProps file : ParsedProject =
+  let private projInfoCrossTargeting projInfoFromMsbuild projInfoCached parseAsSdk additionalMSBuildProps file : ParsedProject =
 
     let follow = projInfoCached (projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk)
 
