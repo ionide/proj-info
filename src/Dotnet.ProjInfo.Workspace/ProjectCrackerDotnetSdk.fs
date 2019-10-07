@@ -325,20 +325,20 @@ module ProjectCrackerDotnetSdk =
   let private (|ProjectExtraInfoBySdk|_|) po =
       Some po.ExtraProjectInfo
 
-  let private loadBySdk crosstargetingChooser msbuildPath notifyState (cache: ParsedProjectCache) parseAsSdk file =
+  let private loadBySdk crosstargetingStrategy msbuildPath notifyState (cache: ParsedProjectCache) parseAsSdk file =
       try
-        let po, log, additionalProjs = getProjectOptionsFromProjectFile crosstargetingChooser (execProjInfoFromMsbuild msbuildPath notifyState) (asProjInfoCached cache) parseAsSdk file
+        let po, log, additionalProjs = getProjectOptionsFromProjectFile crosstargetingStrategy (execProjInfoFromMsbuild msbuildPath notifyState) (asProjInfoCached cache) parseAsSdk file
 
         Ok (po, (log |> Map.ofList), additionalProjs)
       with
         | ProjectInspectException d -> Error d
         | e -> Error (GenericError(file, e.Message))
 
-  let load crosstargetingChooser msbuildPath notifyState (cache: ParsedProjectCache) file =
-      loadBySdk crosstargetingChooser msbuildPath notifyState cache ProjectParsingSdk.DotnetSdk file
+  let load crosstargetingStrategy msbuildPath notifyState (cache: ParsedProjectCache) file =
+      loadBySdk crosstargetingStrategy msbuildPath notifyState cache ProjectParsingSdk.DotnetSdk file
 
-  let loadVerboseSdk crosstargetingChooser msbuildPath notifyState (cache: ParsedProjectCache) file =
-      loadBySdk crosstargetingChooser msbuildPath notifyState cache ProjectParsingSdk.VerboseSdk file
+  let loadVerboseSdk crosstargetingStrategy msbuildPath notifyState (cache: ParsedProjectCache) file =
+      loadBySdk crosstargetingStrategy msbuildPath notifyState cache ProjectParsingSdk.VerboseSdk file
 
   module CrosstargetingStrategies =
 
