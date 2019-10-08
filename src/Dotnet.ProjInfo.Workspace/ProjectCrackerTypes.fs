@@ -162,3 +162,12 @@ module internal FscArguments =
             s |> makeAbs projDir |> Path.GetFullPath
         else
             s
+
+  let isTempFile (name: string) =
+      let tempPath = System.IO.Path.GetTempPath()
+      let s = name.ToLower()
+      s.StartsWith(tempPath.ToLower())
+
+  let isDeprecatedArg n =
+    // TODO put in FCS
+    (n = "--times") || (n = "--no-jit-optimize")
