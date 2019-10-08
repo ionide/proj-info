@@ -69,6 +69,10 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
         with get () : Dotnet.ProjInfo.Inspect.MSBuildExePath = msbuildNetSdkPath
 
     member this.LoadProjects(projects: string list) =
+        this.LoadProjects(projects, CrosstargetingStrategies.preferDotnetCore)
+
+    member this.LoadProjects(projects: string list, crosstargetingStrategy: CrosstargetingStrategy) =
+
         let cache = ProjectCrackerDotnetSdk.ParsedProjectCache()
         
         let notify arg =
@@ -80,9 +84,9 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
                 if File.Exists project then
                     match project with
                     | NetCoreSdk ->
-                        ProjectCrackerDotnetSdk.load this.MSBuildNetSdkPath
+                        ProjectCrackerDotnetSdk.load crosstargetingStrategy this.MSBuildNetSdkPath
                     | Net45 ->
-                        ProjectCrackerDotnetSdk.loadVerboseSdk this.MSBuildPath
+                        ProjectCrackerDotnetSdk.loadVerboseSdk crosstargetingStrategy this.MSBuildPath
                     | NetCoreProjectJson | Unsupported ->
                         failwithf "unsupported project %s" project
                  else
@@ -114,12 +118,15 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
                 notify failed
 
     member this.LoadSln(slnPath: string) =
+        this.LoadSln(slnPath, CrosstargetingStrategies.preferDotnetCore)
+
+    member this.LoadSln(slnPath: string, crosstargetingStrategy: CrosstargetingStrategy) =
 
         match InspectSln.tryParseSln slnPath with
         | Choice1Of2 (_, slnData) ->
             let projs = InspectSln.loadingBuildOrder slnData
 
-            this.LoadProjects(projs)
+            this.LoadProjects(projs, crosstargetingStrategy)
         | Choice2Of2 d ->
             failwithf "cannot load the sln: %A" d
 

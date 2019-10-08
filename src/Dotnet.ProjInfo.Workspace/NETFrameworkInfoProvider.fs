@@ -1,6 +1,6 @@
 namespace Dotnet.ProjInfo.Workspace
 
-module DotnetProjInfoInspectHelpers =
+module internal DotnetProjInfoInspectHelpers =
 
   let (|MsbuildOk|_|) x =
     match x with

@@ -1,6 +1,6 @@
 namespace Dotnet.ProjInfo.Workspace
 
-module CommonHelpers =
+module internal CommonHelpers =
 
   let chooseByPrefix prefix (s: string) =
       if s.StartsWith(prefix) then Some (s.Substring(prefix.Length))
@@ -18,15 +18,7 @@ module CommonHelpers =
       prefixes
       |> List.tryPick (fun prefix -> splitByPrefix prefix s)
 
-[<RequireQualifiedAccess>]
-module Option =
-
-  let getOrElse defaultValue option =
-    match option with
-    | None -> defaultValue
-    | Some x -> x
-
-module Utils =
+module internal Utils =
 
   let runProcess (log: string -> unit) (workingDir: string) (exePath: string) (args: string) =
       let psi = System.Diagnostics.ProcessStartInfo()
