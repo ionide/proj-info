@@ -134,7 +134,7 @@ module internal ProjectCrackerDotnetSdk =
 
     let globalArgs =
         match Environment.GetEnvironmentVariable("DOTNET_PROJ_INFO_MSBUILD_BL") with
-        | "1" -> Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Switch("bl") :: []
+        | "1" -> [ Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Switch("bl") ]
         | _ -> []
 
     let infoResult =
