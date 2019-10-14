@@ -327,9 +327,6 @@ module internal ProjectCrackerDotnetSdk =
   let load crosstargetingStrategy msbuildPath notifyState projInfoCached file =
       loadBySdk crosstargetingStrategy msbuildPath notifyState projInfoCached file
 
-  let loadVerboseSdk crosstargetingStrategy msbuildPath notifyState projInfoCached file =
-      loadBySdk crosstargetingStrategy msbuildPath notifyState projInfoCached file
-
 type CrosstargetingStrategy = string -> (string * string * string list) -> string
 
 module CrosstargetingStrategies =
