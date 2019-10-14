@@ -42,7 +42,7 @@ type GetProjectInfoErrors<'T> =
 [<RequireQualifiedAccess>]
 type MSBuildExePath =
     | Path of string
-    | DotnetMsbuild of dotnetExePath: string 
+    | DotnetMsbuild of dotnetExePath: string
 
 let disableEnvVar envVarName =
     let oldEnv =
@@ -542,9 +542,9 @@ let getProjectInfos log msbuildExec getters additionalArgs projPath =
     |> Result.bind (fun targetPath -> msbuildExec projPath (args @ additionalArgs @ [ Property("CustomAfterMicrosoftCommonTargets", targetPath); Property("CustomAfterMicrosoftCommonCrossTargetingTargets", targetPath) ]))
     |> Result.map (fun _ -> parsers |> List.map (fun parse -> parse ()))
 
-let getProjectInfo log msbuildExec getArgs additionalArgs (projPath: string) =
+let getProjectInfo log msbuildExec getArgs (projPath: string) =
     //TODO refactor to use getProjectInfosOldSdk
-    let template, args, parse =  getArgs ()
+    let template, args, parse = getArgs ()
 
     // remove deprecated target file, if exists
     projPath
@@ -552,10 +552,8 @@ let getProjectInfo log msbuildExec getArgs additionalArgs (projPath: string) =
 
     getNewTempFilePath "proj-info.hook.targets"
     |> writeTargetFile log [template]
-    |> Result.bind (fun targetPath -> msbuildExec projPath (args @ additionalArgs @ [ Property("CustomAfterMicrosoftCommonTargets", targetPath) ]))
+    |> Result.bind (fun targetPath -> msbuildExec projPath (args @ [ Property("CustomAfterMicrosoftCommonTargets", targetPath) ]))
     |> Result.bind (fun _ -> parse ())
-
-#if !NETSTANDARD1_6
 
 let getFscArgsOldSdk propsToFscArgs () =
 
@@ -602,13 +600,9 @@ let getFscArgsOldSdk propsToFscArgs () =
                                |> Result.bind propsToFscArgs
                                |> Result.map FscArgs)
 
-#endif
+module ProjectLanguageRecognizer =
 
-module ProjectRecognizer =
-
-    type ProjectRecognizedInfo =
-        { Language: ProjectLanguage }
-    and ProjectLanguage =
+    type ProjectLanguage =
         | CSharp
         | FSharp
         | Unknown of string
@@ -618,22 +612,3 @@ module ProjectRecognizer =
         | ".csproj" -> ProjectLanguage.CSharp
         | ".fsproj" -> ProjectLanguage.FSharp
         | ext -> ProjectLanguage.Unknown ext
-
-    let (|DotnetSdk|OldSdk|Unsupported|) file =
-        //Easy way to detect new fsproj is to check the msbuild version of .fsproj
-        //Post 1.0 has Sdk attribute (like `Sdk="FSharp.NET.Sdk;Microsoft.NET.Sdk"`), use that
-        //for checking .NET Core fsproj.
-        let rec getProjectType (sr:StreamReader) limit =
-            // post preview5 dropped this, check Sdk field
-            let isNetCore (line:string) = line.ToLower().Contains("sdk=")
-            if limit = 0 then
-                Unsupported // unsupported project type
-            else
-                let line = sr.ReadLine()
-                if not <| line.Contains("ToolsVersion") && not <| line.Contains("Sdk=") then
-                    getProjectType sr (limit-1)
-                else
-                    let projInfo = { Language = languageOfProject file }
-                    if isNetCore line then DotnetSdk projInfo else OldSdk projInfo
-        use sr = File.OpenText(file)
-        getProjectType sr 3

@@ -1,8 +1,8 @@
 namespace Dotnet.ProjInfo.Workspace
 
 open System.Collections.Concurrent
-open ProjectRecognizer
 open System.IO
+open ProjectRecognizer
 
 type ProjectKey =
     { ProjectPath: string
@@ -17,31 +17,31 @@ type MSBuildLocator () =
         with get() = Dotnet.ProjInfo.Inspect.MSBuildExePath.Path "msbuild"
 
     member this.DotnetMSBuildFromPATH
-        with get() =  Dotnet.ProjInfo.Inspect.MSBuildExePath.DotnetMsbuild "dotnet"
+        with get() = Dotnet.ProjInfo.Inspect.MSBuildExePath.DotnetMsbuild "dotnet"
 
-    member this.InstalledMSBuilds () =
+    member this.InstalledMSBuildNET () =
         installedMSBuilds.Force()
         |> List.map (Dotnet.ProjInfo.Inspect.MSBuildExePath.Path)
 
-    member this.LatestInstalledMSBuild () =
+    member this.LatestInstalledMSBuildNET () =
         match installedMSBuilds.Force() with
         | [] -> this.MSBuildFromPATH
         | path :: _ -> Dotnet.ProjInfo.Inspect.MSBuildExePath.Path path
 
 type LoaderConfig = {
-    MSBuildHost : Dotnet.ProjInfo.Inspect.MSBuildExePath
-    MSBuildNetSdkHost: Dotnet.ProjInfo.Inspect.MSBuildExePath } with
+    MSBuildHostVerboseSdk : Dotnet.ProjInfo.Inspect.MSBuildExePath
+    MSBuildHostDotNetSdk: Dotnet.ProjInfo.Inspect.MSBuildExePath } with
 
     static member Default (msbuildLocator: MSBuildLocator) =
-        let latestMSBuild = msbuildLocator.LatestInstalledMSBuild ()
-        { LoaderConfig.MSBuildHost = latestMSBuild
-          MSBuildNetSdkHost = msbuildLocator.DotnetMSBuildFromPATH }
+        let latestMSBuild = msbuildLocator.LatestInstalledMSBuildNET ()
+        { LoaderConfig.MSBuildHostVerboseSdk = latestMSBuild
+          MSBuildHostDotNetSdk = msbuildLocator.DotnetMSBuildFromPATH }
 
     static member FromPATH (msbuildLocator: MSBuildLocator) =
-        { LoaderConfig.MSBuildHost = msbuildLocator.MSBuildFromPATH
-          MSBuildNetSdkHost = msbuildLocator.DotnetMSBuildFromPATH }
+        { LoaderConfig.MSBuildHostVerboseSdk = msbuildLocator.MSBuildFromPATH
+          MSBuildHostDotNetSdk = msbuildLocator.DotnetMSBuildFromPATH }
 
-type Loader private (msbuildPath, msbuildNetSdkPath) =
+type Loader private (msbuildHostDotNetSdk, msbuildHostVerboseSdk) =
 
     let event1 = new Event<_>()
     let parsedProjects = ConcurrentDictionary<_, _>()
@@ -62,11 +62,11 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
         | true, v -> Some v
         | false, _ -> None
 
-    member this.MSBuildPath
-        with get () : Dotnet.ProjInfo.Inspect.MSBuildExePath = msbuildPath
+    member this.MSBuildHostVerboseSdk
+        with get () : Dotnet.ProjInfo.Inspect.MSBuildExePath = msbuildHostVerboseSdk
 
-    member this.MSBuildNetSdkPath
-        with get () : Dotnet.ProjInfo.Inspect.MSBuildExePath = msbuildNetSdkPath
+    member this.MSBuildHostDotNetSdk
+        with get () : Dotnet.ProjInfo.Inspect.MSBuildExePath = msbuildHostDotNetSdk
 
     member this.LoadProjects(projects: string list) =
         this.LoadProjects(projects, CrosstargetingStrategies.preferDotnetCore)
@@ -82,12 +82,12 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
 
             let loader =
                 if File.Exists project then
-                    match project with
-                    | NetCoreSdk ->
-                        ProjectCrackerDotnetSdk.load crosstargetingStrategy this.MSBuildNetSdkPath
-                    | Net45 ->
-                        ProjectCrackerDotnetSdk.loadVerboseSdk crosstargetingStrategy this.MSBuildPath
-                    | NetCoreProjectJson | Unsupported ->
+                    match kindOfProjectSdk project with
+                    | Some ProjectSdkKind.DotNetSdk ->
+                        ProjectCrackerDotnetSdk.load crosstargetingStrategy this.MSBuildHostDotNetSdk
+                    | Some ProjectSdkKind.VerboseSdk ->
+                        ProjectCrackerDotnetSdk.loadVerboseSdk crosstargetingStrategy this.MSBuildHostVerboseSdk
+                    | Some ProjectSdkKind.ProjectJson | None ->
                         failwithf "unsupported project %s" project
                  else
                     fun notify _ proj ->
@@ -131,13 +131,13 @@ type Loader private (msbuildPath, msbuildNetSdkPath) =
             failwithf "cannot load the sln: %A" d
 
     static member Create(config: LoaderConfig) =
-        Loader(config.MSBuildHost, config.MSBuildNetSdkHost)
+        Loader(config.MSBuildHostDotNetSdk, config.MSBuildHostVerboseSdk)
 
 type NetFWInfoConfig = {
     MSBuildHost : Dotnet.ProjInfo.Inspect.MSBuildExePath } with
 
     static member Default (msbuildLocator: MSBuildLocator) =
-        let latestMSBuild = msbuildLocator.LatestInstalledMSBuild ()
+        let latestMSBuild = msbuildLocator.LatestInstalledMSBuildNET ()
         { NetFWInfoConfig.MSBuildHost = latestMSBuild }
 
     static member FromPATH (msbuildLocator: MSBuildLocator) =

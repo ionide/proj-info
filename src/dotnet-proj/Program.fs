@@ -246,12 +246,18 @@ let validateProj log projOpt = attempt {
         | _xs ->
             Error (InvalidArgsState "multiple .*proj found in current directory, use --project argument to specify path")
 
+    let workDir = Directory.GetCurrentDirectory()
+
     let! proj =
         match projOpt with
-        | Some p -> Ok p
+        | Some p ->
+            if File.Exists(p) then
+                Ok p
+            else
+                // scan given directory
+                scanDirForProj (Path.Combine(workDir, p))
         | None ->
-            //scan current directory
-            let workDir = Directory.GetCurrentDirectory()
+            // scan current directory
             scanDirForProj workDir
 
     let projPath = proj |> Path.GetFullPath
@@ -265,48 +271,41 @@ let validateProj log projOpt = attempt {
     return projPath
     }
 
+open Dotnet.ProjInfo.Workspace.ProjectRecognizer
+
 let analizeProj projPath = attempt {
 
     let! (isDotnetSdk, pi) =
-        match projPath with
-        | ProjectRecognizer.DotnetSdk pi ->
+        match kindOfProjectSdk projPath, ProjectLanguageRecognizer.languageOfProject projPath with
+        | Some ProjectSdkKind.DotNetSdk, pi ->
             Ok (true, pi)
-        | ProjectRecognizer.OldSdk pi ->
-#if NETCOREAPP1_0
-            Errors.GenericError "unsupported project format on .net core 1.0, use at least .net core 2.0"
-            |> Result.Error
-#else
+        | Some ProjectSdkKind.VerboseSdk, pi ->
             Ok (false, pi)
-#endif
-        | ProjectRecognizer.Unsupported ->
+        | Some ProjectSdkKind.ProjectJson, _
+        | None, _ ->
             Errors.GenericError "unsupported project format"
             |> Result.Error
 
-    return isDotnetSdk, pi, getProjectInfo
+    return isDotnetSdk, pi
     }
 
-let propMain log (results: ParseResults<PropCLIArguments>) = attempt {
+let doNothing _log _msbuildExec projPath =
+    Result.Ok None
 
-    let! projPath =
-        results.TryGetResult <@ PropCLIArguments.Project @>
-        |> validateProj log
+let doRestore _log msbuildExec projPath =
+    msbuildExec projPath [ MSBuild.MSbuildCli.Target "Restore" ]
+    |> Result.map Some
 
-    let! (isDotnetSdk, _, getProjectInfoBySdk) = analizeProj projPath
+let restoreIfNeededBySdk isDotnetSdk =
+    if isDotnetSdk then doRestore else doNothing
 
-    let globalArgs =
-        [ results.TryGetResult <@ PropCLIArguments.Framework @>, if isDotnetSdk then "TargetFramework" else "TargetFrameworkVersion"
-          results.TryGetResult <@ PropCLIArguments.Runtime @>, "RuntimeIdentifier"
-          results.TryGetResult <@ PropCLIArguments.Configuration @>, "Configuration" ]
-        |> List.choose (fun (a,p) -> a |> Option.map (fun x -> (p,x)))
-        |> List.map (MSBuild.MSbuildCli.Property)
+let pickMsbuild isDotnetSdk (msbuildArg: Quotations.Expr<(string -> 'a)>) (dotnetcliArg: Quotations.Expr<(string -> 'a)>) (msbuildhostArg: Quotations.Expr<(MSBuildHostPicker -> 'a)>) (results: ParseResults<'a>) =
 
-    let msbuildPath = results.GetResult(<@ PropCLIArguments.MSBuild @>, defaultValue = "msbuild")
-    let dotnetPath = results.GetResult(<@ PropCLIArguments.DotnetCli @>, defaultValue = "dotnet")
-    let dotnetHostPicker = results.GetResult(<@ PropCLIArguments.MSBuild_Host @>, defaultValue = MSBuildHostPicker.Auto)
+    let msbuildPath = results.GetResult(msbuildArg, defaultValue = "msbuild")
+    let dotnetPath = results.GetResult(dotnetcliArg, defaultValue = "dotnet")
+    let dotnetHostPicker = results.GetResult(msbuildhostArg, defaultValue = MSBuildHostPicker.Auto)
 
-    let props = results.GetResults <@ PropCLIArguments.GetProperty @>
-
-    let cmd () = getProperties props
+    let cmd = getP2PRefs
 
     let rec msbuildHost host =
         match host with
@@ -322,7 +321,32 @@ let propMain log (results: ParseResults<PropCLIArguments>) = attempt {
         | x ->
             failwithf "Unexpected msbuild host '%A'" x
 
-    return projPath, getProjectInfoBySdk, cmd, (msbuildHost dotnetHostPicker), globalArgs
+    msbuildHost dotnetHostPicker
+
+let propMain log (results: ParseResults<PropCLIArguments>) = attempt {
+
+    let! projPath =
+        results.TryGetResult <@ PropCLIArguments.Project @>
+        |> validateProj log
+
+    let! (isDotnetSdk, _) = analizeProj projPath
+
+    let globalArgs =
+        [ results.TryGetResult <@ PropCLIArguments.Framework @>, if isDotnetSdk then "TargetFramework" else "TargetFrameworkVersion"
+          results.TryGetResult <@ PropCLIArguments.Runtime @>, "RuntimeIdentifier"
+          results.TryGetResult <@ PropCLIArguments.Configuration @>, "Configuration" ]
+        |> List.choose (fun (a,p) -> a |> Option.map (fun x -> (p,x)))
+        |> List.map (MSBuild.MSbuildCli.Property)
+
+    let props = results.GetResults <@ PropCLIArguments.GetProperty @>
+
+    let cmd () = getProperties props
+
+    let msbuildHost =
+        results
+        |> pickMsbuild isDotnetSdk <@ PropCLIArguments.MSBuild @> <@ PropCLIArguments.DotnetCli @> <@ PropCLIArguments.MSBuild_Host @>
+
+    return projPath, cmd, msbuildHost, globalArgs, (restoreIfNeededBySdk isDotnetSdk)
     }
 
 let itemMain log (results: ParseResults<ItemCLIArguments>) = attempt {
@@ -331,7 +355,7 @@ let itemMain log (results: ParseResults<ItemCLIArguments>) = attempt {
         results.TryGetResult <@ ItemCLIArguments.Project @>
         |> validateProj log
 
-    let! (isDotnetSdk, _, getProjectInfoBySdk) = analizeProj projPath
+    let! (isDotnetSdk, _) = analizeProj projPath
 
     let globalArgs =
         [ results.TryGetResult <@ ItemCLIArguments.Framework @>, if isDotnetSdk then "TargetFramework" else "TargetFrameworkVersion"
@@ -339,10 +363,6 @@ let itemMain log (results: ParseResults<ItemCLIArguments>) = attempt {
           results.TryGetResult <@ ItemCLIArguments.Configuration @>, "Configuration" ]
         |> List.choose (fun (a,p) -> a |> Option.map (fun x -> (p,x)))
         |> List.map (MSBuild.MSbuildCli.Property)
-
-    let msbuildPath = results.GetResult(<@ ItemCLIArguments.MSBuild @>, defaultValue = "msbuild")
-    let dotnetPath = results.GetResult(<@ ItemCLIArguments.DotnetCli @>, defaultValue = "dotnet")
-    let dotnetHostPicker = results.GetResult(<@ ItemCLIArguments.MSBuild_Host @>, defaultValue = MSBuildHostPicker.Auto)
 
     let parseItemPath (path: string) =
         match path.Split('.') |> List.ofArray with
@@ -364,21 +384,11 @@ let itemMain log (results: ParseResults<ItemCLIArguments>) = attempt {
 
     let cmd () = getItems items dependsOn
 
-    let rec msbuildHost host =
-        match host with
-        | MSBuildHostPicker.MSBuild ->
-            MSBuildExePath.Path msbuildPath
-        | MSBuildHostPicker.DotnetMSBuild ->
-            MSBuildExePath.DotnetMsbuild dotnetPath
-        | MSBuildHostPicker.Auto ->
-            if isDotnetSdk then
-                msbuildHost MSBuildHostPicker.DotnetMSBuild
-            else
-                msbuildHost MSBuildHostPicker.MSBuild
-        | x ->
-            failwithf "Unexpected msbuild host '%A'" x
+    let msbuildHost =
+        results
+        |> pickMsbuild isDotnetSdk <@ ItemCLIArguments.MSBuild @> <@ ItemCLIArguments.DotnetCli @> <@ ItemCLIArguments.MSBuild_Host @>
 
-    return projPath, getProjectInfoBySdk, cmd, (msbuildHost dotnetHostPicker), globalArgs
+    return projPath, cmd, msbuildHost, globalArgs, (restoreIfNeededBySdk isDotnetSdk)
     }
 
 let fscArgsMain log (results: ParseResults<FscArgsCLIArguments>) = attempt {
@@ -387,21 +397,21 @@ let fscArgsMain log (results: ParseResults<FscArgsCLIArguments>) = attempt {
         results.TryGetResult <@ FscArgsCLIArguments.Project @>
         |> validateProj log
 
-    let! (isDotnetSdk, pi, getProjectInfoBySdk) = analizeProj projPath
+    let! (isDotnetSdk, projectLanguage) = analizeProj projPath
 
     let! getCompilerArgsBySdk =
-        match isDotnetSdk, pi.Language with
-        | true, ProjectRecognizer.ProjectLanguage.FSharp ->
+        match isDotnetSdk, projectLanguage with
+        | true, ProjectLanguageRecognizer.ProjectLanguage.FSharp ->
             Ok getFscArgs
-        | false, ProjectRecognizer.ProjectLanguage.FSharp ->
+        | false, ProjectLanguageRecognizer.ProjectLanguage.FSharp ->
             let asFscArgs props =
                 let fsc = Microsoft.FSharp.Build.Fsc()
                 Dotnet.ProjInfo.FakeMsbuildTasks.getResponseFileFromTask props fsc
             Ok (getFscArgsOldSdk (asFscArgs >> Ok))
-        | _, ProjectRecognizer.ProjectLanguage.CSharp ->
+        | _, ProjectLanguageRecognizer.ProjectLanguage.CSharp ->
             Errors.GenericError (sprintf "fsc args not supported on .csproj, expected an .fsproj" )
             |> Result.Error
-        | _, ProjectRecognizer.ProjectLanguage.Unknown ext ->
+        | _, ProjectLanguageRecognizer.ProjectLanguage.Unknown ext ->
             Errors.GenericError (sprintf "compiler args not supported on project with extension %s, expected .fsproj" ext)
             |> Result.Error
 
@@ -412,27 +422,13 @@ let fscArgsMain log (results: ParseResults<FscArgsCLIArguments>) = attempt {
         |> List.choose (fun (a,p) -> a |> Option.map (fun x -> (p,x)))
         |> List.map (MSBuild.MSbuildCli.Property)
 
-    let msbuildPath = results.GetResult(<@ FscArgsCLIArguments.MSBuild @>, defaultValue = "msbuild")
-    let dotnetPath = results.GetResult(<@ FscArgsCLIArguments.DotnetCli @>, defaultValue = "dotnet")
-    let dotnetHostPicker = results.GetResult(<@ FscArgsCLIArguments.MSBuild_Host @>, defaultValue = MSBuildHostPicker.Auto)
-
     let cmd = getCompilerArgsBySdk
 
-    let rec msbuildHost host =
-        match host with
-        | MSBuildHostPicker.MSBuild ->
-            MSBuildExePath.Path msbuildPath
-        | MSBuildHostPicker.DotnetMSBuild ->
-            MSBuildExePath.DotnetMsbuild dotnetPath
-        | MSBuildHostPicker.Auto ->
-            if isDotnetSdk then
-                msbuildHost MSBuildHostPicker.DotnetMSBuild
-            else
-                msbuildHost MSBuildHostPicker.MSBuild
-        | x ->
-            failwithf "Unexpected msbuild host '%A'" x
+    let msbuildHost =
+        results
+        |> pickMsbuild isDotnetSdk <@ FscArgsCLIArguments.MSBuild @> <@ FscArgsCLIArguments.DotnetCli @> <@ FscArgsCLIArguments.MSBuild_Host @>
 
-    return projPath, getProjectInfoBySdk, cmd, (msbuildHost dotnetHostPicker), globalArgs
+    return projPath, cmd, msbuildHost, globalArgs, (restoreIfNeededBySdk isDotnetSdk)
     }
 
 let cscArgsMain log (results: ParseResults<CscArgsCLIArguments>) = attempt {
@@ -441,19 +437,19 @@ let cscArgsMain log (results: ParseResults<CscArgsCLIArguments>) = attempt {
         results.TryGetResult <@ CscArgsCLIArguments.Project @>
         |> validateProj log
 
-    let! (isDotnetSdk, pi, getProjectInfoBySdk) = analizeProj projPath
+    let! (isDotnetSdk, projectLanguage) = analizeProj projPath
 
     let! getCompilerArgsBySdk =
-        match isDotnetSdk, pi.Language with
-        | true, ProjectRecognizer.ProjectLanguage.CSharp ->
+        match isDotnetSdk, projectLanguage with
+        | true, ProjectLanguageRecognizer.ProjectLanguage.CSharp ->
             Ok getCscArgs
-        | false, ProjectRecognizer.ProjectLanguage.CSharp ->
+        | false, ProjectLanguageRecognizer.ProjectLanguage.CSharp ->
             Errors.GenericError "csc args not supported on old sdk"
             |> Result.Error
-        | _, ProjectRecognizer.ProjectLanguage.FSharp ->
+        | _, ProjectLanguageRecognizer.ProjectLanguage.FSharp ->
             Errors.GenericError (sprintf "csc args not supported on .fsproj, expected an .csproj" )
             |> Result.Error
-        | _, ProjectRecognizer.ProjectLanguage.Unknown ext ->
+        | _, ProjectLanguageRecognizer.ProjectLanguage.Unknown ext ->
             Errors.GenericError (sprintf "compiler args not supported on project with extension %s" ext)
             |> Result.Error
 
@@ -464,27 +460,13 @@ let cscArgsMain log (results: ParseResults<CscArgsCLIArguments>) = attempt {
         |> List.choose (fun (a,p) -> a |> Option.map (fun x -> (p,x)))
         |> List.map (MSBuild.MSbuildCli.Property)
 
-    let msbuildPath = results.GetResult(<@ CscArgsCLIArguments.MSBuild @>, defaultValue = "msbuild")
-    let dotnetPath = results.GetResult(<@ CscArgsCLIArguments.DotnetCli @>, defaultValue = "dotnet")
-    let dotnetHostPicker = results.GetResult(<@ CscArgsCLIArguments.MSBuild_Host @>, defaultValue = MSBuildHostPicker.Auto)
-
     let cmd = getCompilerArgsBySdk
 
-    let rec msbuildHost host =
-        match host with
-        | MSBuildHostPicker.MSBuild ->
-            MSBuildExePath.Path msbuildPath
-        | MSBuildHostPicker.DotnetMSBuild ->
-            MSBuildExePath.DotnetMsbuild dotnetPath
-        | MSBuildHostPicker.Auto ->
-            if isDotnetSdk then
-                msbuildHost MSBuildHostPicker.DotnetMSBuild
-            else
-                msbuildHost MSBuildHostPicker.MSBuild
-        | x ->
-            failwithf "Unexpected msbuild host '%A'" x
+    let msbuildHost =
+        results
+        |> pickMsbuild isDotnetSdk <@ CscArgsCLIArguments.MSBuild @> <@ CscArgsCLIArguments.DotnetCli @> <@ CscArgsCLIArguments.MSBuild_Host @>
 
-    return projPath, getProjectInfoBySdk, cmd, (msbuildHost dotnetHostPicker), globalArgs
+    return projPath, cmd, msbuildHost, globalArgs, (restoreIfNeededBySdk isDotnetSdk)
     }
 
 let p2pMain log (results: ParseResults<P2pCLIArguments>) = attempt {
@@ -493,25 +475,7 @@ let p2pMain log (results: ParseResults<P2pCLIArguments>) = attempt {
         results.TryGetResult <@ P2pCLIArguments.Project @>
         |> validateProj log
 
-    let! (isDotnetSdk, pi, getProjectInfoBySdk) = analizeProj projPath
-
-    let getCompilerArgsBySdk () =
-        match isDotnetSdk, pi.Language with
-        | true, ProjectRecognizer.ProjectLanguage.FSharp ->
-            Ok getFscArgs
-        | true, ProjectRecognizer.ProjectLanguage.CSharp ->
-            Ok getCscArgs
-        | false, ProjectRecognizer.ProjectLanguage.FSharp ->
-            let asFscArgs props =
-                let fsc = Microsoft.FSharp.Build.Fsc()
-                Dotnet.ProjInfo.FakeMsbuildTasks.getResponseFileFromTask props fsc
-            Ok (getFscArgsOldSdk (asFscArgs >> Ok))
-        | false, ProjectRecognizer.ProjectLanguage.CSharp ->
-            Errors.GenericError "csc args not supported on old sdk"
-            |> Result.Error
-        | _, ProjectRecognizer.ProjectLanguage.Unknown ext ->
-            Errors.GenericError (sprintf "compiler args not supported on project with extension %s" ext)
-            |> Result.Error
+    let! (isDotnetSdk, _projectLanguage) = analizeProj projPath
 
     let globalArgs =
         [ results.TryGetResult <@ P2pCLIArguments.Framework @>, if isDotnetSdk then "TargetFramework" else "TargetFrameworkVersion"
@@ -520,27 +484,13 @@ let p2pMain log (results: ParseResults<P2pCLIArguments>) = attempt {
         |> List.choose (fun (a,p) -> a |> Option.map (fun x -> (p,x)))
         |> List.map (MSBuild.MSbuildCli.Property)
 
-    let msbuildPath = results.GetResult(<@ P2pCLIArguments.MSBuild @>, defaultValue = "msbuild")
-    let dotnetPath = results.GetResult(<@ P2pCLIArguments.DotnetCli @>, defaultValue = "dotnet")
-    let dotnetHostPicker = results.GetResult(<@ P2pCLIArguments.MSBuild_Host @>, defaultValue = MSBuildHostPicker.Auto)
-
     let cmd = getP2PRefs
 
-    let rec msbuildHost host =
-        match host with
-        | MSBuildHostPicker.MSBuild ->
-            MSBuildExePath.Path msbuildPath
-        | MSBuildHostPicker.DotnetMSBuild ->
-            MSBuildExePath.DotnetMsbuild dotnetPath
-        | MSBuildHostPicker.Auto ->
-            if isDotnetSdk then
-                msbuildHost MSBuildHostPicker.DotnetMSBuild
-            else
-                msbuildHost MSBuildHostPicker.MSBuild
-        | x ->
-            failwithf "Unexpected msbuild host '%A'" x
+    let msbuildHost =
+        results
+        |> pickMsbuild isDotnetSdk <@ P2pCLIArguments.MSBuild @> <@ P2pCLIArguments.DotnetCli @> <@ P2pCLIArguments.MSBuild_Host @>
 
-    return projPath, getProjectInfoBySdk, cmd, (msbuildHost dotnetHostPicker), globalArgs
+    return projPath, cmd, msbuildHost, globalArgs, (restoreIfNeededBySdk isDotnetSdk)
     }
 
 let netFwMain log (results: ParseResults<NetFwCLIArguments>) = attempt {
@@ -556,7 +506,7 @@ let netFwMain log (results: ParseResults<NetFwCLIArguments>) = attempt {
 
     let msbuildHost = MSBuildExePath.Path msbuildPath
 
-    return projPath, getProjectInfo, cmd, msbuildHost, []
+    return projPath, cmd, msbuildHost, [], doNothing
     }
 
 let netFwRefMain log (results: ParseResults<NetFwRefCLIArguments>) = attempt {
@@ -577,7 +527,7 @@ let netFwRefMain log (results: ParseResults<NetFwRefCLIArguments>) = attempt {
 
     let msbuildHost = MSBuildExePath.Path msbuildPath
 
-    return projPath, getProjectInfo, cmd, msbuildHost, []
+    return projPath, cmd, msbuildHost, [], doNothing
     }
 
 let realMain argv = attempt {
@@ -589,7 +539,7 @@ let realMain argv = attempt {
         | Some _ -> printfn "%s"
         | None -> ignore
 
-    let! (projPath, getProjectInfoBySdk, cmd, msbuildHost, globalArgs) =
+    let! (projPath, cmd, msbuildHost, globalArgs, preAction) =
         match results.TryGetSubCommand () with
         | Some (Prop subCmd) ->
             propMain log subCmd
@@ -615,20 +565,18 @@ let realMain argv = attempt {
         | "1" -> MSBuild.MSbuildCli.Switch("bl") :: globalArgs
         | _ -> globalArgs
 
-    let exec getArgs additionalArgs = attempt {
-        let msbuildExec =
-            let projDir = Path.GetDirectoryName(projPath)
-            msbuild msbuildHost (runCmd log projDir)
+    let msbuildExec proj args =
+        let projDir = Path.GetDirectoryName(projPath)
+        msbuild msbuildHost (runCmd log projDir) proj (globalArgs @ args)
 
-        let! r =
-            projPath
-            |> getProjectInfoBySdk log msbuildExec getArgs additionalArgs
-            |> Result.mapError ExecutionError
+    do! preAction log msbuildExec projPath
+        |> Result.map ignore
+        |> Result.mapError ExecutionError
 
-        return r
-        }
-
-    let! r = exec cmd globalArgs
+    let! r =
+        projPath
+        |> getProjectInfo log msbuildExec cmd
+        |> Result.mapError ExecutionError
 
     let out =
         match r with
@@ -695,11 +643,11 @@ let main argv =
         | ExecutionError (MSBuildFailed (i, ShellCommandResult(wd, exePath, args, output))) ->
             printfn "msbuild exit code: %i" i
             printfn "command line was: %s> %s %s" wd exePath args
-            output
-                |> Seq.iter (fun (isErr, line) ->
-                    if isErr then
-                        printfn "stderr: %s" line
-                    else printfn "stdout: %s" line)
+            for (isErr, line) in output do
+                if isErr then
+                    printfn "stderr: %s" line
+                else
+                    printfn "stdout: %s" line
             7
         | ExecutionError (UnexpectedMSBuildResult r) ->
             printfn "%A" r
