@@ -315,7 +315,7 @@ module internal ProjectCrackerDotnetSdk =
     let _, po, log, additionalProjs = projInfoCached (projInfoCrossTargeting crosstargetingChooser projInfoFromMsbuild projInfoCached) [] rootProjFile
     (po, log, additionalProjs)
 
-  let private loadBySdk crosstargetingStrategy msbuildPath notifyState projInfoCached file =
+  let load crosstargetingStrategy msbuildPath notifyState projInfoCached file =
       try
         let po, log, additionalProjs = getProjectOptionsFromProjectFile crosstargetingStrategy (execProjInfoFromMsbuild msbuildPath notifyState) projInfoCached file
 
@@ -323,9 +323,6 @@ module internal ProjectCrackerDotnetSdk =
       with
         | ProjectInspectException d -> Error d
         | e -> Error (GenericError(file, e.Message))
-
-  let load crosstargetingStrategy msbuildPath notifyState projInfoCached file =
-      loadBySdk crosstargetingStrategy msbuildPath notifyState projInfoCached file
 
 type CrosstargetingStrategy = string -> (string * string * string list) -> string
 
