@@ -130,12 +130,7 @@ module internal ProjectCrackerDotnetSdk =
 
     let additionalArgs = additionalMSBuildProps |> List.map (Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Property)
 
-    let inspect =
-        match projectSdkKind with
-        | ProjectSdkKind.DotNetSdk ->
-            Dotnet.ProjInfo.Inspect.getProjectInfos
-        | ProjectSdkKind.VerboseSdk ->
-            Dotnet.ProjInfo.Inspect.getProjectInfos // getProjectInfosOldSdk
+    let inspect = Dotnet.ProjInfo.Inspect.getProjectInfos
 
     let globalArgs =
         match Environment.GetEnvironmentVariable("DOTNET_PROJ_INFO_MSBUILD_BL") with
