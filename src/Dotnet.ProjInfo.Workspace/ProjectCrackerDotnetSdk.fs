@@ -261,7 +261,9 @@ module internal ProjectCrackerDotnetSdk =
                     v.TargetFrameworkVersion |> Dotnet.ProjInfo.NETFramework.netifyTargetFrameworkVersion
             SourceFiles = sourceFiles
             OtherOptions = otherOptions
-            ReferencedProjects = p2pProjects |> List.map (fun (_,y,_,_) -> { ProjectReference.ProjectFileName = y.ProjectFileName; TargetFramework = y.TargetFramework })
+            ReferencedProjects =
+                p2pProjects
+                |> List.map (fun (_,y,_,_) -> { ProjectReference.ProjectFileName = y.ProjectFileName; TargetFramework = y.TargetFramework })
             LoadTime = DateTime.Now
             Items = compileItems
             ExtraProjectInfo =
