@@ -183,16 +183,6 @@ module internal ProjectCrackerDotnetSdk =
     | _ ->
         failwithf "error getting msbuild info: internal error"
 
-  let asProjInfoCached (cache: ParsedProjectCache) getProjInfoOf additionalMSBuildProps file : ParsedProject =
-    let key = sprintf "%s;%A" file additionalMSBuildProps
-    match cache.TryGetValue(key) with
-    | true, alreadyParsed ->
-        alreadyParsed
-    | false, _ ->
-        let p = file |> getProjInfoOf additionalMSBuildProps
-        cache.AddOrUpdate(key, p, fun _ _ -> p)
-
-
   let private visitSingleTfmProj follow parseAsSdk (file, projData) =
 
     let { NoCrossTargetingData.FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } = projData
@@ -333,12 +323,10 @@ module internal ProjectCrackerDotnetSdk =
         | ProjectInspectException d -> Error d
         | e -> Error (GenericError(file, e.Message))
 
-  let load crosstargetingStrategy msbuildPath notifyState (cache: ParsedProjectCache) file =
-      let projInfoCached = asProjInfoCached cache
+  let load crosstargetingStrategy msbuildPath notifyState projInfoCached file =
       loadBySdk crosstargetingStrategy msbuildPath notifyState projInfoCached ProjectParsingSdk.DotnetSdk file
 
-  let loadVerboseSdk crosstargetingStrategy msbuildPath notifyState (cache: ParsedProjectCache) file =
-      let projInfoCached = asProjInfoCached cache
+  let loadVerboseSdk crosstargetingStrategy msbuildPath notifyState projInfoCached file =
       loadBySdk crosstargetingStrategy msbuildPath notifyState projInfoCached ProjectParsingSdk.VerboseSdk file
 
 type CrosstargetingStrategy = string -> (string * string * string list) -> string

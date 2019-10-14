@@ -51,6 +51,15 @@ type Loader private (msbuildHostDotNetSdk, msbuildHostVerboseSdk) =
         { ProjectKey.ProjectPath = po.ProjectFileName
           TargetFramework = po.TargetFramework }
 
+    let asProjInfoCached (cache: ProjectCrackerDotnetSdk.ParsedProjectCache) getProjInfoOf additionalMSBuildProps file : ProjectCrackerDotnetSdk.ParsedProject =
+        let key = sprintf "%s;%A" file additionalMSBuildProps
+        match cache.TryGetValue(key) with
+        | true, alreadyParsed ->
+            alreadyParsed
+        | false, _ ->
+            let p = file |> getProjInfoOf additionalMSBuildProps
+            cache.AddOrUpdate(key, p, fun _ _ -> p)
+
     [<CLIEvent>]
     member __.Notifications = event1.Publish
 
@@ -74,7 +83,9 @@ type Loader private (msbuildHostDotNetSdk, msbuildHostVerboseSdk) =
     member this.LoadProjects(projects: string list, crosstargetingStrategy: CrosstargetingStrategy) =
 
         let cache = ProjectCrackerDotnetSdk.ParsedProjectCache()
-        
+
+        let projInfoCached = asProjInfoCached cache
+
         let notify arg =
             event1.Trigger(this, arg)
 
@@ -95,7 +106,7 @@ type Loader private (msbuildHostDotNetSdk, msbuildHostVerboseSdk) =
                         notify loading
                         Error (GetProjectOptionsErrors.GenericError(proj, "not found"))
 
-            match loader notify cache project with
+            match loader notify projInfoCached project with
             | Ok (po, props, additionalProjs) ->
                 let rec visit (p: ProjectOptions) = seq {
                     yield p
