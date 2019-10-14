@@ -98,7 +98,7 @@ type Loader private (msbuildHostDotNetSdk, msbuildHostVerboseSdk) =
                         ProjectCrackerDotnetSdk.load crosstargetingStrategy this.MSBuildHostDotNetSdk
                     | Some ProjectSdkKind.VerboseSdk ->
                         ProjectCrackerDotnetSdk.loadVerboseSdk crosstargetingStrategy this.MSBuildHostVerboseSdk
-                    | Some ProjectSdkKind.ProjectJson | None ->
+                    | None ->
                         failwithf "unsupported project %s" project
                  else
                     fun notify _ proj ->

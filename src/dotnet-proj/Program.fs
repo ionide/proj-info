@@ -281,7 +281,6 @@ let analizeProj projPath = attempt {
             Ok (true, pi)
         | Some ProjectSdkKind.VerboseSdk, pi ->
             Ok (false, pi)
-        | Some ProjectSdkKind.ProjectJson, _
         | None, _ ->
             Errors.GenericError "unsupported project format"
             |> Result.Error

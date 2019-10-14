@@ -101,7 +101,6 @@ module ProjectRecognizer =
 
     [<RequireQualifiedAccess>]
     type ProjectSdkKind =
-        | ProjectJson
         | DotNetSdk
         | VerboseSdk
 
@@ -123,11 +122,8 @@ module ProjectRecognizer =
                     getProjectType sr (limit-1)
                 else // both net45 and preview3-5 have 'ToolsVersion', > 5 has 'Sdk'
                     if isNetCore line then Some ProjectSdkKind.DotNetSdk else Some ProjectSdkKind.VerboseSdk
-        if Path.GetExtension file = ".json" then
-            Some ProjectSdkKind.ProjectJson // dotnet core preview 2 or earlier
-        else
-            use sr = File.OpenText(file)
-            getProjectType sr 3
+        use sr = File.OpenText(file)
+        getProjectType sr 3
 
 
 module internal FscArguments =
