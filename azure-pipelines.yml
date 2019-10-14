@@ -1,0 +1,55 @@
+name: $(Rev:r)
+jobs:
+- job: Windows
+  pool:
+    vmImage: 'vs2017-win2016'
+  steps:
+  - powershell: |
+      $buildId = $env:BUILD_BUILDNUMBER.PadLeft(5, '0');
+      $versionSuffixPR = "-PR$($env:SYSTEM_PULLREQUEST_PULLREQUESTNUMBER)-$buildId";
+      $branchName = "$env:BUILD_SOURCEBRANCHNAME".Replace("_","");
+      $versionSuffixBRANCH = "-$branchName-$buildId";
+      $isTag = "$env:BUILD_SOURCEBRANCH".StartsWith('refs/tags/');
+      $isPR = "$env:SYSTEM_PULLREQUEST_PULLREQUESTNUMBER" -ne ""
+      $versionSuffix = if ($isTag) { "" } else { if ($isPR) { $versionSuffixPR } else { $versionSuffixBRANCH } };
+      Write-Host "##vso[task.setvariable variable=VersionSuffix]$versionSuffix";
+  - task: UseDotNet@2
+    displayName: 'Use .NET Core Sdk'
+    inputs:
+      version: 2.1.401
+  - script: dotnet pack -v n
+    displayName: Create package
+    env:
+      VersionSuffix: '$(VersionSuffix)'
+  - script: dotnet test -v n
+    displayName: Run tests
+    env:
+      VersionSuffix: '$(VersionSuffix)'
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFormat: 'VSTest'
+      testResultsFiles: 'tests/**/TestResults/*.trx'
+    condition: succeededOrFailed()
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: 'bin/nupkg'
+      artifactName: 'nupkgs'
+- job: Linux
+  pool:
+    vmImage: 'ubuntu-16.04'
+  steps:
+  - script: echo "##vso[task.setvariable variable=FrameworkPathOverride]$(dirname $(which mono))/../lib/mono/4.6.1-api/"
+    displayName: Workaround .NET reference assemblies on linux
+  - task: UseDotNet@2
+    displayName: 'Use .NET Core Sdk'
+    inputs:
+      version: 2.1.401
+  - script: dotnet pack -v n
+    displayName: Create package
+  - script: dotnet test -v n
+    displayName: Run tests
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFormat: 'VSTest'
+      testResultsFiles: 'tests/**/TestResults/*.trx'
+    condition: succeededOrFailed()
