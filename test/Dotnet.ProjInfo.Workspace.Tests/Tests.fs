@@ -1023,7 +1023,7 @@ let tests (suiteConfig: TestSuiteConfig) =
 
         let msbuildLocator = MSBuildLocator()
 
-        let msbuildPaths = msbuildLocator.InstalledMSBuilds ()
+        let msbuildPaths = msbuildLocator.InstalledMSBuildNET ()
 
         logMsbuild logger msbuildPaths
 
@@ -1035,7 +1035,7 @@ let tests (suiteConfig: TestSuiteConfig) =
 
         let msbuildLocator = MSBuildLocator()
 
-        let msbuildPath = msbuildLocator.LatestInstalledMSBuild ()
+        let msbuildPath = msbuildLocator.LatestInstalledMSBuildNET ()
 
         logMsbuild logger msbuildPath
 

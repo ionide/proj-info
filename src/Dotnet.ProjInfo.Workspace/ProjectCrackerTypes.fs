@@ -99,7 +99,13 @@ type [<RequireQualifiedAccess>] WorkspaceProjectState =
 
 module ProjectRecognizer =
 
-    let (|NetCoreProjectJson|NetCoreSdk|Net45|Unsupported|) (file: string) =
+    [<RequireQualifiedAccess>]
+    type ProjectSdkKind =
+        | ProjectJson
+        | DotNetSdk
+        | VerboseSdk
+
+    let kindOfProjectSdk (file: string) =
         //.NET Core Sdk preview3+ replace project.json with fsproj
         //Easy way to detect new fsproj is to check the msbuild version of .fsproj
         //Post preview5 has (`Sdk="FSharp.NET.Sdk;Microsoft.NET.Sdk"`), use that
@@ -110,15 +116,15 @@ module ProjectRecognizer =
             // post preview5 dropped this, check Sdk field
             let isNetCore (line:string) = line.ToLower().Contains("sdk=")
             if limit = 0 then
-                Unsupported // unsupported project type
+                None // unknown project type
             else
                 let line = sr.ReadLine()
                 if not <| line.Contains("ToolsVersion") && not <| line.Contains("Sdk=") then
                     getProjectType sr (limit-1)
                 else // both net45 and preview3-5 have 'ToolsVersion', > 5 has 'Sdk'
-                    if isNetCore line then NetCoreSdk else Net45
+                    if isNetCore line then Some ProjectSdkKind.DotNetSdk else Some ProjectSdkKind.VerboseSdk
         if Path.GetExtension file = ".json" then
-            NetCoreProjectJson // dotnet core preview 2 or earlier
+            Some ProjectSdkKind.ProjectJson // dotnet core preview 2 or earlier
         else
             use sr = File.OpenText(file)
             getProjectType sr 3

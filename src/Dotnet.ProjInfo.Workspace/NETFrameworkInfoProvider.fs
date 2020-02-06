@@ -52,7 +52,7 @@ module internal NETFrameworkInfoProvider =
 
     let result =
         projPath
-        |> getProjectInfo log msbuildExec cmd []
+        |> getProjectInfo log msbuildExec cmd
 
     match result with
     | Ok (Dotnet.ProjInfo.Inspect.GetResult.InstalledNETFw fws) ->
@@ -129,12 +129,12 @@ module internal NETFrameworkInfoProvider =
 
       let runCmd exePath args = Utils.runProcess log projDir exePath (args |> String.concat " ")
 
-      let msbuildExec =
-        msbuild msbuildHost runCmd
+      let msbuildExec proj args =
+        msbuild msbuildHost runCmd proj (props @ args)
 
       let result =
         projPath
-        |> getProjectInfo log msbuildExec cmd props
+        |> getProjectInfo log msbuildExec cmd
 
       match result with
       | Ok (Dotnet.ProjInfo.Inspect.GetResult.ResolvedNETRefs resolvedRefs) ->
