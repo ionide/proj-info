@@ -514,7 +514,7 @@ let getResolvedP2PRefs () =
           Property ("_Inspect_GetResolvedProjectReferences_OutFile", outFile) ]
     template, args, (fun () -> bindSkipped parseResolvedP2PRefOut outFile)
 
-let uninstall_old_target_file log projPath =
+let uninstall_old_target_file log (projPath: string) =
     let projDir, projName = Path.GetDirectoryName(projPath), Path.GetFileName(projPath)
     let objDir = Path.Combine(projDir, "obj")
     let targetFileDestPath = Path.Combine(objDir, (sprintf "%s.proj-info.targets" projName))
@@ -613,7 +613,7 @@ module ProjectRecognizer =
         | FSharp
         | Unknown of string
 
-    let languageOfProject file =
+    let languageOfProject (file: string) =
         match Path.GetExtension(file) with
         | ".csproj" -> ProjectLanguage.CSharp
         | ".fsproj" -> ProjectLanguage.FSharp

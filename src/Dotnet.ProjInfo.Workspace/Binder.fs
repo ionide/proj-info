@@ -70,7 +70,7 @@ type FCSAdapter<'FCSProjectOptions>(workspace: Loader, toFCSPoMapper: FCSProject
               Error (LanguageNotSupported po.ProjectFileName)
           | po ->
 
-              let isGeneratedTfmAssemblyInfoFile path =
+              let isGeneratedTfmAssemblyInfoFile (path: string) =
                 let f = System.IO.Path.GetFileName(path)
                 f.StartsWith(".NETFramework,Version=v") && f.EndsWith(".AssemblyAttributes.fs")
 

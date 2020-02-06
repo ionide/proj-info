@@ -10,7 +10,7 @@ module VisualTree =
     // let f2 = @"c:\prova\src\b\b.fs";;
     // let fsproj = @"c:\prova\src\a\a.fsproj";;
 
-    let getDirEnsureTrailingSlash projPath =
+    let getDirEnsureTrailingSlash (projPath: string) =
         let dir = Path.GetDirectoryName(projPath)
         if dir.EndsWith(Path.DirectorySeparatorChar.ToString()) then
             dir
