@@ -32,7 +32,7 @@ steps:
   inputs:
     testResultsFormat: 'NUnit'
     testResultsFiles: '*.xml'
-    searchFolder: '$(Build.SourcesDirectory)/bin/test_results'
+    searchFolder: 'bin/test_results'
     publishRunAttachments: true
   condition: always()
   continueOnError: true

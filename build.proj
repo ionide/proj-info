@@ -24,15 +24,17 @@
     <Exec Command='dotnet pack src/Dotnet.ProjInfo.Workspace.FCS -c $(Configuration) -o "$(NupkgsDir)" -p:Version=$(Version)' />
   </Target>
 
-  <Target Name="TestTool">
-    <Exec Command='dotnet run -c $(Configuration) -- "$(Version)" --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/dotnet-proj.Tests" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' != 'true' " />
-  </Target>
-
   <ItemGroup>
+    <TestArgs Include="--known-failure --flaky " Condition=" '$(UnstableTests)' == 'true' " />
     <TestArgs Include="--summary " />
     <TestArgs Include="--fail-on-focused-tests " />
-    <TestArgs Include="--known-failure --flaky " Condition=" '$(UnstableTests)' == 'true' " />
+    <TestArgs Include="--colours 0 " />
   </ItemGroup>
+
+  <Target Name="TestTool">
+    <Exec Command='dotnet run -c $(Configuration) -- "$(Version)" %(TestArgs.Identity)' WorkingDirectory="$(RepoRootDir)/test/dotnet-proj.Tests" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' != 'true' " />
+  </Target>
+
 
   <Target Name="TestLibsNetCore">
     <Exec Command='dotnet run -p test/Dotnet.ProjInfo.Workspace.Tests -f netcoreapp2.1 -c $(Configuration) -- %(TestArgs.Identity)' IgnoreStandardErrorWarningFormat="true" />
