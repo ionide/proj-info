@@ -4,10 +4,13 @@ strategy:
   matrix:
     linux:
       imageName: 'ubuntu-18.04'
+      FrameworkPathOverride: /lib/mono/4.5
     mac:
       imageName: 'macos-10.15'
+      FrameworkPathOverride: /Library/Frameworks/Mono.framework/Versions/Current
     windows:
       imageName: 'windows-2019'
+      FrameworkPathOverride: ''
     
 
 pool:
@@ -24,8 +27,11 @@ steps:
     version: '2.1.x'
 - script: dotnet tool restore
   displayName: Install Tools
+- script: export FrameworkPathOverride=${{variables.FrameworkPathOverride}}
+  condition: and(succeeded(), or(eq(variables['Agent.OS'], 'Linux'), eq(variables['Agent.OS'], 'Darwin')))
 - script: dotnet pack -v n
   displayName: Build packages
+- script: export
 - script: dotnet test -v n -p:UnstableTests=false
   displayName: Run Tests
 - task: PublishTestResults@2
