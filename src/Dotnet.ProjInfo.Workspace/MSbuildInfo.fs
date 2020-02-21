@@ -69,10 +69,15 @@ module MSBuildInfo =
         ["msbuild"] // we're way past 5.0 now, time to get updated
       else
         let legacyPaths =
-            [ Path.Combine(programFilesX86, @"MSBuild\14.0\Bin")
-              Path.Combine(programFilesX86, @"MSBuild\12.0\Bin")
-              Path.Combine(programFilesX86, @"MSBuild\12.0\Bin\amd64")
-              @"c:\Windows\Microsoft.NET\Framework\v4.0.30319"
+          let programFilesPaths = 
+            [ @"\MSBuild\15.0\Bin"
+              @"MSBuild\14.0\Bin"
+              @"MSBuild\12.0\Bin"
+              @"MSBuild\12.0\Bin\amd64" ]
+            |> List.map (fun p -> Path.Combine(programFilesX86, p))
+
+          programFilesPaths @ 
+            [ @"c:\Windows\Microsoft.NET\Framework\v4.0.30319"
               @"c:\Windows\Microsoft.NET\Framework\v4.0.30128"
               @"c:\Windows\Microsoft.NET\Framework\v3.5" ]
 
