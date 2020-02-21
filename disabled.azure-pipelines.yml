@@ -1,3 +1,9 @@
+# to reenable AZDO builds, rename this file to 'azure-pipelines.yml' and commit.
+# these builds are close to complete, but:
+# * on windows the `MSBuild.exe` binary can't be located so the tests that crack projects using it fail
+# * on linux/osx the reference assemblies for net461 can't be located at runtime.
+#    * I've tried setting the FrameworkPathOverride and that hasn't done the job.
+#    * might be able to do something with the nuget package for the ref assemblies?
 name: $(Rev:r)
 
 strategy:
