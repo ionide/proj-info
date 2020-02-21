@@ -70,7 +70,8 @@ module MSBuildInfo =
       else
         let legacyPaths =
           let programFilesPaths = 
-            [ @"\MSBuild\15.0\Bin"
+            [ @"MSBuild\Current\Bin"
+              @"MSBuild\15.0\Bin"
               @"MSBuild\14.0\Bin"
               @"MSBuild\12.0\Bin"
               @"MSBuild\12.0\Bin\amd64" ]
