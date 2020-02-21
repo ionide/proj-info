@@ -2,7 +2,7 @@ source https://api.nuget.org/v3/index.json
 storage: none
 framework: netstandard2.0, netcoreapp2.1, net461
 
-nuget Expecto.Diff
+nuget BlackFox.VsWhere
 nuget FSharp.Core >= 4.3.4 lowest_matching: true
 nuget System.ValueTuple ~> 4.4 lowest_matching: true
 nuget FSharp.Compiler.Service ~> 34.1
@@ -13,6 +13,7 @@ nuget Microsoft.NETFramework.ReferenceAssemblies # for net461 builds
 
 nuget Expecto ~> 8.4
 nuget Expecto.TestResults ~> 8.4
+nuget Expecto.Diff ~> 8.4
 nuget MedallionShell ~> 1.5.0
 
 // the Fsc build task
