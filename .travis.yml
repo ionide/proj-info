@@ -14,28 +14,23 @@ script:
 mono:
 - 6.8.0
 
+# one build triggered for each of these
+os:
+- linux
+- osx
+
+# one build triggered for each of these
+env:
+- UnstableTests=false
+- UnstableTests=true
+
+# target the dist/osx_image based on `os`, regardless of other settings
 matrix:
   include:
     - os: linux
       dist: xenial
-      env: UnstableTests=false
     - os: osx
-      osx_image: xcode9
-      env: UnstableTests=false
-    - os: linux
-      dist: xenial
-      env: UnstableTests=true
-    - os: osx
-      osx_image: xcode9
-      env: UnstableTests=true
-    - os: linux
-      dist: xenial  
-      env: UnstableTests=false
-    - os: osx
-      osx_image: xcode9
-      env: UnstableTests=false
+      osx_image: xcode11.2
   allow_failures:
     # unstable tests may fail
     - env: UnstableTests=true
-    - dist: xenial
-      
