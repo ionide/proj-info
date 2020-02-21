@@ -1,5 +1,6 @@
 FSharp.Core
 Expecto
 Expecto.TestResults
+Expecto.Diff
 MedallionShell
 Microsoft.NETFramework.ReferenceAssemblies

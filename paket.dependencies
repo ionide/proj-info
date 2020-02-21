@@ -2,6 +2,7 @@ source https://api.nuget.org/v3/index.json
 storage: none
 framework: netstandard2.0, netcoreapp2.1, net461
 
+nuget Expecto.Diff
 nuget FSharp.Core >= 4.3.4 lowest_matching: true
 nuget System.ValueTuple ~> 4.4 lowest_matching: true
 nuget FSharp.Compiler.Service ~> 34.1
