@@ -147,7 +147,10 @@ module Result =
     | Result.Error err -> failwithf "Error: %A" err 
 
 let tests (suiteConfig: TestSuiteConfig) =
- 
+  let skipIfSet () = 
+    if suiteConfig.SkipKnownFailure 
+    then Tests.skiptest "skipping due to configuration"
+
   let prepareTestsAssets = lazy(
       let logger = Log.create "Tests Assets"
       let fs = FileUtils(logger)
@@ -227,7 +230,8 @@ let tests (suiteConfig: TestSuiteConfig) =
 
     testList "valid" [
 
-      testCase |> withLog "can load sample1" (fun logger fs ->
+      testCase |> (withLog ("can load sample1" |> knownFailure)) (fun logger fs ->
+        skipIfSet ()
         let testDir = inDir fs "load_sample1"
         copyDirFromAssets fs ``sample1 OldSdk library``.ProjDir testDir
 
@@ -372,7 +376,7 @@ let tests (suiteConfig: TestSuiteConfig) =
 
       )
 
-      testCase |> withLog ("can load sample3" |> knownFailure) (fun logger fs ->
+      testCase |> withLog "can load sample3" (fun logger fs ->
         let testDir = inDir fs "load_sample3"
         copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
 
@@ -413,39 +417,22 @@ let tests (suiteConfig: TestSuiteConfig) =
 
         expectP2PKeyIsTargetPath fcsPo
 
-        if (isOSX () && suiteConfig.SkipKnownFailure) then
-          let errorOnOsx =
-            """
-no errors but was: System.Exception: Build was not evaluated, expected the results to be ready after 'Eval' (GetCheckResultsAndImplementationsForProject, data = ("FinalizeTypeCheck", [|Id 1014; Id 1015; Id 1016; Id 1017; Id 1018|], Id 1020,
-            """.Trim()
-          Tests.skiptest (sprintf "Known failure on OSX travis. error is %s" errorOnOsx)
-          //TODO check failure on osx
-
         let result =
           fcs.ParseAndCheckProject(fcsPo)
           |> Async.RunSynchronously
 
-        if (isOSX () && suiteConfig.SkipKnownFailure) then
-          let errorOnOsx =
-            """
-no errors but was: [|commandLineArgs (0,1)-(0,1) parameter error No inputs specified;
- unknown (1,1)-(1,1) parameter error Assembly reference 'mscorlib.dll' was not found or is invalid|]. Should be empty.
-            """.Trim()
-          Tests.skiptest (sprintf "Known failure on OSX travis. error is %s" errorOnOsx)
-          //TODO check failure on osx
-          //the same sample3 workspace test fails, OtherOptions is empty
-        else
-          expectNoErrors result
+        expectNoErrors result
 
         let uses =
           result.GetAllUsesOfAllSymbols()
           |> Async.RunSynchronously
 
         Expect.isNonEmpty uses "all symbols usages"
-
       )
 
-      testCase |> withLog "can load sample7" (fun logger fs ->
+      // known failure because finind fsharp.core is a crapshoot
+      testCase |> withLog (knownFailure "can load sample7") (fun logger fs ->
+        skipIfSet ()
         let testDir = inDir fs "load_sample7"
         copyDirFromAssets fs ``sample7 Oldsdk projs``.ProjDir testDir
 
@@ -502,7 +489,10 @@ no errors but was: [|commandLineArgs (0,1)-(0,1) parameter error No inputs speci
         Expect.isNonEmpty uses "all symbols usages"
       )
 
-      testCase |> withLog "can fsx" (fun logger fs ->
+
+      // known failure because locating mono FSharp.Core on netstandard is a crapshoot
+      testCase |> withLog (knownFailure "can fsx") (fun logger fs ->
+        skipIfSet ()
         let testDir = inDir fs "check_fsx"
 
         let fcs = createFCS ()

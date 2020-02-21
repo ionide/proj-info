@@ -91,6 +91,7 @@ dotnet build
 To run tests:
 
 ```bash
+# create packages first (see below)
 dotnet test -v n
 ```
 

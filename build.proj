@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <Target Name="Restore">
-    <Exec Command="$(MonoOrEmpty)paket.exe restore" WorkingDirectory=".paket" ConsoleToMSBuild="true" />
+    <Exec Command='dotnet paket restore' ConsoleToMSBuild="true" />
     <Exec Command='dotnet restore src/dotnet-proj.sln -p:Version=$(Version)' />
   </Target>
 
@@ -29,9 +29,9 @@
   </Target>
 
   <ItemGroup>
-    <TestArgs Include="--fail-on-focused-tests --summary" Condition=" '$(UnstableTests)' != 'true' " />
-    <TestArgs Include="--known-failure --fail-on-focused-tests --summary" Condition=" '$(UnstableTests)' == 'true' " />
-    <TestArgs Include="--flaky --fail-on-focused-tests --summary" Condition=" '$(UnstableTests)' == 'true' " />
+    <TestArgs Include="--summary " />
+    <TestArgs Include="--fail-on-focused-tests " />
+    <TestArgs Include="--known-failure --flaky " Condition=" '$(UnstableTests)' == 'true' " />
   </ItemGroup>
 
   <Target Name="TestLibsNetCore">
