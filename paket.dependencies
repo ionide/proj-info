@@ -8,6 +8,8 @@ nuget FSharp.Compiler.Service ~> 34.1
 nuget Sln ~> 0.3.0
 nuget Argu ~> 5.1
 
+nuget Microsoft.NETFramework.ReferenceAssemblies # for net461 builds
+
 nuget Expecto ~> 8.4
 nuget Expecto.TestResults ~> 8.4
 nuget MedallionShell ~> 1.5.0

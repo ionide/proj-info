@@ -22,8 +22,6 @@ steps:
   displayName: 'Add .Net Core SDK 2.1.x for test projects'
   inputs:
     version: '2.1.x'
-- script: export FrameworkPathOverride=$(dirname $(which mono))/../lib/mono/4.6.1-api/
-  condition: and(succeeded(), or(eq(variables['Agent.OS'], 'Linux'), eq(variables['Agent.OS'], 'Darwin')))
 - script: dotnet tool restore
   displayName: Install Tools
 - script: dotnet pack -v n
@@ -36,3 +34,5 @@ steps:
     testResultsFiles: '*.xml'
     searchFolder: '$(Build.SourcesDirectory)/bin/test_results'
     publishRunAttachments: true
+  condition: always()
+  continueOnError: true
