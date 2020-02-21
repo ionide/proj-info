@@ -2,6 +2,17 @@ language: csharp
 
 dotnet: 3.1.101
 
+addons:
+  homebrew:
+    taps:
+    - isen-ng/dotnet-sdk-versions
+    casks:
+    - dotnet-sdk-2.1.800
+    update: true # needed to get around a breakage in the `brew bundle` command: https://github.com/Homebrew/homebrew-bundle/issues/646
+  apt:
+    packages:
+    - dotnet-sdk-2.1
+
 install:
   # workaround for missing .net 4.6.1 targing pack
   - export FrameworkPathOverride=$(dirname $(which mono))/../lib/mono/4.6.1-api/
