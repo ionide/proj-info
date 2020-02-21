@@ -66,36 +66,20 @@ module MSBuildInfo =
         |> List.map (fun (version, sku) -> Path.Combine(programFilesX86, "Microsoft Visual Studio", version, sku))
 
       if not (Utils.isWindows ()) then
-        Some ["msbuild"] // we're way past 5.0 now, time to get updated
+        ["msbuild"] // we're way past 5.0 now, time to get updated
       else
-        let getMostCurrentValidPaths () =
-          let getAllVsPath () =
-            BlackFox.VsWhere.VsInstances.getWithPackage "Microsoft.Component.MSBuild" false
-            |> List.map (fun vs -> vs.InstallationPath)
+        let legacyPaths =
+            [ Path.Combine(programFilesX86, @"MSBuild\14.0\Bin")
+              Path.Combine(programFilesX86, @"MSBuild\12.0\Bin")
+              Path.Combine(programFilesX86, @"MSBuild\12.0\Bin\amd64")
+              @"c:\Windows\Microsoft.NET\Framework\v4.0.30319"
+              @"c:\Windows\Microsoft.NET\Framework\v4.0.30128"
+              @"c:\Windows\Microsoft.NET\Framework\v3.5" ]
 
-          let getAllMsBuildPaths vsPath =
-              let msBuildDir = Path.Combine(vsPath, "MSBuild")
-              if Directory.Exists(msBuildDir) then
-                  Directory.EnumerateDirectories(msBuildDir)
-                  |> Seq.map (fun dir -> Path.Combine(dir, "Bin", "MSBuild.exe"))
-                  |> Seq.choose(fun exe ->
-                      if File.Exists(exe) then
-                          let v = System.Diagnostics.FileVersionInfo.GetVersionInfo(exe)
-                          Some (v.FileMajorPart, Path.GetDirectoryName(exe))
-                      else
-                          None)
-                  |> List.ofSeq
-              else
-                  []
-          
-          getAllVsPath ()
-          |> List.collect getAllMsBuildPaths
-          |> List.groupBy fst
-          |> List.sortByDescending fst
-          |> List.tryHead
-          |> Option.map (snd >> List.map snd)
-        
+        let sideBySidePaths =
+          vsRoots
+          |> List.map (fun root -> Path.Combine(root, "MSBuild", "15.0", "bin") )
+
         let ev = Environment.GetEnvironmentVariable "MSBuild"
-        if not (String.IsNullOrEmpty ev) 
-        then Some [ev]
-        else getMostCurrentValidPaths ()
+        if not (String.IsNullOrEmpty ev) then [ev]
+        else EnvUtils.tryFindPath (sideBySidePaths @ legacyPaths) "MsBuild.exe"

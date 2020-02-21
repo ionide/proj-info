@@ -21,13 +21,12 @@ type MSBuildLocator () =
 
     member this.InstalledMSBuildNET () =
         installedMSBuilds.Force()
-        |> Option.map (List.map (Dotnet.ProjInfo.Inspect.MSBuildExePath.Path))
+        |> List.map (Dotnet.ProjInfo.Inspect.MSBuildExePath.Path)
 
     member this.LatestInstalledMSBuildNET () =
         match installedMSBuilds.Force() with
-        | Some []  -> this.MSBuildFromPATH
-        | None -> this.MSBuildFromPATH
-        | Some(path :: _) -> Dotnet.ProjInfo.Inspect.MSBuildExePath.Path path
+        | [] -> this.MSBuildFromPATH
+        | path :: _ -> Dotnet.ProjInfo.Inspect.MSBuildExePath.Path path
 
 type LoaderConfig = {
     MSBuildHostVerboseSdk : Dotnet.ProjInfo.Inspect.MSBuildExePath
