@@ -1,19 +1,38 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
+name: $(Rev:r)
 
-trigger:
-- master
+strategy:
+  matrix:
+    linux:
+      imageName: 'ubuntu-18.04'
+    mac:
+      imageName: 'macos-10.15'
+    windows:
+      imageName: 'windows-2019'
+    
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: $(imageName)
 
 steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
-
-- script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+- task: UseDotNet@2
+  displayName: 'Use .NET Core Sdk from global.json'
+  inputs:
+    useGlobalJson: true
+- task: UseDotNet@2
+  displayName: 'Add .Net Core SDK 2.1.x for test projects'
+  inputs:
+    version: '2.1.x'
+- script: export FrameworkPathOverride=$(dirname $(which mono))/../lib/mono/4.6.1-api/
+  condition: and(succeeded(), or(eq(variables['Agent.OS'], 'Linux'), eq(variables['Agent.OS'], 'Darwin')))
+- script: dotnet tool restore
+  displayName: Install Tools
+- script: dotnet pack -v n
+  displayName: Build packages
+- script: dotnet test -v n -p:UnstableTests=false
+  displayName: Run Tests
+- task: PublishTestResults@2
+  inputs:
+    testResultsFormat: 'NUnit'
+    testResultsFiles: '*.xml'
+    searchFolder: '$(Build.SourcesDirectory)/bin/test_results'
+    publishRunAttachments: true
