@@ -25,10 +25,8 @@
   </Target>
 
   <ItemGroup>
-    <TestArgs Include="--known-failure --flaky " Condition=" '$(UnstableTests)' == 'true' " />
-    <TestArgs Include="--summary " />
-    <TestArgs Include="--fail-on-focused-tests " />
-    <TestArgs Include="--colours 0 " />
+    <TestArgs Include="--known-failure --flaky --summary --fail-on-focused-tests --colours 0 " Condition=" '$(UnstableTests)' == 'true' " />
+    <TestArgs                         Include="--summary --fail-on-focused-tests --colours 0 " Condition=" '$(UnstableTests)' == 'false' " />
   </ItemGroup>
 
   <Target Name="TestTool">
