@@ -106,7 +106,7 @@ module internal NETFrameworkInfoProvider =
           yield "System.Numerics" 
     ]
 
-  let getAdditionalArgumentsBy (msbuildHost: MSBuildExePath) targetFramework =
+  let getAdditionalArgumentsBy (msbuildHost: MSBuildExePath) (targetFramework: string) =
     let refs =
       let log = ignore
 
@@ -144,7 +144,14 @@ module internal NETFrameworkInfoProvider =
       | r ->
           failwithf "error getting msbuild info: unexpected %A" r
 
+    let targetProfile =
+      if targetFramework.StartsWith("netcoreapp", StringComparison.OrdinalIgnoreCase)
+        || targetFramework.StartsWith("netstandard", StringComparison.OrdinalIgnoreCase)
+      then "--targetprofile:netstandard"
+      else "--targetprofile:mscorlib"
+
     [ yield "--simpleresolution"
       yield "--noframework"
+      yield targetProfile
       yield! refs |> List.map (sprintf "-r:%s") ]
 

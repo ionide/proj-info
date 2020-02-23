@@ -64,6 +64,7 @@ type FCSAdapter<'FCSProjectOptions>(workspace: Loader, toFCSPoMapper: FCSProject
             match parsed |> Array.tryPick (byKey key) with
             | None -> Error (ProjectNotLoaded key.ProjectPath)
             | Some kv -> getPo kv
+
         and getPo (kv: KeyValuePair<ProjectKey, ProjectOptions>) : Result<FCSProjectOptionsData, GetProjectOptionsErrors> =
           match kv.Value with
           | po when not (po.ProjectFileName.EndsWith(".fsproj")) ->
