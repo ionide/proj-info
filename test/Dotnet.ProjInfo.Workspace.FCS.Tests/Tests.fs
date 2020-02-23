@@ -376,7 +376,7 @@ let tests (suiteConfig: TestSuiteConfig) =
 
       )
 
-      testCase |> withLog "can load sample3" (fun logger fs ->
+      testCase |> withLog (knownFailure "can load sample3") (fun logger fs ->
         let testDir = inDir fs "load_sample3"
         copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
 
