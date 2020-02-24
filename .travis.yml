@@ -28,7 +28,7 @@ mono:
 # one build triggered for each of these
 os:
 - linux
-- osx
+# - osx
 
 # one build triggered for each of these
 env:
@@ -40,8 +40,8 @@ matrix:
   include:
     - os: linux
       dist: xenial
-    - os: osx
-      osx_image: xcode11.2
+    # - os: osx
+    #   osx_image: xcode11.2
   allow_failures:
     # unstable tests may fail
     - env: UnstableTests=true
