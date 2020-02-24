@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <Target Name="Restore">
-    <Exec Command="$(MonoOrEmpty)paket.exe restore" WorkingDirectory=".paket" ConsoleToMSBuild="true" />
+    <Exec Command='dotnet paket restore' ConsoleToMSBuild="true" />
     <Exec Command='dotnet restore src/dotnet-proj.sln -p:Version=$(Version)' />
   </Target>
 
@@ -24,15 +24,15 @@
     <Exec Command='dotnet pack src/Dotnet.ProjInfo.Workspace.FCS -c $(Configuration) -o "$(NupkgsDir)" -p:Version=$(Version)' />
   </Target>
 
+  <ItemGroup>
+    <TestArgs Include="--known-failure --flaky --summary --fail-on-focused-tests --colours 0 " Condition=" '$(UnstableTests)' == 'true' " />
+    <TestArgs                         Include="--summary --fail-on-focused-tests --colours 0 " Condition=" '$(UnstableTests)' == 'false' " />
+  </ItemGroup>
+
   <Target Name="TestTool">
-    <Exec Command='dotnet run -c $(Configuration) -- "$(Version)" --fail-on-focused-tests --summary' WorkingDirectory="$(RepoRootDir)/test/dotnet-proj.Tests" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' != 'true' " />
+    <Exec Command='dotnet run -c $(Configuration) -- "$(Version)" %(TestArgs.Identity)' WorkingDirectory="$(RepoRootDir)/test/dotnet-proj.Tests" IgnoreStandardErrorWarningFormat="true" Condition=" '$(UnstableTests)' != 'true' " />
   </Target>
 
-  <ItemGroup>
-    <TestArgs Include="--fail-on-focused-tests --summary" Condition=" '$(UnstableTests)' != 'true' " />
-    <TestArgs Include="--known-failure --fail-on-focused-tests --summary" Condition=" '$(UnstableTests)' == 'true' " />
-    <TestArgs Include="--flaky --fail-on-focused-tests --summary" Condition=" '$(UnstableTests)' == 'true' " />
-  </ItemGroup>
 
   <Target Name="TestLibsNetCore">
     <Exec Command='dotnet run -p test/Dotnet.ProjInfo.Workspace.Tests -f netcoreapp2.1 -c $(Configuration) -- %(TestArgs.Identity)' IgnoreStandardErrorWarningFormat="true" />

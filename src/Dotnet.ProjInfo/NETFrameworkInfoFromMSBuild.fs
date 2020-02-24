@@ -66,7 +66,7 @@ let [<Literal>] private FrameworkPathOverride = "FrameworkPathOverride"
 let installedNETFrameworks () =
     let template, args, parser = Inspect.getProperties [FrameworkPathOverride]
 
-    let find frameworkPathOverride =
+    let find (frameworkPathOverride: string) =
 
       let isTFVersion (name: string) =
         name

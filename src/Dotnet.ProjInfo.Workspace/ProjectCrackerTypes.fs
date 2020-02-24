@@ -105,7 +105,7 @@ module ProjectRecognizer =
         | DotNetSdk
         | VerboseSdk
 
-    let kindOfProjectSdk file =
+    let kindOfProjectSdk (file: string) =
         //.NET Core Sdk preview3+ replace project.json with fsproj
         //Easy way to detect new fsproj is to check the msbuild version of .fsproj
         //Post preview5 has (`Sdk="FSharp.NET.Sdk;Microsoft.NET.Sdk"`), use that
@@ -143,7 +143,7 @@ module internal FscArguments =
 
   let private outputFileArg = ["--out:"; "-o:"]
 
-  let private makeAbs projDir f =
+  let private makeAbs (projDir: string) (f: string) =
       if Path.IsPathRooted f then f else Path.Combine(projDir, f)
 
   let outputFile projDir rsp =

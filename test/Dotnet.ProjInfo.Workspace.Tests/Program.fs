@@ -6,6 +6,8 @@ open System.IO
 
 open TestsConfig
 
+Expecto.Expect.defaultDiffPrinter <- Expecto.Diff.colourisedDiff
+
 type Args =
     { RunOnlyFlaky: bool
       RunOnlyKnownFailure: bool }

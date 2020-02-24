@@ -4,6 +4,8 @@ open Expecto
 open System
 open System.IO
 
+Expecto.Expect.defaultDiffPrinter <- Expecto.Diff.colourisedDiff
+
 [<EntryPoint>]
 let main argv =
     let artifactsDir =

@@ -259,9 +259,13 @@ let tests (suiteConfig: TestSuiteConfig) =
           |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "net461" } "a lib"
 
         let expectedSources =
-          [ projDir / "AssemblyInfo.fs"
-            projDir / "Library.fs"
-            (Path.GetTempPath()) / ".NETFramework,Version=v4.6.1.AssemblyAttributes.fs" ]
+          let sourceFiles = 
+            [ projDir / "AssemblyInfo.fs"
+              projDir / "Library.fs" ]
+
+          let autoGenAttributesFile = (Path.GetTempPath()) / ".NETFramework,Version=v4.6.1.AssemblyAttributes.fs"
+
+          autoGenAttributesFile :: sourceFiles
 
         Expect.equal l1Parsed.SourceFiles expectedSources "check sources"
 
@@ -607,7 +611,8 @@ let tests (suiteConfig: TestSuiteConfig) =
         Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(wrongPath, (GetProjectOptionsErrors.GenericError(wrongPath, "not found")))) "check error type"
       )
 
-      testCase |> withLog "project not restored" (fun logger fs ->
+      // test marked pending because it seems like the 3.x SDK does a restore as part of core compile
+      ptestCase |> withLog "project not restored" (fun logger fs ->
         let testDir = inDir fs "proj_not_restored"
         copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
 

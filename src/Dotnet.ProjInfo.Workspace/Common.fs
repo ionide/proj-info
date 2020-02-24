@@ -2,7 +2,7 @@ namespace Dotnet.ProjInfo.Workspace
 
 module internal CommonHelpers =
 
-  let chooseByPrefix prefix (s: string) =
+  let chooseByPrefix (prefix: string) (s: string) =
       if s.StartsWith(prefix) then Some (s.Substring(prefix.Length))
       else None
 
@@ -10,7 +10,7 @@ module internal CommonHelpers =
       prefixes
       |> List.tryPick (fun prefix -> chooseByPrefix prefix s)
 
-  let splitByPrefix prefix (s: string) =
+  let splitByPrefix (prefix: string) (s: string) =
       if s.StartsWith(prefix) then Some (prefix, s.Substring(prefix.Length))
       else None
 

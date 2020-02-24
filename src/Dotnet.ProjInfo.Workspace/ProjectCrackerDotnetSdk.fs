@@ -71,7 +71,7 @@ module internal ProjectCrackerDotnetSdk =
   type ParsedProject = string * ProjectOptions * ((string * string) list) * (ProjectOptions list)
   type ParsedProjectCache = Collections.Concurrent.ConcurrentDictionary<string, ParsedProject>
 
-  let private execProjInfoFromMsbuild msbuildPath notifyState parseAsSdk additionalMSBuildProps file =
+  let private execProjInfoFromMsbuild msbuildPath notifyState parseAsSdk additionalMSBuildProps (file: string) =
     let projDir = Path.GetDirectoryName file
 
     notifyState (WorkspaceProjectState.Loading (file, additionalMSBuildProps))
@@ -193,7 +193,7 @@ module internal ProjectCrackerDotnetSdk =
         cache.AddOrUpdate(key, p, fun _ _ -> p)
 
 
-  let private visitSingleTfmProj follow parseAsSdk (file, projData) =
+  let private visitSingleTfmProj follow parseAsSdk (file: string, projData) =
 
     let { NoCrossTargetingData.FscArgs = rsp; P2PRefs = p2ps; Properties = props; Items = projItems } = projData
 

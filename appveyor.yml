@@ -1,5 +1,5 @@
 image:
-  - Visual Studio 2017
+  - Visual Studio 2019
 
 before_build:
   - ps: >-
@@ -11,6 +11,7 @@ before_build:
 
 build_script:
   - cmd: echo vs %VersionSuffix%"
+  - cmd: dotnet tool restore
   - cmd: dotnet pack -v n
   - cmd: dotnet test -v n
 
