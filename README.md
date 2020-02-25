@@ -1,7 +1,7 @@
+# dotnet-proj-info
 
 [![Build status](https://ci.appveyor.com/api/projects/status/i7piggo87r7k31t2/branch/master?svg=true)](https://ci.appveyor.com/project/enricosada/dotnet-proj-info/branch/master)
-
-# dotnet-proj-info
+[![Build Status](https://travis-ci.org/enricosada/dotnet-proj-info.svg?branch=master)](https://travis-ci.org/enricosada/dotnet-proj-info)
 
 - as .NET Core Tool: [![NuGet](https://img.shields.io/nuget/v/dotnet-proj.svg)](https://www.nuget.org/packages/dotnet-proj/)
 - as library: `Dotnet.ProjInfo` [![NuGet](https://img.shields.io/nuget/v/Dotnet.ProjInfo.svg)](https://www.nuget.org/packages/Dotnet.ProjInfo)
@@ -104,6 +104,10 @@ dotnet pack
 will create packages in `bin\nupkgs`
 
 pass `/p:Version=1.2.3` to create a package with version `1.2.3`
+
+## Release
+
+Make a new version tag and push that to the repo.  Appveyor builds that are based off tags will create a github release. Nuget packages need to be pushed separately, but can be downloaded from Appveyor to do so.
 
 ## Deprecated
 
