@@ -135,7 +135,7 @@ module ExpectNotification =
 
       member __.Notifications
           with get () = notifications |> List.ofSeq
-        
+
 let findByPath path parsed =
   parsed
   |> Array.tryPick (fun (kv: KeyValuePair<ProjectKey, ProjectOptions>) ->
@@ -156,7 +156,7 @@ let isOSX () =
 open TestsConfig
 
 let tests (suiteConfig: TestSuiteConfig) =
- 
+
   let prepareTestsAssets = lazy(
       let logger = Log.create "Tests Assets"
       let fs = FileUtils(logger)
@@ -253,13 +253,13 @@ let tests (suiteConfig: TestSuiteConfig) =
         let parsed = loader.Projects
 
         Expect.equal parsed.Length 1 "lib"
-        
+
         let l1Parsed =
           parsed
           |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "net461" } "a lib"
 
         let expectedSources =
-          let sourceFiles = 
+          let sourceFiles =
             [ projDir / "AssemblyInfo.fs"
               projDir / "Library.fs" ]
 
@@ -296,7 +296,7 @@ let tests (suiteConfig: TestSuiteConfig) =
         let parsed = loader.Projects
 
         Expect.equal parsed.Length 1 "console and lib"
-        
+
         let n1Parsed =
           parsed
           |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "first is a lib"
@@ -503,7 +503,7 @@ let tests (suiteConfig: TestSuiteConfig) =
         let parsed = loader.Projects
 
         Expect.equal parsed.Length 3 "c1, l1, l2"
-        
+
         let c1 = testDir/ (``sample6 Netsdk Sparse/1``.ProjectFile)
         let c1Dir = Path.GetDirectoryName c1
 
@@ -569,6 +569,46 @@ let tests (suiteConfig: TestSuiteConfig) =
         Expect.isTrue (File.Exists outputPath) (sprintf "output assembly '%s' not found" outputPath)
       )
 
+      testCase |> withLog "can load sample9" (fun logger fs ->
+        let testDir = inDir fs "load_sample9"
+        copyDirFromAssets fs ``sample9 NetSdk library``.ProjDir testDir
+        // fs.cp (``sample9 NetSdk library``.ProjDir/"Directory.Build.props") testDir
+
+        let projPath = testDir/ (``sample9 NetSdk library``.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
+
+        dotnet fs ["restore"; projPath]
+        |> checkExitCodeZero
+
+        let loader = createLoader logger
+
+        let watcher = watchNotifications logger loader
+
+        loader.LoadProjects [projPath]
+
+        [ loading "n1.fsproj"; loaded "n1.fsproj" ]
+        |> expectNotifications (watcher.Notifications)
+
+        let [_; WorkspaceProjectState.Loaded(n1Loaded,_)] = watcher.Notifications
+
+        let parsed = loader.Projects
+
+        Expect.equal parsed.Length 1 "console and lib"
+
+        let n1Parsed =
+          parsed
+          |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "first is a lib"
+
+        let expectedSources =
+          [ projDir / "obj2/Debug/netstandard2.0/n1.AssemblyInfo.fs"
+            projDir / "Library.fs" ]
+          |> List.map Path.GetFullPath
+
+        Expect.equal n1Parsed.SourceFiles expectedSources "check sources"
+
+        Expect.equal n1Parsed n1Loaded "notificaton and parsed should be the same"
+      )
+
     ]
 
   let invalid =
@@ -607,7 +647,7 @@ let tests (suiteConfig: TestSuiteConfig) =
         let parsed = loader.Projects
 
         Expect.equal parsed.Length 0 "no project loaded"
-        
+
         Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(wrongPath, (GetProjectOptionsErrors.GenericError(wrongPath, "not found")))) "check error type"
       )
 
@@ -632,7 +672,7 @@ let tests (suiteConfig: TestSuiteConfig) =
         let parsed = loader.Projects
 
         Expect.equal parsed.Length 0 "no project loaded"
-        
+
         Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(projPath, (GetProjectOptionsErrors.ProjectNotRestored projPath))) "check error type"
       )
 
@@ -801,7 +841,7 @@ let tests (suiteConfig: TestSuiteConfig) =
         loader.LoadProjects [projPath]
 
         let parsed = loader.Projects
-        
+
         let l1Parsed =
           parsed
           |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "net461" } "a lib"
@@ -834,7 +874,7 @@ let tests (suiteConfig: TestSuiteConfig) =
         loader.LoadProjects [projPath]
 
         let parsed = loader.Projects
-        
+
         let n1Parsed =
           parsed
           |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "first is a lib"
@@ -1000,7 +1040,7 @@ let tests (suiteConfig: TestSuiteConfig) =
         loader.LoadProjects [projPath]
 
         let parsed = loader.Projects
-        
+
         let n1Parsed =
           parsed
           |> expectFind projPath { ProjectKey.ProjectPath = projPath; TargetFramework = "netstandard2.0" } "first is a lib"

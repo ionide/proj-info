@@ -167,3 +167,13 @@ let ``sample8 NetSdk Explorer`` =
       "netstandard2.0", sourceFiles ["LibraryA.fs"; "LibraryC.fs"; "LibraryB.fs"]
     ]
     ProjectReferences = [] }
+
+/// dotnet sdk, one netstandard2.0 lib n1, nonstandard obj
+let ``sample9 NetSdk library`` =
+  { ProjDir = "sample9-netsdk-changed-obj"
+    AssemblyName = "n1"
+    ProjectFile = "n1"/"n1.fsproj"
+    TargetFrameworks =  Map.ofList [
+      "netstandard2.0", sourceFiles ["Library.fs"]
+    ]
+    ProjectReferences = [] }

@@ -1,0 +1,5 @@
+<Project ToolsVersion="15.0">
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>obj2\</BaseIntermediateOutputPath>
+  </PropertyGroup>
+</Project>
