@@ -72,7 +72,7 @@ module VisualTree =
 
         let item = projItems |> List.tryFind (isCompileItemWithFullpath sourceFile)
         match item with
-        | None -> 
+        | None ->
             let (name, fullpath) = projPath |> getVisualPath None (Some sourceFile) sourceFile
 
             ProjectItem.Compile (name, fullpath)
@@ -80,6 +80,6 @@ module VisualTree =
             let linkMetadata = p |> tryFindMetadata (GetItemsModifier.Custom("Link"))
             let fullpathMetadata = p |> tryFindMetadata (GetItemsModifier.FullPath)
 
-            let (name, fullpath) = projPath |> getVisualPath linkMetadata fullpathMetadata p.Identity 
+            let (name, fullpath) = projPath |> getVisualPath linkMetadata fullpathMetadata p.Identity
 
             ProjectItem.Compile (name, fullpath)

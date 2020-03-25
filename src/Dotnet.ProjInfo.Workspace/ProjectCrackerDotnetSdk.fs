@@ -72,13 +72,58 @@ module internal ProjectCrackerDotnetSdk =
   type ParsedProjectCache = Collections.Concurrent.ConcurrentDictionary<string, ParsedProject>
 
   let private execProjInfoFromMsbuild msbuildPath notifyState parseAsSdk additionalMSBuildProps (file: string) =
+    let inspect =
+        match parseAsSdk with
+        | ProjectParsingSdk.DotnetSdk ->
+            Dotnet.ProjInfo.Inspect.getProjectInfos
+        | ProjectParsingSdk.VerboseSdk ->
+            Dotnet.ProjInfo.Inspect.getProjectInfos // getProjectInfosOldSdk
+
+    let globalArgs =
+        match Environment.GetEnvironmentVariable("DOTNET_PROJ_INFO_MSBUILD_BL") with
+        | "1" -> Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Switch("bl") :: []
+        | _ -> []
+
     let projDir = Path.GetDirectoryName file
+
+    let loggedMessages = System.Collections.Concurrent.ConcurrentQueue<string>()
+
+    let runCmd exePath args = Utils.runProcess loggedMessages.Enqueue projDir exePath (args |> String.concat " ")
+
+    let msbuildExec =
+        Dotnet.ProjInfo.Inspect.msbuild msbuildPath runCmd
 
     notifyState (WorkspaceProjectState.Loading (file, additionalMSBuildProps))
 
+    let objRes =
+        let r =
+            file
+            |> inspect loggedMessages.Enqueue msbuildExec [fun () -> Dotnet.ProjInfo.Inspect.getProperties ["BaseIntermediateOutputPath"] ] globalArgs
+            |> Result.bind (fun n ->
+                match List.tryHead n with
+                | Some n -> n
+                | None -> Error (GetProjectInfoErrors.UnexpectedMSBuildResult "Couldn't find BaseIntermediateOutputPath"))
+            |> Result.map (fun n ->
+                match n with
+                | Properties lst -> List.tryHead lst |> Option.map snd
+                | _ -> None
+            )
+        match r with
+        | Ok r -> r
+        | _ -> None
+
+
     match parseAsSdk with
     | ProjectParsingSdk.DotnetSdk ->
-        let projectAssetsJsonPath = Path.Combine(projDir, "obj", "project.assets.json")
+        let projectAssetsJsonPath =
+            match objRes with
+            | Some r ->
+                if Path.IsPathRooted r then
+                    Path.Combine(r, "project.assets.json")
+                else
+                    Path.Combine(projDir, r, "project.assets.json")
+            | None ->
+                Path.Combine(projDir, "obj", "project.assets.json")
         if not(File.Exists(projectAssetsJsonPath)) then
             raise (ProjectInspectException (ProjectNotRestored file))
     | ProjectParsingSdk.VerboseSdk ->
@@ -117,21 +162,13 @@ module internal ProjectCrackerDotnetSdk =
 
     let getItems () = Dotnet.ProjInfo.Inspect.getItems [("Compile", GetItemsModifier.FullPath); ("Compile", GetItemsModifier.Custom("Link"))] []
 
-    let loggedMessages = System.Collections.Concurrent.ConcurrentQueue<string>()
 
-    let runCmd exePath args = Utils.runProcess loggedMessages.Enqueue projDir exePath (args |> String.concat " ")
 
-    let msbuildExec =
-        Dotnet.ProjInfo.Inspect.msbuild msbuildPath runCmd
+
 
     let additionalArgs = additionalMSBuildProps |> List.map (Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Property)
 
-    let inspect =
-        match parseAsSdk with
-        | ProjectParsingSdk.DotnetSdk ->
-            Dotnet.ProjInfo.Inspect.getProjectInfos
-        | ProjectParsingSdk.VerboseSdk ->
-            Dotnet.ProjInfo.Inspect.getProjectInfos // getProjectInfosOldSdk
+
 
     let globalArgs =
         match Environment.GetEnvironmentVariable("DOTNET_PROJ_INFO_MSBUILD_BL") with
@@ -231,7 +268,7 @@ module internal ProjectCrackerDotnetSdk =
             let mergedLog =
                 [ yield (file, "")
                   yield! p2pProjects |> List.collect (fun (_,_,x,_) -> x) ]
-            
+
             let extraInfo = getExtraInfoVerboseSdk props
             ProjectSdkType.Verbose(extraInfo), mergedLog
 
@@ -253,7 +290,7 @@ module internal ProjectCrackerDotnetSdk =
         {
             ProjectId = Some file
             ProjectFileName = file
-            TargetFramework = 
+            TargetFramework =
                 match sdkTypeData with
                 | ProjectSdkType.DotnetSdk t ->
                     t.TargetFramework

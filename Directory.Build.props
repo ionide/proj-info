@@ -1,14 +1,14 @@
 <Project ToolsVersion="15.0">
 
   <PropertyGroup>
-    <Version Condition=" '$(Version)' == '' ">0.38.0$(VersionSuffix)</Version>
+    <Version Condition=" '$(Version)' == '' ">0.39.0$(VersionSuffix)</Version>
   </PropertyGroup>
 
   <PropertyGroup>
     <Authors>enricosada</Authors>
-    <PackageProjectUrl>https://github.com/enricosada/dotnet-proj-info/</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/IonideProject/dotnet-proj-info/</PackageProjectUrl>
     <PackageTags>msbuild;dotnet;sdk;csproj;fsproj</PackageTags>
-    <RepositoryUrl>https://github.com/enricosada/dotnet-proj-info.git</RepositoryUrl>
+    <RepositoryUrl>https://github.com/IonideProject/dotnet-proj-info.git</RepositoryUrl>
     <PackageLicenseUrl>https://github.com/enricosada/dotnet-proj-info/blob/master/LICENSE</PackageLicenseUrl>
   </PropertyGroup>
 

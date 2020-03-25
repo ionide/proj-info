@@ -65,7 +65,7 @@ module internal NETFrameworkInfoProvider =
   let private defaultReferencesForNonProjectFiles () =
     // ref https://github.com/fsharp/FSharp.Compiler.Service/blob/1f497ef86fd5d0a18e5a935f3d16984fda91f1de/src/fsharp/CompileOps.fs#L1801
     // This list is the default set of references for "non-project" files
-    
+
     // TODO make somehow this list public on FCS and use that directly instead of hardcode it in FSAC
 
     let GetDefaultSystemValueTupleReference () =
@@ -75,17 +75,17 @@ module internal NETFrameworkInfoProvider =
     // from https://github.com/fsharp/FSharp.Compiler.Service/blob/1f497ef86fd5d0a18e5a935f3d16984fda91f1de/src/fsharp/CompileOps.fs#L1803-L1832
     [
           yield "System"
-          yield "System.Xml" 
+          yield "System.Xml"
           yield "System.Runtime.Remoting"
           yield "System.Runtime.Serialization.Formatters.Soap"
           yield "System.Data"
           yield "System.Drawing"
           yield "System.Core"
           // These are the Portable-profile and .NET Standard 1.6 dependencies of FSharp.Core.dll.  These are needed
-          // when an F# sript references an F# profile 7, 78, 259 or .NET Standard 1.6 component which in turn refers 
+          // when an F# sript references an F# profile 7, 78, 259 or .NET Standard 1.6 component which in turn refers
           // to FSharp.Core for profile 7, 78, 259 or .NET Standard.
           yield "System.Runtime" // lots of types
-          yield "System.Linq" // System.Linq.Expressions.Expression<T> 
+          yield "System.Linq" // System.Linq.Expressions.Expression<T>
           yield "System.Reflection" // System.Reflection.ParameterInfo
           yield "System.Linq.Expressions" // System.Linq.IQueryable<T>
           yield "System.Threading.Tasks" // valuetype [System.Threading.Tasks]System.Threading.CancellationToken
@@ -96,14 +96,14 @@ module internal NETFrameworkInfoProvider =
           yield "System.Runtime.Numerics" // BigInteger
           yield "System.Threading"  // OperationCanceledException
           // always include a default reference to System.ValueTuple.dll in scripts and out-of-project sources
-          match GetDefaultSystemValueTupleReference() with 
+          match GetDefaultSystemValueTupleReference() with
           | None -> ()
           | Some v -> yield v
 
           yield "System.Web"
           yield "System.Web.Services"
           yield "System.Windows.Forms"
-          yield "System.Numerics" 
+          yield "System.Numerics"
     ]
 
   let getAdditionalArgumentsBy (msbuildHost: MSBuildExePath) (targetFramework: string) =
