@@ -6,10 +6,10 @@
 
   <PropertyGroup>
     <Authors>enricosada</Authors>
-    <PackageProjectUrl>https://github.com/IonideProject/dotnet-proj-info/</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/ionide/dotnet-proj-info/</PackageProjectUrl>
     <PackageTags>msbuild;dotnet;sdk;csproj;fsproj</PackageTags>
-    <RepositoryUrl>https://github.com/IonideProject/dotnet-proj-info.git</RepositoryUrl>
-    <PackageLicenseUrl>https://github.com/enricosada/dotnet-proj-info/blob/master/LICENSE</PackageLicenseUrl>
+    <RepositoryUrl>https://github.com/ionide/dotnet-proj-info.git</RepositoryUrl>
+    <PackageLicenseUrl>https://github.com/ionide/dotnet-proj-info/blob/master/LICENSE</PackageLicenseUrl>
   </PropertyGroup>
 
   <PropertyGroup>
