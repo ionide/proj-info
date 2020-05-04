@@ -651,8 +651,7 @@ let tests (suiteConfig: TestSuiteConfig) =
         Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(wrongPath, (GetProjectOptionsErrors.GenericError(wrongPath, "not found")))) "check error type"
       )
 
-      // test marked pending because it seems like the 3.x SDK does a restore as part of core compile
-      ptestCase |> withLog "project not restored" (fun logger fs ->
+      testCase |> withLog "project not restored" (fun logger fs ->
         let testDir = inDir fs "proj_not_restored"
         copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
 
