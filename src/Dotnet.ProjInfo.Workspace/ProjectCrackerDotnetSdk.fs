@@ -71,7 +71,7 @@ module internal ProjectCrackerDotnetSdk =
   type ParsedProject = string * ProjectOptions * ((string * string) list) * (ProjectOptions list)
   type ParsedProjectCache = Collections.Concurrent.ConcurrentDictionary<string, ParsedProject>
 
-  let private execProjInfoFromMsbuild msbuildPath notifyState parseAsSdk additionalMSBuildProps (file: string) =
+  let private execProjInfoFromMsbuild msbuildPath notifyState (useBinaryLogger: bool) parseAsSdk additionalMSBuildProps (file: string) =
 
     let projDir = Path.GetDirectoryName file
 
@@ -121,9 +121,12 @@ module internal ProjectCrackerDotnetSdk =
     let additionalArgs = additionalMSBuildProps |> List.map (Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Property)
 
     let globalArgs =
-        match Environment.GetEnvironmentVariable("DOTNET_PROJ_INFO_MSBUILD_BL") with
-        | "1" -> Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Switch("bl") :: []
-        | _ -> []
+        if useBinaryLogger then
+            [ Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Switch("bl") ]
+        else
+            match Environment.GetEnvironmentVariable("DOTNET_PROJ_INFO_MSBUILD_BL") with
+            | "1" -> [ Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Switch("bl") ]
+            | _ -> []
 
     let infoResult =
         getProjectInfos loggedMessages.Enqueue msbuildExec [getFscArgs; getP2PRefs; gp; getItems] (additionalArgs @ globalArgs) file
@@ -335,20 +338,20 @@ module internal ProjectCrackerDotnetSdk =
     let _, po, log, additionalProjs = projInfoCached (projInfoCrossTargeting crosstargetingChooser projInfoFromMsbuild projInfoCached parseAsSdk) [] rootProjFile
     (po, log, additionalProjs)
 
-  let private loadBySdk crosstargetingStrategy msbuildPath notifyState (cache: ParsedProjectCache) parseAsSdk file =
+  let private loadBySdk crosstargetingStrategy msbuildPath notifyState (cache: ParsedProjectCache) parseAsSdk (useBinaryLogger: bool) file =
       try
-        let po, log, additionalProjs = getProjectOptionsFromProjectFile crosstargetingStrategy (execProjInfoFromMsbuild msbuildPath notifyState) (asProjInfoCached cache) parseAsSdk file
+        let po, log, additionalProjs = getProjectOptionsFromProjectFile crosstargetingStrategy (execProjInfoFromMsbuild msbuildPath notifyState useBinaryLogger) (asProjInfoCached cache) parseAsSdk file
 
         Ok (po, (log |> Map.ofList), additionalProjs)
       with
         | ProjectInspectException d -> Error d
         | e -> Error (GenericError(file, e.Message))
 
-  let load crosstargetingStrategy msbuildPath notifyState (cache: ParsedProjectCache) file =
-      loadBySdk crosstargetingStrategy msbuildPath notifyState cache ProjectParsingSdk.DotnetSdk file
+  let load crosstargetingStrategy msbuildPath (useBinaryLogger: bool) notifyState (cache: ParsedProjectCache)  file =
+      loadBySdk crosstargetingStrategy msbuildPath notifyState cache ProjectParsingSdk.DotnetSdk useBinaryLogger file
 
-  let loadVerboseSdk crosstargetingStrategy msbuildPath notifyState (cache: ParsedProjectCache) file =
-      loadBySdk crosstargetingStrategy msbuildPath notifyState cache ProjectParsingSdk.VerboseSdk file
+  let loadVerboseSdk crosstargetingStrategy msbuildPath (useBinaryLogger: bool) notifyState (cache: ParsedProjectCache)file =
+      loadBySdk crosstargetingStrategy msbuildPath notifyState cache ProjectParsingSdk.VerboseSdk useBinaryLogger file
 
 type CrosstargetingStrategy = string -> (string * string * string list) -> string
 

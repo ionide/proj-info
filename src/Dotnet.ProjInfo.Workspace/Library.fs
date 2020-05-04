@@ -69,12 +69,15 @@ type Loader private (msbuildHostDotNetSdk, msbuildHostVerboseSdk) =
         with get () : Dotnet.ProjInfo.Inspect.MSBuildExePath = msbuildHostDotNetSdk
 
     member this.LoadProjects(projects: string list) =
-        this.LoadProjects(projects, CrosstargetingStrategies.preferDotnetCore)
+        this.LoadProjects(projects, CrosstargetingStrategies.preferDotnetCore, false)
 
-    member this.LoadProjects(projects: string list, crosstargetingStrategy: CrosstargetingStrategy) =
+    member this.LoadProjects(projects: string list, useBinaryLogger: bool) =
+        this.LoadProjects(projects, CrosstargetingStrategies.preferDotnetCore, useBinaryLogger)
+
+    member this.LoadProjects(projects: string list, crosstargetingStrategy: CrosstargetingStrategy, useBinaryLogger: bool ) =
 
         let cache = ProjectCrackerDotnetSdk.ParsedProjectCache()
-        
+
         let notify arg =
             event1.Trigger(this, arg)
 
@@ -84,9 +87,9 @@ type Loader private (msbuildHostDotNetSdk, msbuildHostVerboseSdk) =
                 if File.Exists project then
                     match kindOfProjectSdk project with
                     | Some ProjectSdkKind.DotNetSdk ->
-                        ProjectCrackerDotnetSdk.load crosstargetingStrategy this.MSBuildHostDotNetSdk
+                        ProjectCrackerDotnetSdk.load crosstargetingStrategy this.MSBuildHostDotNetSdk useBinaryLogger
                     | Some ProjectSdkKind.VerboseSdk ->
-                        ProjectCrackerDotnetSdk.loadVerboseSdk crosstargetingStrategy this.MSBuildHostVerboseSdk
+                        ProjectCrackerDotnetSdk.loadVerboseSdk crosstargetingStrategy this.MSBuildHostVerboseSdk useBinaryLogger
                     | Some ProjectSdkKind.ProjectJson | None ->
                         failwithf "unsupported project %s" project
                  else
@@ -118,15 +121,18 @@ type Loader private (msbuildHostDotNetSdk, msbuildHostVerboseSdk) =
                 notify failed
 
     member this.LoadSln(slnPath: string) =
-        this.LoadSln(slnPath, CrosstargetingStrategies.preferDotnetCore)
+        this.LoadSln(slnPath, CrosstargetingStrategies.preferDotnetCore, false)
 
-    member this.LoadSln(slnPath: string, crosstargetingStrategy: CrosstargetingStrategy) =
+    member this.LoadSln(slnPath: string, useBinaryLogger: bool) =
+        this.LoadSln(slnPath, CrosstargetingStrategies.preferDotnetCore, useBinaryLogger)
+
+    member this.LoadSln(slnPath: string, crosstargetingStrategy: CrosstargetingStrategy, useBinaryLogger: bool) =
 
         match InspectSln.tryParseSln slnPath with
         | Choice1Of2 (_, slnData) ->
             let projs = InspectSln.loadingBuildOrder slnData
 
-            this.LoadProjects(projs, crosstargetingStrategy)
+            this.LoadProjects(projs, crosstargetingStrategy, useBinaryLogger)
         | Choice2Of2 d ->
             failwithf "cannot load the sln: %A" d
 

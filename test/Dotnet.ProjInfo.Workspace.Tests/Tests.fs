@@ -703,7 +703,7 @@ let tests (suiteConfig: TestSuiteConfig) =
           Expect.equal othersTfms [] "invalid others tfm"
           secondTfm
 
-        loader.LoadProjects([projPath], strategy)
+        loader.LoadProjects([projPath], strategy, false)
 
         //the additional loading is the cross targeting
         [ loading "m1.fsproj"; loading "m1.fsproj"; loaded "m1.fsproj" ]
