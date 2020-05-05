@@ -207,6 +207,15 @@ module internal ProjectCrackerDotnetSdk =
         let p = file |> getProjInfoOf additionalMSBuildProps
         cache.AddOrUpdate(key, p, fun _ _ -> p)
 
+  let fromCache (cache: ParsedProjectCache) getProjInfoOf additionalMSBuildProps file : (ParsedProject * bool) =
+    let key = sprintf "%s;%A" file additionalMSBuildProps
+    match cache.TryGetValue(key) with
+    | true, alreadyParsed ->
+        alreadyParsed, true
+    | false, _ ->
+        let p = file |> getProjInfoOf additionalMSBuildProps
+        cache.AddOrUpdate(key, p, fun _ _ -> p), false
+
 
   let private visitSingleTfmProj follow parseAsSdk (file: string, projData) =
 
@@ -332,16 +341,16 @@ module internal ProjectCrackerDotnetSdk =
         visitSingleTfmProj follow parseAsSdk (file, noCrossTargetingData)
 
 
-  let private getProjectOptionsFromProjectFile crosstargetingChooser projInfoFromMsbuild projInfoCached parseAsSdk (rootProjFile : string) =
+  let private getProjectOptionsFromProjectFile crosstargetingChooser projInfoFromMsbuild projInfoCached cache parseAsSdk (rootProjFile : string) =
 
-    let _, po, log, additionalProjs = projInfoCached (projInfoCrossTargeting crosstargetingChooser projInfoFromMsbuild projInfoCached parseAsSdk) [] rootProjFile
-    (po, log, additionalProjs)
+    let (_, po, log, additionalProjs), isFromCache = fromCache cache (projInfoCrossTargeting crosstargetingChooser projInfoFromMsbuild projInfoCached parseAsSdk) [] rootProjFile
+    (po, log, additionalProjs, isFromCache)
 
   let private loadBySdk crosstargetingStrategy msbuildPath notifyState (cache: ParsedProjectCache) parseAsSdk (useBinaryLogger: bool) file =
       try
-        let po, log, additionalProjs = getProjectOptionsFromProjectFile crosstargetingStrategy (execProjInfoFromMsbuild msbuildPath notifyState useBinaryLogger) (asProjInfoCached cache) parseAsSdk file
+        let po, log, additionalProjs, isFromCache = getProjectOptionsFromProjectFile crosstargetingStrategy (execProjInfoFromMsbuild msbuildPath notifyState useBinaryLogger) (asProjInfoCached cache) cache parseAsSdk file
 
-        Ok (po, (log |> Map.ofList), additionalProjs)
+        Ok (po, (log |> Map.ofList), additionalProjs, isFromCache)
       with
         | ProjectInspectException d -> Error d
         | e -> Error (GenericError(file, e.Message))

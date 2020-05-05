@@ -99,7 +99,7 @@ type Loader private (msbuildHostDotNetSdk, msbuildHostVerboseSdk) =
                         Error (GetProjectOptionsErrors.GenericError(proj, "not found"))
 
             match loader notify cache project with
-            | Ok (po, props, additionalProjs) ->
+            | Ok (po, props, additionalProjs, isFromCache) ->
                 let rec visit (p: ProjectOptions) = seq {
                     yield p
                     for p2pRef in p.ReferencedProjects do
@@ -111,9 +111,9 @@ type Loader private (msbuildHostDotNetSdk, msbuildHostVerboseSdk) =
                 for proj in visit po do
                     parsedProjects.AddOrUpdate(getKey proj, proj, fun _ _ -> proj) |> ignore
 
-                for proj in visit po do
-                    WorkspaceProjectState.Loaded (proj, props)
-                    |> notify
+                // notify only once per project
+                WorkspaceProjectState.Loaded (po, props, isFromCache)
+                |> notify
 
             | Error e ->
                 let failed = WorkspaceProjectState.Failed (project, e)

@@ -94,7 +94,7 @@ and ProjectItem =
 
 type [<RequireQualifiedAccess>] WorkspaceProjectState =
     | Loading of string * ((string * string) list)
-    | Loaded of ProjectOptions * Map<string,string>
+    | Loaded of ProjectOptions * Map<string,string> * fromCache: bool
     | Failed of string * GetProjectOptionsErrors
 
 module ProjectRecognizer =
