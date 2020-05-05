@@ -3,6 +3,7 @@ namespace Dotnet.ProjInfo.Workspace
 open System.Collections.Concurrent
 open System.IO
 open ProjectRecognizer
+open System.Threading.Tasks
 
 type ProjectKey =
     { ProjectPath: string
@@ -68,21 +69,29 @@ type Loader private (msbuildHostDotNetSdk, msbuildHostVerboseSdk) =
     member this.MSBuildHostDotNetSdk
         with get () : Dotnet.ProjInfo.Inspect.MSBuildExePath = msbuildHostDotNetSdk
 
-    member this.LoadProjects(projects: string list) =
-        this.LoadProjects(projects, CrosstargetingStrategies.preferDotnetCore, false)
+    member this.LoadProjects(projects: string list, ?numberOfThreads : int) =
+        let numberOfThreads = defaultArg numberOfThreads 1
+        this.LoadProjects(projects, CrosstargetingStrategies.preferDotnetCore, false, numberOfThreads)
 
-    member this.LoadProjects(projects: string list, useBinaryLogger: bool) =
-        this.LoadProjects(projects, CrosstargetingStrategies.preferDotnetCore, useBinaryLogger)
+    member this.LoadProjects(projects: string list, useBinaryLogger: bool, ?numberOfThreads : int) =
+        let numberOfThreads = defaultArg numberOfThreads 1
+        this.LoadProjects(projects, CrosstargetingStrategies.preferDotnetCore, useBinaryLogger, numberOfThreads)
 
-    member this.LoadProjects(projects: string list, crosstargetingStrategy: CrosstargetingStrategy, useBinaryLogger: bool ) =
-
+    member this.LoadProjects(projects: string list, crosstargetingStrategy: CrosstargetingStrategy, useBinaryLogger: bool, ?numberOfThreads : int ) =
+        let numberOfThreads = defaultArg numberOfThreads 1
         let cache = ProjectCrackerDotnetSdk.ParsedProjectCache()
 
         let notify arg =
             event1.Trigger(this, arg)
 
-        for project in projects do
+        let iter (action: string -> unit) (array: string []) =
+            let opts = ParallelOptions()
+            opts.MaxDegreeOfParallelism <- numberOfThreads
+            Parallel.For(0, array.Length, opts, fun i -> action array.[i]) |> ignore
 
+        projects
+        |> Array.ofList
+        |> Array.Parallel.iter (fun project ->
             let loader =
                 if File.Exists project then
                     match kindOfProjectSdk project with
@@ -96,10 +105,10 @@ type Loader private (msbuildHostDotNetSdk, msbuildHostVerboseSdk) =
                     fun notify _ proj ->
                         let loading = WorkspaceProjectState.Loading (proj, [])
                         notify loading
-                        Error (GetProjectOptionsErrors.GenericError(proj, "not found"))
+                        Some <| Error (GetProjectOptionsErrors.GenericError(proj, "not found"))
 
             match loader notify cache project with
-            | Ok (po, props, additionalProjs, isFromCache) ->
+            | Some (Ok (po, props, additionalProjs, isFromCache)) ->
                 let rec visit (p: ProjectOptions) = seq {
                     yield p
                     for p2pRef in p.ReferencedProjects do
@@ -115,24 +124,30 @@ type Loader private (msbuildHostDotNetSdk, msbuildHostVerboseSdk) =
                 WorkspaceProjectState.Loaded (po, props, isFromCache)
                 |> notify
 
-            | Error e ->
+            | Some (Error e) ->
                 let failed = WorkspaceProjectState.Failed (project, e)
                 lastProjectError.AddOrUpdate(project, e, fun _ _ -> e) |> ignore
                 notify failed
+            | None ->
+                ()
+        )
 
-    member this.LoadSln(slnPath: string) =
-        this.LoadSln(slnPath, CrosstargetingStrategies.preferDotnetCore, false)
+    member this.LoadSln(slnPath: string, ?numberOfThreads : int ) =
+        let numberOfThreads = defaultArg numberOfThreads 1
+        this.LoadSln(slnPath, CrosstargetingStrategies.preferDotnetCore, false, numberOfThreads)
 
-    member this.LoadSln(slnPath: string, useBinaryLogger: bool) =
-        this.LoadSln(slnPath, CrosstargetingStrategies.preferDotnetCore, useBinaryLogger)
+    member this.LoadSln(slnPath: string, useBinaryLogger: bool, ?numberOfThreads : int ) =
+        let numberOfThreads = defaultArg numberOfThreads 1
+        this.LoadSln(slnPath, CrosstargetingStrategies.preferDotnetCore, useBinaryLogger, numberOfThreads)
 
-    member this.LoadSln(slnPath: string, crosstargetingStrategy: CrosstargetingStrategy, useBinaryLogger: bool) =
+    member this.LoadSln(slnPath: string, crosstargetingStrategy: CrosstargetingStrategy, useBinaryLogger: bool, ?numberOfThreads : int ) =
+        let numberOfThreads = defaultArg numberOfThreads 1
 
         match InspectSln.tryParseSln slnPath with
         | Choice1Of2 (_, slnData) ->
             let projs = InspectSln.loadingBuildOrder slnData
 
-            this.LoadProjects(projs, crosstargetingStrategy, useBinaryLogger)
+            this.LoadProjects(projs, crosstargetingStrategy, useBinaryLogger, numberOfThreads)
         | Choice2Of2 d ->
             failwithf "cannot load the sln: %A" d
 
