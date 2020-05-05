@@ -101,7 +101,7 @@ module ExpectNotification =
   let loaded (name: string) =
     let isLoaded n =
       match n with
-      | WorkspaceProjectState.Loaded (po, _) when po.ProjectFileName.EndsWith(name) -> true
+      | WorkspaceProjectState.Loaded (po, _, _) when po.ProjectFileName.EndsWith(name) -> true
       | _ -> false
     sprintf "loaded %s" name, isLoaded
 
@@ -122,7 +122,7 @@ module ExpectNotification =
         let minimal_info =
           match n with
           | WorkspaceProjectState.Loading (path, _) -> sprintf "loading %s " path
-          | WorkspaceProjectState.Loaded (po, _) -> sprintf "loaded %s" po.ProjectFileName
+          | WorkspaceProjectState.Loaded (po, _, _) -> sprintf "loaded %s" po.ProjectFileName
           | WorkspaceProjectState.Failed (path, _) -> sprintf "failed %s" path
         Expect.isTrue (f n) (sprintf "expected %s but was %s" name minimal_info) )
 
@@ -248,7 +248,7 @@ let tests (suiteConfig: TestSuiteConfig) =
         [ loading "l1.fsproj"; loaded "l1.fsproj" ]
         |> expectNotifications (watcher.Notifications)
 
-        let [_; WorkspaceProjectState.Loaded(l1Loaded,_)] = watcher.Notifications
+        let [_; WorkspaceProjectState.Loaded(l1Loaded,_, _)] = watcher.Notifications
 
         let parsed = loader.Projects
 
@@ -291,7 +291,7 @@ let tests (suiteConfig: TestSuiteConfig) =
         [ loading "n1.fsproj"; loaded "n1.fsproj" ]
         |> expectNotifications (watcher.Notifications)
 
-        let [_; WorkspaceProjectState.Loaded(n1Loaded,_)] = watcher.Notifications
+        let [_; WorkspaceProjectState.Loaded(n1Loaded,_, _)] = watcher.Notifications
 
         let parsed = loader.Projects
 
@@ -336,7 +336,7 @@ let tests (suiteConfig: TestSuiteConfig) =
         [ loading "c1.fsproj"; loading "l1.csproj"; loading "l2.fsproj"; loaded "c1.fsproj"; loaded "l1.csproj"; loaded "l2.fsproj";  ]
         |> expectNotifications (watcher.Notifications)
 
-        let [_; _; _; WorkspaceProjectState.Loaded(c1Loaded,_); WorkspaceProjectState.Loaded(l1Loaded,_); WorkspaceProjectState.Loaded(l2Loaded,_)] = watcher.Notifications
+        let [_; _; _; WorkspaceProjectState.Loaded(c1Loaded,_, _); WorkspaceProjectState.Loaded(l1Loaded,_, _); WorkspaceProjectState.Loaded(l2Loaded,_, _)] = watcher.Notifications
 
         let parsed = loader.Projects
 
@@ -420,7 +420,7 @@ let tests (suiteConfig: TestSuiteConfig) =
         [ loading "m1.fsproj"; loading "m1.fsproj"; loaded "m1.fsproj" ]
         |> expectNotifications (watcher.Notifications)
 
-        let [_; _; WorkspaceProjectState.Loaded(m1Loaded,_)] = watcher.Notifications
+        let [_; _; WorkspaceProjectState.Loaded(m1Loaded,_, _)] = watcher.Notifications
 
         let parsed = loader.Projects
 
@@ -459,7 +459,7 @@ let tests (suiteConfig: TestSuiteConfig) =
         [ loading "l2.csproj"; loaded "l2.csproj" ]
         |> expectNotifications (watcher.Notifications)
 
-        let [_; WorkspaceProjectState.Loaded(l2Loaded,_)] = watcher.Notifications
+        let [_; WorkspaceProjectState.Loaded(l2Loaded,_, _)] = watcher.Notifications
 
         let parsed = loader.Projects
 
@@ -589,7 +589,7 @@ let tests (suiteConfig: TestSuiteConfig) =
         [ loading "n1.fsproj"; loaded "n1.fsproj" ]
         |> expectNotifications (watcher.Notifications)
 
-        let [_; WorkspaceProjectState.Loaded(n1Loaded,_)] = watcher.Notifications
+        let [_; WorkspaceProjectState.Loaded(n1Loaded,_, _)] = watcher.Notifications
 
         let parsed = loader.Projects
 
@@ -709,7 +709,7 @@ let tests (suiteConfig: TestSuiteConfig) =
         [ loading "m1.fsproj"; loading "m1.fsproj"; loaded "m1.fsproj" ]
         |> expectNotifications (watcher.Notifications)
 
-        let [_; _; WorkspaceProjectState.Loaded(m1Loaded,_)] = watcher.Notifications
+        let [_; _; WorkspaceProjectState.Loaded(m1Loaded,_, _)] = watcher.Notifications
 
         Expect.equal strategyCalled 1 "strategy should be called once per project"
 
