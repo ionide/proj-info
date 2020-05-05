@@ -131,32 +131,31 @@ module internal ProjectCrackerDotnetSdk =
     let infoResult =
         getProjectInfos loggedMessages.Enqueue msbuildExec [getFscArgs; getP2PRefs; gp; getItems] (additionalArgs @ globalArgs) file
 
-    let objRes =
-        match infoResult with
-        | Ok n ->
+    match infoResult with
+    | Ok n ->
+        let objRes =
             n
             |> List.tryPick (function
                 | Ok (Properties props) -> props |> List.tryFind (fun (k,v) -> k = "BaseIntermediateOutputPath")
                 | _ -> None)
             |> Option.map snd
-        | _ -> None
-
-    match parseAsSdk with
-    | ProjectParsingSdk.DotnetSdk ->
-        let projectAssetsJsonPath =
-            match objRes with
-            | Some r ->
-                if Path.IsPathRooted r then
-                    Path.Combine(r, "project.assets.json")
-                else
-                    Path.Combine(projDir, r, "project.assets.json")
-            | None ->
-                Path.Combine(projDir, "obj", "project.assets.json")
-        if not(File.Exists(projectAssetsJsonPath)) then
-            raise (ProjectInspectException (ProjectNotRestored file))
-    | ProjectParsingSdk.VerboseSdk ->
+        match parseAsSdk with
+        | ProjectParsingSdk.DotnetSdk ->
+            let projectAssetsJsonPath =
+                match objRes with
+                | Some r ->
+                    if Path.IsPathRooted r then
+                        Path.Combine(r, "project.assets.json")
+                    else
+                        Path.Combine(projDir, r, "project.assets.json")
+                | None ->
+                    Path.Combine(projDir, "obj", "project.assets.json")
+            if not(File.Exists(projectAssetsJsonPath)) then
+                raise (ProjectInspectException (ProjectNotRestored file))
+        | ProjectParsingSdk.VerboseSdk ->
+            ()
+    | Error (er) ->
         ()
-
 
     infoResult, (loggedMessages.ToArray() |> Array.toList)
 
