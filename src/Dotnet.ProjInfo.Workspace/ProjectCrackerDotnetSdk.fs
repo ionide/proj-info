@@ -3,6 +3,7 @@ namespace Dotnet.ProjInfo.Workspace
 open System
 open System.IO
 open Dotnet.ProjInfo.Inspect
+open System.Collections.Concurrent
 
 module MSBuildPrj = Dotnet.ProjInfo.Inspect
 
@@ -16,6 +17,7 @@ module internal ProjectCrackerDotnetSdk =
   type NavigateProjectSM =
       | NoCrossTargeting of NoCrossTargetingData
       | CrossTargeting of string list
+      | ProjectIgnored
   and NoCrossTargetingData = { FscArgs: string list; P2PRefs: MSBuildPrj.ResolvedP2PRefsInfo list; Properties: Map<string,string>; Items: MSBuildPrj.GetItemResult list }
 
   open DotnetProjInfoInspectHelpers
@@ -69,7 +71,10 @@ module internal ProjectCrackerDotnetSdk =
   type private ProjectParsingSdk = DotnetSdk | VerboseSdk
 
   type ParsedProject = string * ProjectOptions * ((string * string) list) * (ProjectOptions list)
+  type CacheFunction<'a> = ('a -> string -> ParsedProject option) -> list<string * string> -> string -> ParsedProject option
   type ParsedProjectCache = Collections.Concurrent.ConcurrentDictionary<string, ParsedProject>
+
+  let currentlyParsing = ConcurrentDictionary<string, unit>()
 
   let private execProjInfoFromMsbuild msbuildPath notifyState (useBinaryLogger: bool) parseAsSdk additionalMSBuildProps (file: string) =
 
@@ -128,36 +133,43 @@ module internal ProjectCrackerDotnetSdk =
             | "1" -> [ Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Switch("bl") ]
             | _ -> []
 
-    let infoResult =
-        getProjectInfos loggedMessages.Enqueue msbuildExec [getFscArgs; getP2PRefs; gp; getItems] (additionalArgs @ globalArgs) file
+    if currentlyParsing.ContainsKey file then
+        Result.Ok [], (loggedMessages.ToArray() |> Array.toList)
 
-    match infoResult with
-    | Ok n ->
-        let objRes =
-            n
-            |> List.tryPick (function
-                | Ok (Properties props) -> props |> List.tryFind (fun (k,v) -> k = "BaseIntermediateOutputPath")
-                | _ -> None)
-            |> Option.map snd
-        match parseAsSdk with
-        | ProjectParsingSdk.DotnetSdk ->
-            let projectAssetsJsonPath =
-                match objRes with
-                | Some r ->
-                    if Path.IsPathRooted r then
-                        Path.Combine(r, "project.assets.json")
-                    else
-                        Path.Combine(projDir, r, "project.assets.json")
-                | None ->
-                    Path.Combine(projDir, "obj", "project.assets.json")
-            if not(File.Exists(projectAssetsJsonPath)) then
-                raise (ProjectInspectException (ProjectNotRestored file))
-        | ProjectParsingSdk.VerboseSdk ->
+    else
+        currentlyParsing.AddOrUpdate(file, (), fun _ _ -> ())
+
+        let infoResult =
+            getProjectInfos loggedMessages.Enqueue msbuildExec [getFscArgs; getP2PRefs; gp; getItems] (additionalArgs @ globalArgs) file
+
+        match infoResult with
+        | Ok n ->
+            let objRes =
+                n
+                |> List.tryPick (function
+                    | Ok (Properties props) -> props |> List.tryFind (fun (k,v) -> k = "BaseIntermediateOutputPath")
+                    | _ -> None)
+                |> Option.map snd
+            match parseAsSdk with
+            | ProjectParsingSdk.DotnetSdk ->
+                let projectAssetsJsonPath =
+                    match objRes with
+                    | Some r ->
+                        if Path.IsPathRooted r then
+                            Path.Combine(r, "project.assets.json")
+                        else
+                            Path.Combine(projDir, r, "project.assets.json")
+                    | None ->
+                        Path.Combine(projDir, "obj", "project.assets.json")
+                if not(File.Exists(projectAssetsJsonPath)) then
+                    raise (ProjectInspectException (ProjectNotRestored file))
+            | ProjectParsingSdk.VerboseSdk ->
+                ()
+        | Error (er) ->
             ()
-    | Error (er) ->
-        ()
 
-    infoResult, (loggedMessages.ToArray() |> Array.toList)
+        currentlyParsing.TryRemove(file) |> ignore
+        infoResult, (loggedMessages.ToArray() |> Array.toList)
 
 
   let mapMSBuildResults (results, log) =
@@ -177,6 +189,8 @@ module internal ProjectCrackerDotnetSdk =
             NoCrossTargeting { FscArgs = fa; P2PRefs = p2p; Properties = p |> Map.ofList; Items = pi }
         | r ->
             failwithf "error getting msbuild info: %A" r
+    | MsbuildOk [] ->
+        ProjectIgnored
     | MsbuildOk r ->
         failwithf "error getting msbuild info: internal error, more info returned than expected %A" r
     | MsbuildError r ->
@@ -198,23 +212,29 @@ module internal ProjectCrackerDotnetSdk =
     | _ ->
         failwithf "error getting msbuild info: internal error"
 
-  let asProjInfoCached (cache: ParsedProjectCache) getProjInfoOf additionalMSBuildProps file : ParsedProject =
+  let asProjInfoCached (cache: ParsedProjectCache) getProjInfoOf additionalMSBuildProps file : ParsedProject option =
     let key = sprintf "%s;%A" file additionalMSBuildProps
     match cache.TryGetValue(key) with
     | true, alreadyParsed ->
-        alreadyParsed
+        Some alreadyParsed
     | false, _ ->
-        let p = file |> getProjInfoOf additionalMSBuildProps
-        cache.AddOrUpdate(key, p, fun _ _ -> p)
+        file
+        |> getProjInfoOf additionalMSBuildProps
+        |> Option.map (fun p ->
+            cache.AddOrUpdate(key, p, fun _ _ -> p)
+        )
 
-  let fromCache (cache: ParsedProjectCache) getProjInfoOf additionalMSBuildProps file : (ParsedProject * bool) =
+  let fromCache (cache: ParsedProjectCache) getProjInfoOf additionalMSBuildProps file : (ParsedProject option * bool) =
     let key = sprintf "%s;%A" file additionalMSBuildProps
     match cache.TryGetValue(key) with
     | true, alreadyParsed ->
-        alreadyParsed, true
+        Some alreadyParsed, true
     | false, _ ->
         let p = file |> getProjInfoOf additionalMSBuildProps
-        cache.AddOrUpdate(key, p, fun _ _ -> p), false
+        match p with
+        | Some p ->
+            Some(cache.AddOrUpdate(key, p, fun _ _ -> p)), false
+        | None -> None, false
 
 
   let private visitSingleTfmProj follow parseAsSdk (file: string, projData) =
@@ -229,7 +249,7 @@ module internal ProjectCrackerDotnetSdk =
         // TODO before was no follow. now follow other projects too
         // do not follow others lang project, is not supported by FCS anyway
         // |> List.filter (fun p2p -> p2p.ProjectReferenceFullPath.ToLower().EndsWith(".fsproj"))
-        |> List.map (fun p2p ->
+        |> List.choose (fun p2p ->
             let followP2pArgs =
                 p2p.TargetFramework
                 |> Option.map (fun tfm -> MSBuildKnownProperties.TargetFramework, tfm)
@@ -305,7 +325,7 @@ module internal ProjectCrackerDotnetSdk =
 
     (tar, po, log, additionalProjects)
 
-  let rec private projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk additionalMSBuildProps file : ParsedProject =
+  let rec private projInfoOf projInfoFromMsbuild (projInfoCached: CacheFunction<_>) parseAsSdk additionalMSBuildProps file : ParsedProject option =
 
     let follow = projInfoCached (projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk)
 
@@ -318,8 +338,10 @@ module internal ProjectCrackerDotnetSdk =
         failwithf "Unexpected, found cross targeting %A but expecting a single tfm for props %A" tfms additionalMSBuildProps
     | NoCrossTargeting noCrossTargetingData ->
         visitSingleTfmProj follow parseAsSdk (file, noCrossTargetingData)
+        |> Some
+    | ProjectIgnored -> None
 
-  let private projInfoCrossTargeting crosstargetingStrategy projInfoFromMsbuild projInfoCached parseAsSdk additionalMSBuildProps file : ParsedProject =
+  let private projInfoCrossTargeting crosstargetingStrategy projInfoFromMsbuild (projInfoCached: CacheFunction<_>) parseAsSdk additionalMSBuildProps file : ParsedProject option =
 
     let follow = projInfoCached (projInfoOf projInfoFromMsbuild projInfoCached parseAsSdk)
 
@@ -337,23 +359,33 @@ module internal ProjectCrackerDotnetSdk =
         let tfm = crosstargetingStrategy file (firstTfm, secondTfm, othersTfms)
         //TODO check tfm is contained in tfms
         follow [MSBuildKnownProperties.TargetFramework, tfm] file
+
     | NoCrossTargeting noCrossTargetingData ->
         visitSingleTfmProj follow parseAsSdk (file, noCrossTargetingData)
+        |> Some
+    | ProjectIgnored -> None
 
 
-  let private getProjectOptionsFromProjectFile crosstargetingChooser projInfoFromMsbuild projInfoCached cache parseAsSdk (rootProjFile : string) =
 
-    let (_, po, log, additionalProjs), isFromCache = fromCache cache (projInfoCrossTargeting crosstargetingChooser projInfoFromMsbuild projInfoCached parseAsSdk) [] rootProjFile
-    (po, log, additionalProjs, isFromCache)
+  let private getProjectOptionsFromProjectFile crosstargetingChooser projInfoFromMsbuild (projInfoCached: CacheFunction<_>) cache parseAsSdk (rootProjFile : string) =
+
+    let res, isFromCache = fromCache cache (projInfoCrossTargeting crosstargetingChooser projInfoFromMsbuild projInfoCached parseAsSdk) [] rootProjFile
+    match res with
+    | Some (_, po, log, additionalProjs) ->
+        Some (po, log, additionalProjs, isFromCache)
+    | None -> None
 
   let private loadBySdk crosstargetingStrategy msbuildPath notifyState (cache: ParsedProjectCache) parseAsSdk (useBinaryLogger: bool) file =
       try
-        let po, log, additionalProjs, isFromCache = getProjectOptionsFromProjectFile crosstargetingStrategy (execProjInfoFromMsbuild msbuildPath notifyState useBinaryLogger) (asProjInfoCached cache) cache parseAsSdk file
-
-        Ok (po, (log |> Map.ofList), additionalProjs, isFromCache)
+        let x = getProjectOptionsFromProjectFile crosstargetingStrategy (execProjInfoFromMsbuild msbuildPath notifyState useBinaryLogger) (asProjInfoCached cache) cache parseAsSdk file
+        match x with
+        | Some (po, log, additionalProjs, isFromCache) ->
+            Some <| Ok (po, (log |> Map.ofList), additionalProjs, isFromCache)
+        | None ->
+            None
       with
-        | ProjectInspectException d -> Error d
-        | e -> Error (GenericError(file, e.Message))
+        | ProjectInspectException d -> Some <| Error d
+        | e -> Some <| Error (GenericError(file, e.Message))
 
   let load crosstargetingStrategy msbuildPath (useBinaryLogger: bool) notifyState (cache: ParsedProjectCache)  file =
       loadBySdk crosstargetingStrategy msbuildPath notifyState cache ProjectParsingSdk.DotnetSdk useBinaryLogger file
