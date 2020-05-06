@@ -91,7 +91,7 @@ type Loader private (msbuildHostDotNetSdk, msbuildHostVerboseSdk) =
 
         projects
         |> Array.ofList
-        |> Array.Parallel.iter (fun project ->
+        |> iter (fun project ->
             let loader =
                 if File.Exists project then
                     match kindOfProjectSdk project with
