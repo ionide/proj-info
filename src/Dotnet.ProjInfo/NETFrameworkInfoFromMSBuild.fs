@@ -39,7 +39,7 @@ let getReferencePaths props =
             Lines="@(ReferencePath -> 'ReferencePath=%(Identity)')"
             Overwrite="true"
             Encoding="UTF-8"/>
-            
+
     <!-- WriteLinesToFile doesnt create the file if @(ReferencePath) is empty -->
     <Touch
         Condition=" '$(_GetFsxScriptReferences_OutFile)' != '' "
@@ -56,9 +56,10 @@ let getReferencePaths props =
     //   FrameworkPathOverride = lines |> List.tryPick (chooseByPrefix "FrameworkPathOverride=")
     //   ReferencePath = lines |> List.choose (chooseByPrefix "ReferencePath=") }
 
-    template, args, (fun () -> outFile
-                               |> Inspect.bindSkipped Inspect.parsePropertiesOut
-                               |> Result.map (List.map snd >> Inspect.GetResult.ResolvedNETRefs))
+    template, args, (fun projectPath ->
+                          outFile
+                          |> Inspect.bindSkipped Inspect.parsePropertiesOut
+                          |> Result.map (List.map snd >> Inspect.GetResult.ResolvedNETRefs))
 
 
 let [<Literal>] private FrameworkPathOverride = "FrameworkPathOverride"
@@ -87,8 +88,8 @@ let installedNETFrameworks () =
       |> List.distinct
       |> Inspect.GetResult.InstalledNETFw
 
-    let findInstalledNETFw () =
-        parser ()
+    let findInstalledNETFw (projectPath: string) =
+        parser projectPath
         |> Result.bind (fun p ->
             match p with
             | Inspect.GetResult.Properties props ->

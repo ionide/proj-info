@@ -80,6 +80,7 @@ type Loader private (msbuildHostDotNetSdk, msbuildHostVerboseSdk) =
     member this.LoadProjects(projects: string list, crosstargetingStrategy: CrosstargetingStrategy, useBinaryLogger: bool, ?numberOfThreads : int ) =
         let numberOfThreads = defaultArg numberOfThreads 1
         let cache = ProjectCrackerDotnetSdk.ParsedProjectCache()
+        Dotnet.ProjInfo.Inspect.cleanOutDir ()
 
         let notify arg =
             event1.Trigger(this, arg)
