@@ -152,6 +152,22 @@ type Loader private (msbuildHostDotNetSdk, msbuildHostVerboseSdk) =
         | Choice2Of2 d ->
             failwithf "cannot load the sln: %A" d
 
+    ///Experimental API runing Design Time Build directly on solution file, rather than on each project separately
+    member this.LoadSlnAlternative(slnPath: string) =
+        Dotnet.ProjInfo.Inspect.cleanOutDir ()
+
+        let notify arg =
+            match arg with
+            | WorkspaceProjectState.Loaded (po, _, _) ->
+                parsedProjects.AddOrUpdate(getKey po, po, fun _ _ -> po) |> ignore
+            | _ -> ()
+            event1.Trigger(this, arg)
+
+        if File.Exists slnPath then
+            ProjectCrackerSln.load this.MSBuildHostDotNetSdk false notify slnPath
+        else
+            failwithf "cannot load the sln: %A" slnPath
+
     static member Create(config: LoaderConfig) =
         Loader(config.MSBuildHostDotNetSdk, config.MSBuildHostVerboseSdk)
 

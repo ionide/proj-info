@@ -553,6 +553,79 @@ let tests (suiteConfig: TestSuiteConfig) =
 
       )
 
+      testCase |> withLog "can load sln 2" (fun logger fs ->
+        let testDir = inDir fs "load_sln_2"
+        copyDirFromAssets fs ``sample6 Netsdk Sparse/sln``.ProjDir testDir
+
+        let slnPath = testDir/ (``sample6 Netsdk Sparse/sln``.ProjectFile)
+
+        dotnet fs ["restore"; slnPath]
+        |> checkExitCodeZero
+
+        let loader = createLoader logger
+
+        let watcher = watchNotifications logger loader
+
+        let res = loader.LoadSlnAlternative(slnPath)
+
+        Threading.Thread.Sleep 1000 //Hack, MsBuild finishes running before DPI loads all the stuff, shouldn't be a problem in practice as everything will be based on notifications
+
+        [ loading "sample6-netsdk-sparse.sln"; loaded "l2.fsproj"; loaded "l1.fsproj"; loaded "c1.fsproj" ]
+        |> expectNotifications (watcher.Notifications)
+
+        let parsed = loader.Projects
+
+        Expect.equal parsed.Length 3 "c1, l1, l2"
+
+        let c1 = testDir/ (``sample6 Netsdk Sparse/1``.ProjectFile)
+        let c1Dir = Path.GetDirectoryName c1
+
+        let l2 :: [] =
+          ``sample6 Netsdk Sparse/1``.ProjectReferences
+          |> List.map (fun p2p -> testDir/ p2p.ProjectFile )
+        let l2Dir = Path.GetDirectoryName l2
+
+        let l1 = testDir/ (``sample6 Netsdk Sparse/2``.ProjectFile)
+        let l1Dir = Path.GetDirectoryName l1
+
+        let l1Parsed =
+          parsed
+          |> expectFind l1 { ProjectKey.ProjectPath = l1; TargetFramework = "netstandard2.0" } "the F# lib"
+
+        let l1ExpectedSources =
+          [ l1Dir / "obj/Debug/netstandard2.0/l1.AssemblyInfo.fs"
+            l1Dir / "Library.fs" ]
+          |> List.map Path.GetFullPath
+
+        Expect.equal l1Parsed.SourceFiles l1ExpectedSources "check sources l1"
+        Expect.equal l1Parsed.ReferencedProjects [] "check p2p l1"
+
+        let l2Parsed =
+          parsed
+          |> expectFind l2 { ProjectKey.ProjectPath = l2; TargetFramework = "netstandard2.0" } "the C# lib"
+
+        let l2ExpectedSources =
+          [ l2Dir / "obj/Debug/netstandard2.0/l2.AssemblyInfo.fs"
+            l2Dir / "Library.fs" ]
+          |> List.map Path.GetFullPath
+
+        Expect.equal l2Parsed.SourceFiles l2ExpectedSources "check sources l2"
+        Expect.equal l2Parsed.ReferencedProjects [] "check p2p l2"
+
+        let c1Parsed =
+          parsed
+          |> expectFind c1 { ProjectKey.ProjectPath = c1; TargetFramework = "netcoreapp2.1" } "the F# console"
+
+        let c1ExpectedSources =
+          [ c1Dir / "obj/Debug/netcoreapp2.1/c1.AssemblyInfo.fs"
+            c1Dir / "Program.fs" ]
+          |> List.map Path.GetFullPath
+
+        Expect.equal c1Parsed.SourceFiles c1ExpectedSources "check sources c1"
+        Expect.equal c1Parsed.ReferencedProjects.Length 1 "check p2p c1"
+
+      )
+
       testCase |> withLog "can build sample8" (fun _ fs ->
         let testDir = inDir fs "sanity_check_sample8"
         let sample = ``sample8 NetSdk Explorer``
@@ -1092,5 +1165,6 @@ let tests (suiteConfig: TestSuiteConfig) =
     ]
 
   [ valid; invalid; fsx; netfw; msbuild; view ]
+  |> List.map testSequenced
   |> testList "workspace"
   |> testSequenced

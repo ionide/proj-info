@@ -169,7 +169,7 @@ let getFscArgs () =
           Condition=" '$(IsCrossTargetingBuild)' != 'true' "
           DependsOnTargets="ResolveReferences;CoreCompile">
     <PropertyGroup>
-        <_Inspect_FscArgs_OutFile>$(_Inspect_FscArgs_OutDir)\\$(MSBuildProjectName).FscArgs.txt</_Inspect_FscArgs_OutFile>
+        <_Inspect_FscArgs_OutFile>$(_Inspect_FscArgs_OutDir)\\$(MSBuildProjectFile)_FscArgs.txt</_Inspect_FscArgs_OutFile>
     </PropertyGroup>
     <Message Text="%(FscCommandLineArgs.Identity)" Importance="High" />
     <WriteLinesToFile
@@ -186,8 +186,8 @@ let getFscArgs () =
   </Target>
         """.Trim()
     let outFile projectPath =
-        let pp = Path.GetFileNameWithoutExtension projectPath
-        sprintf "%s\\%s.FscArgs.txt" outDir pp
+        let pp = Path.GetFileName projectPath
+        sprintf "%s\\%s_FscArgs.txt" outDir pp
     let args =
         [ Property ("SkipCompilerExecution", "true")
           Property ("ProvideCommandLineArgs" , "true")
@@ -211,7 +211,7 @@ let getCscArgs () =
           DependsOnTargets="ResolveReferences;CoreCompile">
     <Message Text="%(CscCommandLineArgs.Identity)" Importance="High" />
     <PropertyGroup>
-        <_Inspect_CscArgs_OutFile>$(_Inspect_CscArgs_OutDir)\\$(MSBuildProjectName).CscArgs.txt</_Inspect_CscArgs_OutFile>
+        <_Inspect_CscArgs_OutFile>$(_Inspect_CscArgs_OutDir)\\$(MSBuildProjectFile)_CscArgs.txt</_Inspect_CscArgs_OutFile>
     </PropertyGroup>
     <WriteLinesToFile
             Condition=" '$(_Inspect_CscArgs_OutFile)' != '' "
@@ -227,8 +227,8 @@ let getCscArgs () =
   </Target>
         """.Trim()
     let outFile projectPath =
-        let pp = Path.GetFileNameWithoutExtension projectPath
-        sprintf "%s\\%s.CscArgs.txt" outDir pp
+        let pp = Path.GetFileName projectPath
+        sprintf "%s\\%s_CscArgs.txt" outDir pp
     let args =
         [ Property ("SkipCompilerExecution", "true")
           Property ("ProvideCommandLineArgs" , "true")
@@ -250,7 +250,7 @@ let getP2PRefs () =
   <Target Name="_Inspect_GetProjectReferences">
     <Message Text="%(ProjectReference.FullPath)" Importance="High" />
     <PropertyGroup>
-        <_Inspect_GetProjectReferences_OutFile>$(_Inspect_GetProjectReferences_OutDir)\\$(MSBuildProjectName).GetProjectReferences.txt</_Inspect_GetProjectReferences_OutFile>
+        <_Inspect_GetProjectReferences_OutFile>$(_Inspect_GetProjectReferences_OutDir)\\$(MSBuildProjectFile)_GetProjectReferences.txt</_Inspect_GetProjectReferences_OutFile>
     </PropertyGroup>
     <WriteLinesToFile
             Condition=" '$(_Inspect_GetProjectReferences_OutFile)' != '' "
@@ -265,10 +265,9 @@ let getP2PRefs () =
         AlwaysCreate="True" />
   </Target>
         """.Trim()
-    let outFile = getNewTempFilePath "GetProjectReferences.txt"
     let outFile projectPath =
-        let pp = Path.GetFileNameWithoutExtension projectPath
-        sprintf "%s\\%s.GetProjectReferences.txt" outDir pp
+        let pp = Path.GetFileName projectPath
+        sprintf "%s\\%s_GetProjectReferences.txt" outDir pp
     let args =
         [ Target "_Inspect_GetProjectReferences"
           Property ("_Inspect_GetProjectReferences_OutDir", outDir) ]
@@ -304,7 +303,7 @@ let getProperties props =
           Condition=" '$(IsCrossTargetingBuild)' """ + (if isCrossgen then "==" else "!=") + """ 'true' "
           """ + (if isCrossgen then "" else "DependsOnTargets=\"ResolveReferences\"" ) + """ >
     <PropertyGroup>
-        <_Inspect_GetProperties_OutFile>$(_Inspect_GetProperties_OutDir)\\$(MSBuildProjectName).GetProperties.txt</_Inspect_GetProperties_OutFile>
+        <_Inspect_GetProperties_OutFile>$(_Inspect_GetProperties_OutDir)\\$(MSBuildProjectFile)_GetProperties.txt</_Inspect_GetProperties_OutFile>
     </PropertyGroup>
     <ItemGroup>
         """
@@ -347,8 +346,8 @@ let getProperties props =
         |> String.concat (System.Environment.NewLine)
 
     let outFile projectPath =
-        let pp = Path.GetFileNameWithoutExtension projectPath
-        sprintf "%s\\%s.GetProperties.txt" outDir pp
+        let pp = Path.GetFileName projectPath
+        sprintf "%s\\%s_GetProperties.txt" outDir pp
     let args =
         [ Target "_Inspect_GetProperties"
           Property ("_Inspect_GetProperties_OutDir", outDir) ]
@@ -434,7 +433,7 @@ let getItems items dependsOnTargets =
           Condition=" '$(IsCrossTargetingBuild)' != 'true' "
           DependsOnTargets="{0}">
           <PropertyGroup>
-            <_Inspect_Items_OutFile>$(_Inspect_Items_OutDir)\\$(MSBuildProjectName).Items.txt</_Inspect_Items_OutFile>
+            <_Inspect_Items_OutFile>$(_Inspect_Items_OutDir)\\$(MSBuildProjectFile)_Items.txt</_Inspect_Items_OutFile>
           </PropertyGroup>
                               """, dependsOnTargetsProperty)
 
@@ -466,8 +465,8 @@ let getItems items dependsOnTargets =
         |> String.concat (Environment.NewLine)
 
     let outFile projectPath =
-        let pp = Path.GetFileNameWithoutExtension projectPath
-        sprintf "%s\\%s.Items.txt" outDir pp
+        let pp = Path.GetFileName projectPath
+        sprintf "%s\\%s_Items.txt" outDir pp
     let args =
         [ Target "_Inspect_Items"
           Property ("_Inspect_Items_OutDir", outDir) ]
@@ -526,7 +525,7 @@ let getResolvedP2PRefs () =
           Condition=" '$(IsCrossTargetingBuild)' != 'true' "
           DependsOnTargets="ResolveProjectReferencesDesignTime">
     <PropertyGroup>
-        <_Inspect_GetResolvedProjectReferences_OutFile>$(_Inspect_GetResolvedProjectReferences_OutDir)\\$(MSBuildProjectName).GetResolvedProjectReferences.txt</_Inspect_GetResolvedProjectReferences_OutFile>
+        <_Inspect_GetResolvedProjectReferences_OutFile>$(_Inspect_GetResolvedProjectReferences_OutDir)\\$(MSBuildProjectFile)_GetResolvedProjectReferences.txt</_Inspect_GetResolvedProjectReferences_OutFile>
     </PropertyGroup>
     <Message Text="%(_MSBuildProjectReferenceExistent.FullPath)" Importance="High" />
     <Message Text="%(_MSBuildProjectReferenceExistent.SetTargetFramework)" Importance="High" />
@@ -544,8 +543,8 @@ let getResolvedP2PRefs () =
   </Target>
         """.Trim()
     let outFile projectPath =
-        let pp = Path.GetFileNameWithoutExtension projectPath
-        sprintf "%s\\%s.GetResolvedProjectReferences.txt" outDir pp
+        let pp = Path.GetFileName projectPath
+        sprintf "%s\\%s_GetResolvedProjectReferences.txt" outDir pp
     let args =
         [ Property ("DesignTimeBuild", "true")
           Target "_Inspect_GetResolvedProjectReferences"
@@ -593,6 +592,43 @@ let getProjectInfo log msbuildExec getArgs (projPath: string) =
     |> Result.bind (fun targetPath -> msbuildExec projPath (args @ [ Property("CustomAfterMicrosoftCommonTargets", targetPath) ]))
     |> Result.bind (fun _ -> parse projPath)
 
+/// Runs MsBuild on given project or solution. Blocking call. Result shows if the msbuild managed to run, not an actuall content of the project files.
+///
+let runMsBuild log msbuildExec getters additionalArgs (notify: Event<_>) (path: string) =
+
+    let templates, argsList, parsers =
+        getters
+        |> List.map (fun getArgs -> getArgs ())
+        |> List.unzip3
+
+    let args = argsList |> List.concat
+
+    // remove deprecated target file, if exists
+    path
+    |> uninstall_old_target_file log
+
+    use watcher = new FileSystemWatcher(outDir, "*_Items.txt")
+    watcher.Created.Add (fun t ->
+        let projName = t.Name.Split('_').[0]
+        let res =
+            parsers
+            |> List.map (fun parse ->
+                try
+                    parse projName
+                with
+                | :? System.IO.IOException ->
+                    Threading.Thread.Sleep 50
+                    parse projName)
+        notify.Trigger (projName, res)
+
+        ())
+
+    watcher.EnableRaisingEvents <- true
+
+    getNewTempFilePath "proj-info.hook.targets"
+    |> writeTargetFile log templates
+    |> Result.bind (fun targetPath -> msbuildExec path (args @ additionalArgs @ [ Property("CustomAfterMicrosoftCommonTargets", targetPath); Property("CustomAfterMicrosoftCommonCrossTargetingTargets", targetPath) ]))
+
 let getFscArgsOldSdk propsToFscArgs () =
 
     let props = FakeMsbuildTasks.getFscTaskProperties ()
@@ -602,7 +638,7 @@ let getFscArgsOldSdk propsToFscArgs () =
   <!-- Override CoreCompile target -->
   <Target Name="CoreCompile" DependsOnTargets="$(CoreCompileDependsOn)">
     <PropertyGroup>
-        <_Inspect_CoreCompilePropsOldSdk_OutFile>$(_Inspect_CoreCompilePropsOldSdk_OutDir)\\$(MSBuildProjectName).CoreCompilePropsOldSdk.txt</_Inspect_CoreCompilePropsOldSdk_OutFile>
+        <_Inspect_CoreCompilePropsOldSdk_OutFile>$(_Inspect_CoreCompilePropsOldSdk_OutDir)\\$(MSBuildProjectFile)_CoreCompilePropsOldSdk.txt</_Inspect_CoreCompilePropsOldSdk_OutFile>
     </PropertyGroup>
     <ItemGroup>
         """
@@ -629,8 +665,8 @@ let getFscArgsOldSdk propsToFscArgs () =
   </Target>
         """.Trim()
     let outFile projectPath =
-        let pp = Path.GetFileNameWithoutExtension projectPath
-        sprintf "%s\\%s.CoreCompilePropsOldSdk.txt" outDir pp
+        let pp = Path.GetFileName projectPath
+        sprintf "%s\\%s_CoreCompilePropsOldSdk.txt" outDir pp
     let args =
         [ Property ("CopyBuildOutputToOutputDirectory", "false")
           Property ("UseCommonOutputDirectory", "true")

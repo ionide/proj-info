@@ -22,12 +22,6 @@ module internal ProjectCrackerDotnetSdk =
 
   open DotnetProjInfoInspectHelpers
 
-  let msbuildPropProjectOutputType (s: string) =
-    match s.Trim() with
-    | MSBuildPrj.MSBuild.ConditionEquals "Exe" -> ProjectOutputType.Exe
-    | MSBuildPrj.MSBuild.ConditionEquals "Library" -> ProjectOutputType.Library
-    | x -> ProjectOutputType.Custom x
-
   let getExtraInfo props =
     let msbuildPropBool prop =
         props |> Map.tryFind prop |> Option.bind msbuildPropBool
