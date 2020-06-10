@@ -129,7 +129,10 @@ type Loader private (msbuildHostDotNetSdk, msbuildHostVerboseSdk) =
                 lastProjectError.AddOrUpdate(project, e, fun _ _ -> e) |> ignore
                 notify failed
             | None ->
-                ()
+                let e = GetProjectOptionsErrors.ProjectNotLoaded project
+                let failed = WorkspaceProjectState.Failed (project, e)
+                lastProjectError.AddOrUpdate(project, e, fun _ _ -> e) |> ignore
+                notify failed
         )
 
     member this.LoadSln(slnPath: string, ?numberOfThreads : int ) =

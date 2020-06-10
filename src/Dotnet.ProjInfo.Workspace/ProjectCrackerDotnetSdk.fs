@@ -74,8 +74,6 @@ module internal ProjectCrackerDotnetSdk =
   type CacheFunction<'a> = ('a -> string -> ParsedProject option) -> list<string * string> -> string -> ParsedProject option
   type ParsedProjectCache = Collections.Concurrent.ConcurrentDictionary<string, ParsedProject>
 
-  let currentlyParsing = ConcurrentDictionary<string, unit>()
-
   let private execProjInfoFromMsbuild msbuildPath notifyState (useBinaryLogger: bool) parseAsSdk additionalMSBuildProps (file: string) =
 
     let projDir = Path.GetDirectoryName file
@@ -133,43 +131,36 @@ module internal ProjectCrackerDotnetSdk =
             | "1" -> [ Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Switch("bl") ]
             | _ -> []
 
-    if currentlyParsing.ContainsKey file then
-        Result.Ok [], (loggedMessages.ToArray() |> Array.toList)
+    let infoResult =
+        getProjectInfos loggedMessages.Enqueue msbuildExec [getFscArgs; getP2PRefs; gp; getItems] (additionalArgs @ globalArgs) file
 
-    else
-        currentlyParsing.AddOrUpdate(file, (), fun _ _ -> ())
-
-        let infoResult =
-            getProjectInfos loggedMessages.Enqueue msbuildExec [getFscArgs; getP2PRefs; gp; getItems] (additionalArgs @ globalArgs) file
-
-        match infoResult with
-        | Ok n ->
-            let objRes =
-                n
-                |> List.tryPick (function
-                    | Ok (Properties props) -> props |> List.tryFind (fun (k,v) -> k = "BaseIntermediateOutputPath")
-                    | _ -> None)
-                |> Option.map snd
-            match parseAsSdk with
-            | ProjectParsingSdk.DotnetSdk ->
-                let projectAssetsJsonPath =
-                    match objRes with
-                    | Some r ->
-                        if Path.IsPathRooted r then
-                            Path.Combine(r, "project.assets.json")
-                        else
-                            Path.Combine(projDir, r, "project.assets.json")
-                    | None ->
-                        Path.Combine(projDir, "obj", "project.assets.json")
-                if not(File.Exists(projectAssetsJsonPath)) then
-                    raise (ProjectInspectException (ProjectNotRestored file))
-            | ProjectParsingSdk.VerboseSdk ->
-                ()
-        | Error (er) ->
+    match infoResult with
+    | Ok n ->
+        let objRes =
+            n
+            |> List.tryPick (function
+                | Ok (Properties props) -> props |> List.tryFind (fun (k,v) -> k = "BaseIntermediateOutputPath")
+                | _ -> None)
+            |> Option.map snd
+        match parseAsSdk with
+        | ProjectParsingSdk.DotnetSdk ->
+            let projectAssetsJsonPath =
+                match objRes with
+                | Some r ->
+                    if Path.IsPathRooted r then
+                        Path.Combine(r, "project.assets.json")
+                    else
+                        Path.Combine(projDir, r, "project.assets.json")
+                | None ->
+                    Path.Combine(projDir, "obj", "project.assets.json")
+            if not(File.Exists(projectAssetsJsonPath)) then
+                raise (ProjectInspectException (ProjectNotRestored file))
+        | ProjectParsingSdk.VerboseSdk ->
             ()
+    | Error (er) ->
+        ()
 
-        currentlyParsing.TryRemove(file) |> ignore
-        infoResult, (loggedMessages.ToArray() |> Array.toList)
+    infoResult, (loggedMessages.ToArray() |> Array.toList)
 
 
   let mapMSBuildResults (results, log) =
