@@ -223,7 +223,7 @@ let tests (suiteConfig: TestSuiteConfig) =
 
     testList "valid" [
 
-      testCase |> withLog "can load sample1" (fun logger fs ->
+      ptestCase |> withLog "can load sample1" (fun logger fs ->
         let testDir = inDir fs "load_sample1"
         copyDirFromAssets fs ``sample1 OldSdk library``.ProjDir testDir
 
@@ -818,7 +818,7 @@ let tests (suiteConfig: TestSuiteConfig) =
 
     testList "view" [
 
-      testCase |> withLog "can render sample1" (fun logger fs ->
+      ptestCase |> withLog "can render sample1" (fun logger fs ->
         let testDir = inDir fs "render_sample1"
         let sampleProj = ``sample1 OldSdk library``
         copyDirFromAssets fs sampleProj.ProjDir testDir
