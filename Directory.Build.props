@@ -9,7 +9,10 @@
     <PackageProjectUrl>https://github.com/ionide/dotnet-proj-info/</PackageProjectUrl>
     <PackageTags>msbuild;dotnet;sdk;csproj;fsproj</PackageTags>
     <RepositoryUrl>https://github.com/ionide/dotnet-proj-info.git</RepositoryUrl>
-    <PackageLicenseUrl>https://github.com/ionide/dotnet-proj-info/blob/master/LICENSE</PackageLicenseUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <PropertyGroup>
