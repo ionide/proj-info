@@ -5,11 +5,12 @@ framework: netstandard2.0, netcoreapp2.1, net461
 nuget Expecto.Diff
 nuget FSharp.Core >= 4.3.4 lowest_matching: true
 nuget System.ValueTuple ~> 4.4 lowest_matching: true
-nuget FSharp.Compiler.Service ~> 35.0
+nuget FSharp.Compiler.Service ~> 36.0
 nuget Sln ~> 0.3.0
 nuget Argu ~> 5.1
 
 nuget Microsoft.NETFramework.ReferenceAssemblies # for net461 builds
+nuget Microsoft.SourceLink.GitHub copy_local: true
 
 nuget Expecto ~> 8.4
 nuget Expecto.TestResults ~> 8.4
