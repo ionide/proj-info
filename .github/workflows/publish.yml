@@ -52,4 +52,4 @@ jobs:
         overwrite: true
         file_glob: true
     - name: Push To NuGet
-      run: dotnet nuget push -k ${{ secrets.NUGET_TOKEN }} bin/nupkg/*.nupkg
+      run: dotnet nuget push bin/nupkg/*.nupkg -k ${{ secrets.NUGET_TOKEN }} -s https://api.nuget.org/v3/index.json 
