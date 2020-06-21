@@ -51,3 +51,5 @@ jobs:
         tag: ${{ github.ref }}
         overwrite: true
         file_glob: true
+    - name: Push To NuGet
+      run: dotnet nuget push -k ${{ secrets.NUGET_TOKEN }} bin/nupkg/*.nupkg
