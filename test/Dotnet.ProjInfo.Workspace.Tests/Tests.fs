@@ -553,6 +553,32 @@ let tests (suiteConfig: TestSuiteConfig) =
 
       )
 
+      testCase |> withLog "can parse sln" (fun logger fs ->
+        let testDir = inDir fs "parse_sln"
+        copyDirFromAssets fs ``sample6 Netsdk Sparse/sln``.ProjDir testDir
+
+        let slnPath = testDir/ (``sample6 Netsdk Sparse/sln``.ProjectFile)
+
+        dotnet fs ["restore"; slnPath]
+        |> checkExitCodeZero
+
+        let p = InspectSln.tryParseSln(slnPath)
+
+        Expect.isTrue (match p with Ok _  -> true | Result.Error _  -> false) "expected successful parse"
+
+        let actualProjects = 
+            InspectSln.loadingBuildOrder (match p with Ok (_,data)  -> data | _ -> failwith "unreachable")
+            |> List.map Path.GetFullPath
+
+        let expectedProjects = 
+            [ Path.Combine(testDir, "c1", "c1.fsproj")
+              Path.Combine(testDir, "l1", "l1.fsproj")
+              Path.Combine(testDir, "l2", "l2.fsproj") ]
+            |> List.map Path.GetFullPath
+
+        Expect.equal actualProjects expectedProjects "expected successful calculation of loading build order of solution"
+
+      )
       testCase |> withLog "can build sample8" (fun _ fs ->
         let testDir = inDir fs "sanity_check_sample8"
         let sample = ``sample8 NetSdk Explorer``
