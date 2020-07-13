@@ -1,6 +1,6 @@
 namespace Dotnet.ProjInfo.Workspace
 
-module internal InspectSln =
+module InspectSln =
 
   open System
   open System.IO
@@ -91,9 +91,9 @@ module internal InspectSln =
         slnFilePath
         |> Microsoft.Build.Construction.SolutionFile.Parse
         |> parseSln
-        |> Choice1Of2
+        |> Ok
     with ex ->
-        Choice2Of2 ex
+        Error ex
 
   let loadingBuildOrder (data: SolutionData) =
 

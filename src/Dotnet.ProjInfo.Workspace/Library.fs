@@ -147,11 +147,11 @@ type Loader private (msbuildHostDotNetSdk, msbuildHostVerboseSdk) =
         let numberOfThreads = defaultArg numberOfThreads 1
 
         match InspectSln.tryParseSln slnPath with
-        | Choice1Of2 (_, slnData) ->
+        | Ok (_, slnData) ->
             let projs = InspectSln.loadingBuildOrder slnData
 
             this.LoadProjects(projs, crosstargetingStrategy, useBinaryLogger, numberOfThreads)
-        | Choice2Of2 d ->
+        | Error d ->
             failwithf "cannot load the sln: %A" d
 
     static member Create(config: LoaderConfig) =

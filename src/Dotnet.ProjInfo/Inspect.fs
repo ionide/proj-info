@@ -136,10 +136,9 @@ type GetResult =
      | InstalledNETFw of string list
 and ResolvedP2PRefsInfo = { ProjectReferenceFullPath: string; TargetFramework: string option; Others: (string * string) list }
 
+// See https://stackoverflow.com/questions/581570/how-can-i-create-a-temp-file-with-a-specific-extension-with-net
 let getNewTempFilePath suffix =
-    let outFile = System.IO.Path.GetTempFileName()
-    if File.Exists outFile then File.Delete outFile
-    sprintf "%s.%s" outFile suffix
+    Path.GetTempPath() + Guid.NewGuid().ToString() + suffix 
 
 let bindSkipped f outFile =
     if not(File.Exists outFile) then
