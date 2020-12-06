@@ -4,3 +4,4 @@ Expecto.TestResults
 Expecto.Diff
 MedallionShell
 Microsoft.NETFramework.ReferenceAssemblies
+FSharp.Compiler.Service
