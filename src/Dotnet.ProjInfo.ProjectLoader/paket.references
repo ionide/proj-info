@@ -1,0 +1,4 @@
+group New
+    Microsoft.Build
+    Microsoft.Build.Locator
+    FSharp.Core
