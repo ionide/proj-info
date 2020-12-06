@@ -11,6 +11,7 @@ open System.Collections.Generic
 open Dotnet.ProjInfo.Types
 open Dotnet.ProjInfo
 open Expecto.Logging.Message
+open FSharp.Compiler.SourceCodeServices
 
 let RepoDir = (__SOURCE_DIRECTORY__ / ".." / "..") |> Path.GetFullPath
 let ExamplesDir = RepoDir / "test" / "examples"
@@ -62,6 +63,15 @@ let withLog name f test =
 let renderOf sampleProj sources =
     { ProjectViewerTree.Name = sampleProj.ProjectFile |> Path.GetFileNameWithoutExtension
       Items = sources |> List.map (fun (path, link) -> ProjectViewerItem.Compile(path, { ProjectViewerItemConfig.Link = link })) }
+
+let createFCS () =
+
+    let checker =
+        FSharp.Compiler.SourceCodeServices.FSharpChecker.Create(projectCacheSize = 200, keepAllBackgroundResolutions = true, keepAssemblyContents = true)
+
+    checker.ImplicitlyStartBackgroundWork <- true
+
+    checker
 
 [<AutoOpen>]
 module ExpectNotification =
@@ -641,6 +651,75 @@ let testProjectNotFound toolsPath =
 
             Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(wrongPath, (GetProjectOptionsErrors.ProjectNotFound(wrongPath)))) "check error type")
 
+let testFCSmap toolsPath =
+    testCase
+    |> withLog
+        "can load sample2 with FCS"
+        (fun logger fs ->
+            let rec allFCSProjects (po: FSharpProjectOptions) =
+                [ yield po
+                  for (_, p2p) in po.ReferencedProjects do
+                      yield! allFCSProjects p2p ]
+
+            let findProjectExtraInfo (po: FSharpProjectOptions) =
+                match po.ExtraProjectInfo with
+                | None -> failwithf "expect ExtraProjectInfo but was None"
+                | Some extra ->
+                    match extra with
+                    | :? ProjectOptions as poDPW -> poDPW
+                    | ex -> failwithf "expected ProjectOptions but was '%A'" ex
+
+            let rec allP2P (po: FSharpProjectOptions) =
+                [ for (key, p2p) in po.ReferencedProjects do
+                    let poDPW = findProjectExtraInfo p2p
+                    yield (key, p2p, poDPW)
+                    yield! allP2P p2p ]
+
+            let expectP2PKeyIsTargetPath po =
+                for (tar, fcsPO, poDPW) in allP2P po do
+                    Expect.equal tar poDPW.TargetPath (sprintf "p2p key is TargetPath, fsc projet options was '%A'" fcsPO)
+
+
+
+            let testDir = inDir fs "load_sample2"
+            copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
+
+            let projPath = testDir / (``sample2 NetSdk library``.ProjectFile)
+
+            dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
+
+
+            let loader = WorkspaceLoader.Create(toolsPath)
+
+            let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+
+            let fcsPo = FCS.mapToFSharpProjectOptions parsed.Head parsed
+
+            let po = parsed |> expectFind projPath "first is a lib"
+
+            Expect.equal fcsPo.LoadTime po.LoadTime "load time"
+
+            Expect.equal fcsPo.ReferencedProjects.Length ``sample2 NetSdk library``.ProjectReferences.Length "refs"
+
+            Expect.equal fcsPo.ExtraProjectInfo (Some(box po)) "extra info"
+
+            //TODO check fullpaths
+            Expect.equal fcsPo.SourceFiles (po.SourceFiles |> Array.ofList) "check sources"
+
+
+            expectP2PKeyIsTargetPath fcsPo
+
+            let fcs = createFCS ()
+            let result = fcs.ParseAndCheckProject(fcsPo) |> Async.RunSynchronously
+
+            Expect.isEmpty result.Errors (sprintf "no errors but was: %A" result.Errors)
+
+            let uses = result.GetAllUsesOfAllSymbols() |> Async.RunSynchronously
+
+            Expect.isNonEmpty uses "all symbols usages"
+
+            )
+
 let tests toolsPath =
     testSequenced
     <| testList
@@ -660,4 +739,6 @@ let tests toolsPath =
           testRender5 toolsPath
           testRender8 toolsPath
           //Invalid tests
-          testProjectNotFound toolsPath ]
+          testProjectNotFound toolsPath
+          //FCS tests
+          testFCSmap toolsPath ]

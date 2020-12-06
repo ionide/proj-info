@@ -13,6 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Dotnet.ProjInfo\Dotnet.ProjInfo.fsproj" />
+    <ProjectReference Include="..\..\src\Dotnet.ProjInfo.FCS\Dotnet.ProjInfo.FCS.fsproj" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
