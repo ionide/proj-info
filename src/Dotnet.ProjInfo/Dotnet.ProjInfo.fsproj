@@ -1,37 +1,19 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;net461</TargetFrameworks>
-    <Description>Get msbuild info</Description>
-    <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
+    <TargetFrameworks>net5.0; netcoreapp3.1</TargetFrameworks>
   </PropertyGroup>
+
   <ItemGroup>
-    <Compile Include="Resources.fs" />
-    <Compile Include="ExternalFSharp\MissingApi.fs" />
-    <Compile Include="ExternalFSharp\FscConfig.fs" />
-    <Compile Include="Inspect.fs" />
-    <Compile Include="NETFrameworkInfoFromMSBuild.fs" />
-    <Compile Include="NETFramework.fs" />
+    <Compile Include="Types.fs" />
+    <Compile Include="Utils.fs" />
+    <Compile Include="VisualTree.fs" />
+    <Compile Include="InspectSln.fs" />
+    <Compile Include="Library.fs" />
   </ItemGroup>
+
   <ItemGroup>
-    <ProjectReference Include="..\Dotnet.ProjInfo.Helpers\Dotnet.ProjInfo.Helpers.csproj" PrivateAssets="All" />
+    <ProjectReference Include="..\Dotnet.ProjInfo.Sln\Dotnet.ProjInfo.Sln.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="..\..\paket-files\Microsoft\visualfsharp\src\fsharp\FSharp.Build\Microsoft.FSharp.Targets">
-      <LogicalName>Microsoft.FSharp.Targets</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Resources\EnvironmentInfo.proj">
-      <LogicalName>EnvironmentInfo.proj</LogicalName>
-    </EmbeddedResource>
-  </ItemGroup>
-  <!-- HACK: p2p of type project, not package (ref https://github.com/NuGet/Home/issues/3891 ) -->
-  <PropertyGroup>
-    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeP2POutput</TargetsForTfmSpecificBuildOutput>
-  </PropertyGroup>
-  <Target Name="IncludeP2POutput">
-    <ItemGroup>
-      <BuildOutputInPackage Include="$(MSBuildProjectDirectory)/$(OutputPath)Dotnet.ProjInfo.Helpers.dll" />
-    </ItemGroup>
-  </Target>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
