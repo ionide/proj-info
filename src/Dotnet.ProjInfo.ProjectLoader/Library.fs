@@ -55,9 +55,6 @@ module ProjectLoader =
 
     let loadProject (path: string) (toolsPath: string) =
         let globalProperties = dict [
-            "SolutionDir", Path.GetDirectoryName path
-            "MSBuildExtensionsPath", toolsPath
-            "MSBuildSDKsPath", Path.Combine(toolsPath, "Sdks")
             "IsCrossTargetingBuild", "false" //Make sure we always target single TFM for Design Time Build
         ]
 
@@ -83,7 +80,7 @@ module ProjectLoader =
         pi.SetGlobalProperty("BuildProjectReferences", "false") |> ignore
         pi.SetGlobalProperty("TargetFramework", actualTFM) |> ignore
         let pi = pi.CreateProjectInstance()
-        let build = pi.Build("CoreCompile", [logger])
+        let build = pi.Build([|"ResolveReferences";"CoreCompile" |], [logger])
         if build then
             Success (LoadedProject pi)
         else
