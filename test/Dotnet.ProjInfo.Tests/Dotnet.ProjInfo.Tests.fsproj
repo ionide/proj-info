@@ -2,17 +2,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFrameworks>netcoreapp2.1;net461</TargetFrameworks>
+    <TargetFramework>net5.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\dotnet-proj.Tests\FileUtils.fs" />
-    <Compile Include="..\dotnet-proj.Tests\TestAssets.fs" />
-    <Compile Include="TestsConfig.fs" />
+    <Compile Include="FileUtils.fs" />
+    <Compile Include="TestAssets.fs" />
     <Compile Include="Tests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Dotnet.ProjInfo.Workspace\Dotnet.ProjInfo.Workspace.fsproj" />
+    <ProjectReference Include="..\..\src\Dotnet.ProjInfo\Dotnet.ProjInfo.fsproj" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
