@@ -9,6 +9,11 @@
     <Compile Include="Utils.fs" />
     <Compile Include="VisualTree.fs" />
     <Compile Include="ProjectLoader.fs" />
+    <Compile Include="InspectSln.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dotnet.ProjInfo.Sln\Dotnet.ProjInfo.Sln.csproj" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
