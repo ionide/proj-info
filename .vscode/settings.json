@@ -7,5 +7,6 @@
         "test/testrun_ws_fcs",
         "test/examples",
         "packages"
-    ]
+    ],
+    "editor.formatOnSave": true
 }
