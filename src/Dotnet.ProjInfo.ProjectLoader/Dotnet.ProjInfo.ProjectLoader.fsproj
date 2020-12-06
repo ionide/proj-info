@@ -8,7 +8,7 @@
     <Compile Include="Types.fs" />
     <Compile Include="Utils.fs" />
     <Compile Include="VisualTree.fs" />
-    <Compile Include="Library.fs" />
+    <Compile Include="ProjectLoader.fs" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
