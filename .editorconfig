@@ -1,0 +1,6 @@
+[*.fs]
+indent_size=4
+max_line_length=240
+fsharp_max_infix_operator_expression = 120
+fsharp_max_value_binding_width = 120
+fsharp_max_if_then_else_short_width = 20
