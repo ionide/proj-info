@@ -1,31 +1,39 @@
 source https://api.nuget.org/v3/index.json
 storage: none
-framework: netstandard2.0, netcoreapp2.1, net461, net5.0
+framework: netstandard2.0, net5.0, netcoreapp3.1
 
-nuget Expecto.Diff
 nuget FSharp.Core
 nuget FSharp.Compiler.Service ~> 38.0
-nuget Sln ~> 0.3.0
 nuget Argu ~> 5.1
 
 nuget Microsoft.NETFramework.ReferenceAssemblies # for net461 builds
 nuget Microsoft.SourceLink.GitHub copy_local: true
 
 nuget Expecto ~> 8.4
+nuget Expecto.Diff
 nuget Expecto.TestResults ~> 8.4
 nuget MedallionShell ~> 1.5.0
 
-// the Fsc build task
-github Microsoft/visualfsharp:Visual-Studio-2017-Version-15.4 src/fsharp/FSharp.Build/Fsc.fs
-github Microsoft/visualfsharp:Visual-Studio-2017-Version-15.4 src/fsharp/FSharp.Build/Microsoft.FSharp.Targets
-
-// msbuild classes from Mono
-github mono/mono:mono-5.2.0.224 mcs/class/Microsoft.Build.Utilities/Microsoft.Build.Utilities/CommandLineBuilder.cs
-github mono/mono:mono-5.2.0.224 mcs/class/Microsoft.Build.Framework/Microsoft.Build.Framework/ITaskItem.cs
-github mono/mono:mono-5.2.0.224 mcs/class/Microsoft.Build.Framework/Microsoft.Build.Framework/ITaskItem2.cs
-github mono/mono:mono-5.2.0.224 mcs/class/Microsoft.Build.Utilities/Mono.XBuild.Utilities/MSBuildUtils.cs
-github mono/mono:mono-5.2.0.224 mcs/class/Microsoft.Build.Utilities/Mono.XBuild.Utilities/ReservedNameUtils.cs
-github mono/mono:mono-5.2.0.224 mcs/class/Microsoft.Build.Utilities/Microsoft.Build.Utilities/TaskItem.cs
 
 nuget Microsoft.Build copy_local: false
 nuget Microsoft.Build.Locator
+
+// [ FAKE GROUP ]
+group Build
+  source https://api.nuget.org/v3/index.json
+
+  framework: netstandard2.0
+  storage: none
+
+  nuget Fake.Core.Target
+  nuget Fake.Core.Process
+  nuget Fake.DotNet.Cli
+  nuget Fake.Core.ReleaseNotes
+  nuget Fake.DotNet.AssemblyInfoFile
+  nuget Fake.DotNet.Paket
+  nuget Fake.Tools.Git
+  nuget Fake.Core.Environment
+  nuget Fake.Core.UserInput
+  nuget Fake.IO.FileSystem
+  nuget Fake.DotNet.MsBuild
+  nuget Fake.Api.GitHub
