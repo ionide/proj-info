@@ -66,3 +66,5 @@ module Types =
         { Name: string
           FullPath: string
           Link: string option }
+
+    type ToolsPath = internal ToolsPath of string
