@@ -10,6 +10,7 @@ open Dotnet.ProjInfo
 open System.Collections.Generic
 open Dotnet.ProjInfo.Types
 open Dotnet.ProjInfo
+open Expecto.Logging.Message
 
 let RepoDir = (__SOURCE_DIRECTORY__ / ".." / "..") |> Path.GetFullPath
 let ExamplesDir = RepoDir / "test" / "examples"
@@ -62,6 +63,67 @@ let renderOf sampleProj sources =
     { ProjectViewerTree.Name = sampleProj.ProjectFile |> Path.GetFileNameWithoutExtension
       Items = sources |> List.map (fun (path, link) -> ProjectViewerItem.Compile(path, { ProjectViewerItemConfig.Link = link })) }
 
+[<AutoOpen>]
+module ExpectNotification =
+
+    let loading (name: string) =
+        let isLoading n =
+            match n with
+            | WorkspaceProjectState.Loading (path) when path.EndsWith(name) -> true
+            | _ -> false
+
+        sprintf "loading %s" name, isLoading
+
+    let loaded (name: string) =
+        let isLoaded n =
+            match n with
+            | WorkspaceProjectState.Loaded (po, _) when po.ProjectFileName.EndsWith(name) -> true
+            | _ -> false
+
+        sprintf "loaded %s" name, isLoaded
+
+    let failed (name: string) =
+        let isFailed n =
+            match n with
+            | WorkspaceProjectState.Failed (path, _) when path.EndsWith(name) -> true
+            | _ -> false
+
+        sprintf "failed %s" name, isFailed
+
+    let expectNotifications actual expected =
+        Expect.equal (List.length actual) (List.length expected) (sprintf "notifications: %A" (expected |> List.map fst))
+
+        expected
+        |> List.zip actual
+        |> List.iter
+            (fun (n, check) ->
+                let name, f = check
+
+                let minimal_info =
+                    match n with
+                    | WorkspaceProjectState.Loading (path) -> sprintf "loading %s " path
+                    | WorkspaceProjectState.Loaded (po, _) -> sprintf "loaded %s" po.ProjectFileName
+                    | WorkspaceProjectState.Failed (path, _) -> sprintf "failed %s" path
+
+                Expect.isTrue (f n) (sprintf "expected %s but was %s" name minimal_info))
+
+    type NotificationWatcher(loader: Dotnet.ProjInfo.WorkspaceLoader, log) =
+        let notifications = List<_>()
+
+        do
+            loader.Notifications.Add
+                (fun arg ->
+                    notifications.Add(arg)
+                    log arg)
+
+        member __.Notifications = notifications |> List.ofSeq
+
+    let logNotification (logger: Logger) arg =
+        logger.debug (eventX "notified: {notification}'" >> setField "notification" arg)
+
+    let watchNotifications logger loader =
+        NotificationWatcher(loader, logNotification logger)
+
 let testSample2 toolsPath =
     testCase
     |> withLog
@@ -77,15 +139,15 @@ let testSample2 toolsPath =
 
             let loader = WorkspaceLoader.Create(toolsPath)
 
-            // let watcher = watchNotifications logger loader
+            let watcher = watchNotifications logger loader
 
             let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
 
-            // [ loading "n1.fsproj"
-            //   loaded "n1.fsproj" ]
-            // |> expectNotifications (watcher.Notifications)
+            [ loading "n1.fsproj"
+              loaded "n1.fsproj" ]
+            |> expectNotifications (watcher.Notifications)
 
-            // let [ _; WorkspaceProjectState.Loaded (n1Loaded, _, _) ] = watcher.Notifications
+            let [ _; WorkspaceProjectState.Loaded (n1Loaded, _) ] = watcher.Notifications
 
             let n1Parsed = parsed |> expectFind projPath "first is a lib"
 
@@ -95,7 +157,7 @@ let testSample2 toolsPath =
                 |> List.map Path.GetFullPath
 
             Expect.equal parsed.Length 1 "console and lib"
-            //Expect.equal n1Parsed n1Loaded "notificaton and parsed should be the same"
+            Expect.equal n1Parsed n1Loaded "notificaton and parsed should be the same"
             Expect.equal n1Parsed.SourceFiles expectedSources "check sources")
 
 let testSample3 toolsPath =
@@ -119,21 +181,20 @@ let testSample3 toolsPath =
 
             let loader = WorkspaceLoader.Create(toolsPath)
 
-            //   let watcher = watchNotifications logger loader
+            let watcher = watchNotifications logger loader
 
             let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
 
-            //   [ loading "c1.fsproj"
-            //     loading "l1.csproj"
-            //     loading "l2.fsproj"
-            //     loaded "c1.fsproj"
-            //     loaded "l1.csproj"
-            //     loaded "l2.fsproj" ]
-            //   |> expectNotifications (watcher.Notifications)
+            [ loading "c1.fsproj"
+              loading "l1.csproj"
+              loading "l2.fsproj"
+              loaded "c1.fsproj"
+              loaded "l1.csproj"
+              loaded "l2.fsproj" ]
+            |> expectNotifications (watcher.Notifications)
 
-            //   let [ _; _; _; WorkspaceProjectState.Loaded (c1Loaded, _, _); WorkspaceProjectState.Loaded (l1Loaded, _, _); WorkspaceProjectState.Loaded (l2Loaded, _, _) ] = watcher.Notifications
+            let [ _; _; _; WorkspaceProjectState.Loaded (c1Loaded, _); WorkspaceProjectState.Loaded (l1Loaded, _); WorkspaceProjectState.Loaded (l2Loaded, _) ] = watcher.Notifications
 
-            //   let parsed = loader.Projects
 
 
             let l1Parsed = parsed |> expectFind l1 "the C# lib"
@@ -163,14 +224,13 @@ let testSample3 toolsPath =
                 |> List.map Path.GetFullPath
 
             Expect.equal parsed.Length 3 (sprintf "console (F#) and lib (F#) and lib (C#), but was %A" (parsed |> List.map (fun x -> x.ProjectFileName)))
-            //   Expect.equal c1Parsed.SourceFiles c1ExpectedSources "check sources - C1"
-            //   Expect.equal l1Parsed.SourceFiles [] "check sources - L1"
+            Expect.equal c1Parsed.SourceFiles c1ExpectedSources "check sources - C1"
+            Expect.equal l1Parsed.SourceFiles [] "check sources - L1"
             Expect.equal l2Parsed.SourceFiles l2ExpectedSources "check sources - L2"
 
-            //Expect.equal l1Parsed l1Loaded "l1 notificaton and parsed should be the same"
-            //Expect.equal l2Parsed l2Loaded "l2 notificaton and parsed should be the same"
-            //Expect.equal c1Parsed c1Loaded "c1 notificaton and parsed should be the same"
-            )
+            Expect.equal l1Parsed l1Loaded "l1 notificaton and parsed should be the same"
+            Expect.equal l2Parsed l2Loaded "l2 notificaton and parsed should be the same"
+            Expect.equal c1Parsed c1Loaded "c1 notificaton and parsed should be the same")
 
 let testSample4 toolsPath =
     testCase
@@ -187,17 +247,15 @@ let testSample4 toolsPath =
 
             let loader = WorkspaceLoader.Create(toolsPath)
 
-            //   let watcher = watchNotifications logger loader
+            let watcher = watchNotifications logger loader
 
             let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
 
-            //   //the additional loading is the cross targeting
-            //   [ loading "m1.fsproj"
-            //     loading "m1.fsproj"
-            //     loaded "m1.fsproj" ]
-            //   |> expectNotifications (watcher.Notifications)
+            [ loading "m1.fsproj"
+              loaded "m1.fsproj" ]
+            |> expectNotifications (watcher.Notifications)
 
-            //   let [ _; _; WorkspaceProjectState.Loaded (m1Loaded, _, _) ] = watcher.Notifications
+            let [ _; WorkspaceProjectState.Loaded (m1Loaded, _) ] = watcher.Notifications
 
 
             Expect.equal parsed.Length 1 (sprintf "multi-tfm lib (F#), but was %A" (parsed |> List.map (fun x -> x.ProjectFileName)))
@@ -210,9 +268,7 @@ let testSample4 toolsPath =
                 |> List.map Path.GetFullPath
 
             Expect.equal m1Parsed.SourceFiles m1ExpectedSources "check sources"
-
-            //Expect.equal m1Parsed m1Loaded "m1 notificaton and parsed should be the same"
-            )
+            Expect.equal m1Parsed m1Loaded "m1 notificaton and parsed should be the same")
 
 let testSample5 toolsPath =
     testCase
@@ -229,15 +285,15 @@ let testSample5 toolsPath =
 
             let loader = WorkspaceLoader.Create(toolsPath)
 
-            // let watcher = watchNotifications logger loader
+            let watcher = watchNotifications logger loader
 
             let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
 
-            // [ loading "l2.csproj"
-            //   loaded "l2.csproj" ]
-            // |> expectNotifications (watcher.Notifications)
+            [ loading "l2.csproj"
+              loaded "l2.csproj" ]
+            |> expectNotifications (watcher.Notifications)
 
-            // let [ _; WorkspaceProjectState.Loaded (l2Loaded, _, _) ] = watcher.Notifications
+            let [ _; WorkspaceProjectState.Loaded (l2Loaded, _) ] = watcher.Notifications
 
 
             Expect.equal parsed.Length 1 "lib"
@@ -253,8 +309,7 @@ let testSample5 toolsPath =
             // Expect.equal l2Parsed.SourceFiles l2ExpectedSources "check sources"
             Expect.equal l2Parsed.SourceFiles [] "check sources"
 
-            //Expect.equal l2Parsed l2Loaded "l2 notificaton and parsed should be the same"
-            )
+            Expect.equal l2Parsed l2Loaded "l2 notificaton and parsed should be the same")
 
 let testLoadSln toolsPath =
     testCase
@@ -270,13 +325,18 @@ let testLoadSln toolsPath =
 
             let loader = WorkspaceLoader.Create(toolsPath)
 
-            //let watcher = watchNotifications logger loader
+            let watcher = watchNotifications logger loader
 
             let parsed = loader.LoadSln(slnPath) |> Seq.toList
 
-            //TODO to check: l2 is loaded from cache, but no loading notification
-            // [ loading "c1.fsproj"; loading "l2.fsproj"; loaded "c1.fsproj"; loading "l1.fsproj"; loaded "l1.fsproj"; loaded "l2.fsproj" ]
-            // |> expectNotifications (watcher.Notifications)
+            [ loading "c1.fsproj"
+              loaded "c1.fsproj"
+              loading "l2.fsproj"
+              loaded "l2.fsproj"
+              loading "l1.fsproj"
+              loaded "l1.fsproj"
+              loaded "l2.fsproj" ]
+            |> expectNotifications (watcher.Notifications)
 
 
             Expect.equal parsed.Length 3 "c1, l1, l2"
@@ -375,15 +435,15 @@ let testSample9 toolsPath =
 
             let loader = WorkspaceLoader.Create(toolsPath)
 
-            // let watcher = watchNotifications logger loader
+            let watcher = watchNotifications logger loader
 
             let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
 
-            // [ loading "n1.fsproj"
-            //   loaded "n1.fsproj" ]
-            // |> expectNotifications (watcher.Notifications)
+            [ loading "n1.fsproj"
+              loaded "n1.fsproj" ]
+            |> expectNotifications (watcher.Notifications)
 
-            // let [ _; WorkspaceProjectState.Loaded (n1Loaded, _, _) ] = watcher.Notifications
+            let [ _; WorkspaceProjectState.Loaded (n1Loaded, _) ] = watcher.Notifications
 
 
             Expect.equal parsed.Length 1 "console and lib"
@@ -397,8 +457,7 @@ let testSample9 toolsPath =
 
             Expect.equal n1Parsed.SourceFiles expectedSources "check sources"
 
-            //Expect.equal n1Parsed n1Loaded "notificaton and parsed should be the same"
-            )
+            Expect.equal n1Parsed n1Loaded "notificaton and parsed should be the same")
 
 let testRender2 toolsPath =
     testCase
@@ -485,9 +544,6 @@ let testRender4 toolsPath =
 
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
-            for (tfm, _) in m1Proj.TargetFrameworks |> Map.toList do
-                printfn "tfm: %s" tfm
-
             let loader = WorkspaceLoader.Create(toolsPath)
             let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
 
@@ -568,7 +624,7 @@ let testProjectNotFound toolsPath =
 
             let loader = WorkspaceLoader.Create(toolsPath)
 
-            // let watcher = watchNotifications logger loader
+            let watcher = watchNotifications logger loader
 
             let wrongPath =
                 let dir, name, ext = Path.GetDirectoryName projPath, Path.GetFileNameWithoutExtension projPath, Path.GetExtension projPath
@@ -576,40 +632,14 @@ let testProjectNotFound toolsPath =
 
             let parsed = loader.LoadProjects [ wrongPath ] |> Seq.toList
 
-            // [ loading "n1aa.fsproj"; failed "n1aa.fsproj" ]
-            // |> expectNotifications (watcher.Notifications)
+            [ loading "n1aa.fsproj"
+              failed "n1aa.fsproj" ]
+            |> expectNotifications (watcher.Notifications)
 
 
             Expect.equal parsed.Length 0 "no project loaded"
 
-            // Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(wrongPath, (GetProjectOptionsErrors.GenericError(wrongPath, "not found")))) "check error type"
-            )
-
-let testProjectNotRestored toolsPath =
-    testCase
-    |> withLog
-        "project not restored"
-        (fun logger fs ->
-            let testDir = inDir fs "proj_not_restored"
-            copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
-
-            let projPath = testDir / (``sample2 NetSdk library``.ProjectFile)
-
-            let loader = WorkspaceLoader.Create(toolsPath)
-
-            // no restore
-
-            //let watcher = watchNotifications logger loader
-
-            let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
-
-            // [ loading "n1.fsproj"; failed "n1.fsproj" ]
-            // |> expectNotifications (watcher.Notifications)
-
-            Expect.equal parsed.Length 0 "no project loaded"
-
-            //Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(projPath, (GetProjectOptionsErrors.ProjectNotRestored projPath))) "check error type"
-            )
+            Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(wrongPath, (GetProjectOptionsErrors.ProjectNotFound(wrongPath)))) "check error type")
 
 let tests toolsPath =
     testSequenced
@@ -630,5 +660,4 @@ let tests toolsPath =
           testRender5 toolsPath
           testRender8 toolsPath
           //Invalid tests
-          testProjectNotFound toolsPath
-          testProjectNotRestored toolsPath ]
+          testProjectNotFound toolsPath ]
