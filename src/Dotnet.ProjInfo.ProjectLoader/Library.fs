@@ -53,37 +53,39 @@ module ProjectLoader =
                 with set (v: LoggerVerbosity): unit = () }
 
     let loadProject (path: string) (ToolsPath toolsPath) =
-        let globalProperties = dict [ "IsCrossTargetingBuild", "false" ] //Make sure we always target single TFM for Design Time Build
+        try
+            let globalProperties = dict [ "IsCrossTargetingBuild", "false" ] //Make sure we always target single TFM for Design Time Build
 
-        use pc = new ProjectCollection(globalProperties)
+            use pc = new ProjectCollection(globalProperties)
 
-        let pi = pc.LoadProject(path)
+            let pi = pc.LoadProject(path)
 
-        let tfm =
-            let tfm = pi.GetPropertyValue "TargetFramework"
+            let tfm =
+                let tfm = pi.GetPropertyValue "TargetFramework"
 
-            if String.IsNullOrWhiteSpace tfm
-            then pi.GetPropertyValue "TargetFrameworks"
-            else tfm
+                if String.IsNullOrWhiteSpace tfm
+                then pi.GetPropertyValue "TargetFrameworks"
+                else tfm
 
-        let actualTFM = tfm.Split(';').[0] //Always parse targeting first defined TFM
+            let actualTFM = tfm.Split(';').[0] //Always parse targeting first defined TFM
 
-        use sw = new StringWriter()
-        let logger = logger (sw)
-        pi.SetGlobalProperty("SkipCompilerExecution", "true") |> ignore
-        pi.SetGlobalProperty("ProvideCommandLineArgs", "true") |> ignore
-        pi.SetGlobalProperty("CopyBuildOutputToOutputDirectory", "false") |> ignore
-        pi.SetGlobalProperty("UseCommonOutputDirectory", "true") |> ignore
-        pi.SetGlobalProperty("DesignTimeBuild", "true") |> ignore
-        pi.SetGlobalProperty("BuildProjectReferences", "false") |> ignore
-        pi.SetGlobalProperty("TargetFramework", actualTFM) |> ignore
-        let pi = pi.CreateProjectInstance()
+            use sw = new StringWriter()
+            let logger = logger (sw)
+            pi.SetGlobalProperty("SkipCompilerExecution", "true") |> ignore
+            pi.SetGlobalProperty("ProvideCommandLineArgs", "true") |> ignore
+            pi.SetGlobalProperty("CopyBuildOutputToOutputDirectory", "false") |> ignore
+            pi.SetGlobalProperty("UseCommonOutputDirectory", "true") |> ignore
+            pi.SetGlobalProperty("DesignTimeBuild", "true") |> ignore
+            pi.SetGlobalProperty("BuildProjectReferences", "false") |> ignore
+            pi.SetGlobalProperty("TargetFramework", actualTFM) |> ignore
+            let pi = pi.CreateProjectInstance()
 
-        let build = pi.Build([| "ResolveReferences"; "CoreCompile" |], [ logger ])
+            let build = pi.Build([| "ResolveReferences"; "CoreCompile" |], [ logger ])
 
-        if build
-        then Success(LoadedProject pi)
-        else Error(sw.ToString())
+            if build
+            then Success(LoadedProject pi)
+            else Error(sw.ToString())
+        with exc -> Error(exc.Message)
 
     let getFscArgs (LoadedProject project) =
         project.Items |> Seq.filter (fun p -> p.ItemType = "FscCommandLineArgs") |> Seq.map (fun p -> p.EvaluatedInclude)
@@ -195,8 +197,7 @@ module ProjectLoader =
 
           IsPublishable = msbuildPropBool "IsPublishable" }
 
-    let mapToProject (path: string) (fscArgs: string seq) (p2p: ProjectReference seq) (compile: CompileItem seq) (nugetRefs: PackageReference seq) (props: Property seq) (customProps: Property seq) =
-        let projectSdk = getSdkInfo props
+    let mapToProject (path: string) (fscArgs: string seq) (p2p: ProjectReference seq) (compile: CompileItem seq) (nugetRefs: PackageReference seq) (sdkInfo: ProjectSdkInfo) (props: Property seq) (customProps: Property seq) =
         let projDir = Path.GetDirectoryName path
 
         let fscArgsNormalized =
@@ -210,7 +211,7 @@ module ProjectLoader =
         let project =
             { ProjectId = Some path
               ProjectFileName = path
-              TargetFramework = projectSdk.TargetFramework
+              TargetFramework = sdkInfo.TargetFramework
               SourceFiles = sourceFiles
               OtherOptions = otherOptions
               ReferencedProjects = List.ofSeq p2p
@@ -218,7 +219,7 @@ module ProjectLoader =
               LoadTime = DateTime.Now
               TargetPath = props |> Seq.tryFind (fun n -> n.Name = "TargetPath") |> Option.map (fun n -> n.Value) |> Option.defaultValue ""
               ProjectOutputType = FscArguments.outType fscArgsNormalized
-              ProjectSdkInfo = projectSdk
+              ProjectSdkInfo = sdkInfo
               Items = compileItems
               CustomProperties = List.ofSeq customProps }
 
@@ -265,14 +266,23 @@ module ProjectLoader =
             let compileItems = getCompileItems project
             let nuGetRefs = getNuGetReferences project
             let props = getProperties project properties
+            let sdkInfo = getSdkInfo props
             let customProps = getProperties project customProperties
 
-            let proj = mapToProject path fscArgs p2pRefs compileItems nuGetRefs props customProps
+            if not sdkInfo.RestoreSuccess then
+                Result.Error "not restored"
+            else
 
-            Result.Ok proj
+                let proj = mapToProject path fscArgs p2pRefs compileItems nuGetRefs sdkInfo props customProps
+
+                Result.Ok proj
         | Error e -> Result.Error e
 
 type WorkspaceLoader private (toolsPath: ToolsPath) =
+    let loadingNotification = new Event<Types.WorkspaceProjectState>()
+
+    [<CLIEvent>]
+    member __.Notifications = loadingNotification.Publish
 
     member __.LoadProjects(projects: string list, customProperties: string list) =
         let cache = Dictionary<string, ProjectOptions>()
@@ -281,15 +291,28 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
             for p in projectList do
                 let newList =
                     if cache.ContainsKey p then
-                        cache.[p].ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
+                        let project = cache.[p]
+                        loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, true)) //TODO: Should it even notify here?
+                        project.ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
                     else
+                        loadingNotification.Trigger(WorkspaceProjectState.Loading p)
                         let res = ProjectLoader.getProjectInfo p toolsPath customProperties
 
                         match res with
                         | Ok project ->
-                            cache.Add(p, project)
-                            project.ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
-                        | Error _ -> []
+                            try
+                                loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, false))
+                                cache.Add(p, project)
+                                project.ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
+                            with exc ->
+                                loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, exc.Message)))
+                                []
+                        | Error msg when msg.Contains "The project file could not be loaded." ->
+                            loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
+                            []
+                        | Error msg ->
+                            loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg)))
+                            []
 
                 loadProjectList newList
 
