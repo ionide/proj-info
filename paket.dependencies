@@ -1,11 +1,10 @@
 source https://api.nuget.org/v3/index.json
 storage: none
-framework: netstandard2.0, netcoreapp2.1, net461
+framework: netstandard2.0, netcoreapp2.1, net461, net5.0
 
 nuget Expecto.Diff
-nuget FSharp.Core >= 4.3.4 lowest_matching: true
-nuget System.ValueTuple ~> 4.4 lowest_matching: true
-nuget FSharp.Compiler.Service ~> 37.0
+nuget FSharp.Core
+nuget FSharp.Compiler.Service ~> 38.0
 nuget Sln ~> 0.3.0
 nuget Argu ~> 5.1
 
@@ -28,11 +27,5 @@ github mono/mono:mono-5.2.0.224 mcs/class/Microsoft.Build.Utilities/Mono.XBuild.
 github mono/mono:mono-5.2.0.224 mcs/class/Microsoft.Build.Utilities/Mono.XBuild.Utilities/ReservedNameUtils.cs
 github mono/mono:mono-5.2.0.224 mcs/class/Microsoft.Build.Utilities/Microsoft.Build.Utilities/TaskItem.cs
 
-group New
-    source https://api.nuget.org/v3/index.json
-    storage: none
-    framework: net5.0
-
-    nuget FSharp.Core
-    nuget Microsoft.Build copy_local: false
-    nuget Microsoft.Build.Locator
+nuget Microsoft.Build copy_local: false
+nuget Microsoft.Build.Locator
