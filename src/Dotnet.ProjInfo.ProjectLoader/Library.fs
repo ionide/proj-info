@@ -20,6 +20,11 @@ module ProjectLoader =
         | Success of LoadedProject
         | Error of string
 
+    type ToolsPath =
+        private
+        | ToolsPath of string
+
+    ///Initialize the MsBuild integration. Returns path to MsBuild tool that was detected by Locator. Needs to be called before doing anything else
     let init () =
         let instance = Microsoft.Build.Locator.MSBuildLocator.RegisterDefaults()
         //Workaround from https://github.com/microsoft/MSBuildLocator/issues/86#issuecomment-640275377
@@ -30,9 +35,9 @@ module ProjectLoader =
             else
                 null
         )
-        instance.MSBuildPath
+        ToolsPath instance.MSBuildPath
 
-    let logger (writer: StringWriter) = {
+    let internal logger (writer: StringWriter) = {
         new ILogger with
             member this.Initialize(eventSource: IEventSource): unit =
                 eventSource.ErrorRaised.Add (fun t -> writer.WriteLine t.Message) //Only log errors
@@ -53,7 +58,7 @@ module ProjectLoader =
                     ()
     }
 
-    let loadProject (path: string) (toolsPath: string) =
+    let loadProject (path: string) (ToolsPath toolsPath) =
         let globalProperties = dict [
             "IsCrossTargetingBuild", "false" //Make sure we always target single TFM for Design Time Build
         ]
@@ -81,6 +86,10 @@ module ProjectLoader =
         pi.SetGlobalProperty("TargetFramework", actualTFM) |> ignore
         let pi = pi.CreateProjectInstance()
         let build = pi.Build([|"ResolveReferences";"CoreCompile" |], [logger])
+
+        for pr in pi.Items |> Seq.filter (fun p -> p.ItemType = "PackageReference") do printfn "%s; %s - %s" pr.EvaluatedInclude (pr.GetMetadataValue "Version") (pr.GetMetadataValue "FullPath")
+
+
         if build then
             Success (LoadedProject pi)
         else
@@ -120,7 +129,7 @@ module ProjectLoader =
         |> Seq.filter (fun p -> List.contains p.Name properties )
         |> Seq.map (fun p -> { Name = p.Name; Value =  p.EvaluatedValue} )
 
-    let getSdkInfo props =
+    let getSdkInfo (props: Property seq) =
         let (|ConditionEquals|_|) (str: string) (arg: string) =
             if System.String.Compare(str, arg, System.StringComparison.OrdinalIgnoreCase) = 0
             then Some() else None
@@ -170,7 +179,7 @@ module ProjectLoader =
 
           IsPublishable = msbuildPropBool "IsPublishable" }
 
-    let mapToProject (path: string) (fscArgs: string seq) (p2p: ProjectReference seq) (compile: CompileItem seq) (props: Property seq) =
+    let mapToProject (path: string) (fscArgs: string seq) (p2p: ProjectReference seq) (compile: CompileItem seq) (props: Property seq) (customProps: Property seq) =
         let projectSdk = getSdkInfo props
         let projDir = Path.GetDirectoryName path
 
@@ -199,13 +208,21 @@ module ProjectLoader =
               TargetPath = props |> Seq.tryFind (fun n -> n.Name = "TargetPath") |> Option.map(fun n -> n.Value) |> Option.defaultValue ""
               ProjectOutputType =  FscArguments.outType fscArgsNormalized
               ProjectSdkInfo = projectSdk
-              Items = compileItems }
+              Items = compileItems
+              CustomProperties = List.ofSeq customProps }
 
 
         project
 
 
-    let getProjectInfo(path: string) (toolsPath: string) : Result<Types.ProjectOptions, string> =
+    /// <summary>
+    /// Main entry point for project loading.
+    /// </summary>
+    /// <param name="path">Full path to the `.fsproj` file</param>
+    /// <param name="toolsPath">Path to MsBuild obtained from `ProjectLoader.init ()`</param>
+    /// <param name="customProperties">List of additional MsBuild properties that you want to obtain.</param>
+    /// <returns>Returns the record instance representing the loaded project or string containing error message</returns>
+    let getProjectInfo(path: string) (toolsPath: ToolsPath) (customProperties: string list) : Result<Types.ProjectOptions, string> =
         let loadedProject = loadProject path toolsPath
         match loadedProject with
         | Success project ->
@@ -235,7 +252,8 @@ module ProjectLoader =
             let p2pRefs = getP2Prefs project
             let compileItems = getCompileItems project
             let props = getProperties project properties
-            let proj = mapToProject path fscArgs p2pRefs compileItems props
+            let customProps = getProperties project customProperties
+            let proj = mapToProject path fscArgs p2pRefs compileItems props customProps
 
             Result.Ok proj
         | Error e -> Result.Error e
