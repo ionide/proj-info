@@ -38,6 +38,11 @@ module Types =
             TargetFramework: string
         }
 
+    type Property = {
+        Name: string
+        Value: string
+    }
+
     type ProjectOutputType =
         | Library
         | Exe
@@ -59,6 +64,7 @@ module Types =
             ProjectOutputType: ProjectOutputType
             ProjectSdkInfo: ProjectSdkInfo
             Items: ProjectItem list
+            CustomProperties: Property list
         }
 
     type CompileItem = {
@@ -67,7 +73,3 @@ module Types =
         Link: string option
     }
 
-    type Property = {
-        Name: string
-        Value: string
-    }
