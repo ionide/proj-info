@@ -13,13 +13,15 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Dotnet.ProjInfo.ProjectLoad
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dotnet.ProjInfo.Helpers", "..\src\Dotnet.ProjInfo.Helpers\Dotnet.ProjInfo.Helpers.csproj", "{9275507A-6FC6-46DC-B7CB-DF74D59A4345}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dotnet.ProjInfo.Sln", "..\src\Dotnet.ProjInfo.Sln\Dotnet.ProjInfo.Sln.csproj", "{D0A6EFB6-E9DD-4EB6-A5B0-E5236DE24C9F}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Dotnet.ProjInfo.Workspace", "..\src\Dotnet.ProjInfo.Workspace\Dotnet.ProjInfo.Workspace.fsproj", "{4D486082-E20F-404A-8A8E-F2F398F5BC0C}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Dotnet.ProjInfo.Workspace.FCS", "..\src\Dotnet.ProjInfo.Workspace.FCS\Dotnet.ProjInfo.Workspace.FCS.fsproj", "{00C1B060-A221-4C63-8913-84EA075A160A}"
+EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "dotnet-proj.Tests", "..\test\dotnet-proj.Tests\dotnet-proj.Tests.fsproj", "{48C692CB-AADC-44FC-9D69-3FAAB12FABB1}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Dotnet.ProjInfo.Workspace", "Dotnet.ProjInfo.Workspace\Dotnet.ProjInfo.Workspace.fsproj", "{4D486082-E20F-404A-8A8E-F2F398F5BC0C}"
-EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Dotnet.ProjInfo.Workspace.Tests", "..\test\Dotnet.ProjInfo.Workspace.Tests\Dotnet.ProjInfo.Workspace.Tests.fsproj", "{CDC67002-824C-4859-AA0B-372575F9E2B3}"
-EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Dotnet.ProjInfo.Workspace.FCS", "Dotnet.ProjInfo.Workspace.FCS\Dotnet.ProjInfo.Workspace.FCS.fsproj", "{00C1B060-A221-4C63-8913-84EA075A160A}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Dotnet.ProjInfo.Workspace.FCS.Tests", "..\test\Dotnet.ProjInfo.Workspace.FCS.Tests\Dotnet.ProjInfo.Workspace.FCS.Tests.fsproj", "{75BBA58B-D3CA-4138-BC4E-0FBF6B7266C1}"
 EndProject
@@ -158,11 +160,26 @@ Global
 		{97A731D7-2BD2-46CA-A15E-B8201ED4918A}.Release|x64.Build.0 = Release|Any CPU
 		{97A731D7-2BD2-46CA-A15E-B8201ED4918A}.Release|x86.ActiveCfg = Release|Any CPU
 		{97A731D7-2BD2-46CA-A15E-B8201ED4918A}.Release|x86.Build.0 = Release|Any CPU
+		{D0A6EFB6-E9DD-4EB6-A5B0-E5236DE24C9F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D0A6EFB6-E9DD-4EB6-A5B0-E5236DE24C9F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D0A6EFB6-E9DD-4EB6-A5B0-E5236DE24C9F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D0A6EFB6-E9DD-4EB6-A5B0-E5236DE24C9F}.Debug|x64.Build.0 = Debug|Any CPU
+		{D0A6EFB6-E9DD-4EB6-A5B0-E5236DE24C9F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D0A6EFB6-E9DD-4EB6-A5B0-E5236DE24C9F}.Debug|x86.Build.0 = Debug|Any CPU
+		{D0A6EFB6-E9DD-4EB6-A5B0-E5236DE24C9F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D0A6EFB6-E9DD-4EB6-A5B0-E5236DE24C9F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D0A6EFB6-E9DD-4EB6-A5B0-E5236DE24C9F}.Release|x64.ActiveCfg = Release|Any CPU
+		{D0A6EFB6-E9DD-4EB6-A5B0-E5236DE24C9F}.Release|x64.Build.0 = Release|Any CPU
+		{D0A6EFB6-E9DD-4EB6-A5B0-E5236DE24C9F}.Release|x86.ActiveCfg = Release|Any CPU
+		{D0A6EFB6-E9DD-4EB6-A5B0-E5236DE24C9F}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{93CBD93B-3FA8-40BE-8C86-2E2A7B748545} = {B72D6D81-119E-482E-9306-E5E2189D1CB7}
 		{6E5ECDBA-8C45-4079-B2E2-81DF3D0A5574} = {B72D6D81-119E-482E-9306-E5E2189D1CB7}
 		{61A44A21-95B3-48DD-B555-A869A5BEBADA} = {B72D6D81-119E-482E-9306-E5E2189D1CB7}
 		{9275507A-6FC6-46DC-B7CB-DF74D59A4345} = {B72D6D81-119E-482E-9306-E5E2189D1CB7}
+		{D0A6EFB6-E9DD-4EB6-A5B0-E5236DE24C9F} = {B72D6D81-119E-482E-9306-E5E2189D1CB7}
+		{4D486082-E20F-404A-8A8E-F2F398F5BC0C} = {B72D6D81-119E-482E-9306-E5E2189D1CB7}
+		{00C1B060-A221-4C63-8913-84EA075A160A} = {B72D6D81-119E-482E-9306-E5E2189D1CB7}
 	EndGlobalSection
 EndGlobal
