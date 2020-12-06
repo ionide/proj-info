@@ -68,3 +68,31 @@ module Types =
           Link: string option }
 
     type ToolsPath = internal ToolsPath of string
+
+
+    type GetProjectOptionsErrors =
+        // projFile is duplicated in WorkspaceProjectState???
+        | ProjectNotRestored of projFile: string
+        | ProjectNotFound of projFile: string
+        | LanguageNotSupported of projFile: string
+        | ProjectNotLoaded of projFile: string
+        | MissingExtraProjectInfos of projFile: string
+        | InvalidExtraProjectInfos of projFile: string * error: string
+        | ReferencesNotLoaded of projFile: string * referenceErrors: seq<string * GetProjectOptionsErrors>
+        | GenericError of projFile: string * string
+        member x.ProjFile =
+            match x with
+            | ProjectNotRestored projFile
+            | LanguageNotSupported projFile
+            | ProjectNotLoaded projFile
+            | MissingExtraProjectInfos projFile
+            | InvalidExtraProjectInfos (projFile, _)
+            | ReferencesNotLoaded (projFile, _)
+            | GenericError (projFile, _) -> projFile
+            | ProjectNotFound (projFile) -> projFile
+
+    [<RequireQualifiedAccess>]
+    type WorkspaceProjectState =
+        | Loading of string
+        | Loaded of ProjectOptions * fromCache: bool
+        | Failed of string * GetProjectOptionsErrors
