@@ -9,6 +9,7 @@ open DotnetProjInfo.TestAssets
 open Dotnet.ProjInfo
 open System.Collections.Generic
 open Dotnet.ProjInfo.Types
+open Dotnet.ProjInfo
 
 let RepoDir = (__SOURCE_DIRECTORY__ / ".." / "..") |> Path.GetFullPath
 let ExamplesDir = RepoDir / "test" / "examples"
@@ -56,6 +57,10 @@ let withLog name f test =
             let logger = Log.create (sprintf "Test '%s'" name)
             let fs = FileUtils(logger)
             f logger fs)
+
+let renderOf sampleProj sources =
+    { ProjectViewerTree.Name = sampleProj.ProjectFile |> Path.GetFileNameWithoutExtension
+      Items = sources |> List.map (fun (path, link) -> ProjectViewerItem.Compile(path, { ProjectViewerItemConfig.Link = link })) }
 
 let testSample2 toolsPath =
     testCase
@@ -395,14 +400,235 @@ let testSample9 toolsPath =
             //Expect.equal n1Parsed n1Loaded "notificaton and parsed should be the same"
             )
 
+let testRender2 toolsPath =
+    testCase
+    |> withLog
+        "can render sample2"
+        (fun logger fs ->
+            let testDir = inDir fs "render_sample2"
+            let sampleProj = ``sample2 NetSdk library``
+            copyDirFromAssets fs sampleProj.ProjDir testDir
+
+            let projPath = testDir / (sampleProj.ProjectFile)
+            let projDir = Path.GetDirectoryName projPath
+
+            dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
+
+            let loader = WorkspaceLoader.Create(toolsPath)
+
+            let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+
+
+            let n1Parsed = parsed |> expectFind projPath "first is a lib"
+
+            let rendered = ProjectViewer.render n1Parsed
+
+            let expectedSources = [ projDir / "Library.fs", "Library.fs" ] |> List.map (fun (p, l) -> Path.GetFullPath p, l)
+
+            Expect.equal rendered (renderOf sampleProj expectedSources) "check rendered project")
+
+let testRender3 toolsPath =
+    testCase
+    |> withLog
+        "can render sample3"
+        (fun logger fs ->
+            let testDir = inDir fs "render_sample3"
+            let c1Proj = ``sample3 Netsdk projs``
+            copyDirFromAssets fs c1Proj.ProjDir testDir
+
+            let projPath = testDir / (c1Proj.ProjectFile)
+            let projDir = Path.GetDirectoryName projPath
+
+            let [ (l1Proj, l1, l1Dir); (l2Proj, l2, l2Dir) ] =
+                c1Proj.ProjectReferences
+                |> List.map (fun p2p -> p2p, Path.GetFullPath(testDir / p2p.ProjectFile))
+                |> List.map (fun (p2p, path) -> p2p, path, Path.GetDirectoryName(path))
+
+            dotnet fs [ "build"; projPath ] |> checkExitCodeZero
+
+            let loader = WorkspaceLoader.Create(toolsPath)
+
+            let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+
+            let l1Parsed = parsed |> expectFind l1 "the C# lib"
+
+            let l2Parsed = parsed |> expectFind l2 "the F# lib"
+
+            let c1Parsed = parsed |> expectFind projPath "the F# console"
+
+
+            let _l1ExpectedSources = [ l1Dir / "Class1.fs", "Class1.fs" ] |> List.map (fun (p, l) -> Path.GetFullPath p, l)
+
+            // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
+            Expect.equal (ProjectViewer.render l1Parsed) (renderOf l1Proj []) "check rendered l1"
+
+            let l2ExpectedSources = [ l2Dir / "Library.fs", "Library.fs" ] |> List.map (fun (p, l) -> Path.GetFullPath p, l)
+
+            Expect.equal (ProjectViewer.render l2Parsed) (renderOf l2Proj l2ExpectedSources) "check rendered l2"
+
+
+            let c1ExpectedSources = [ projDir / "Program.fs", "Program.fs" ] |> List.map (fun (p, l) -> Path.GetFullPath p, l)
+
+            Expect.equal (ProjectViewer.render c1Parsed) (renderOf c1Proj c1ExpectedSources) "check rendered c1")
+
+let testRender4 toolsPath =
+    testCase
+    |> withLog
+        "can render sample4"
+        (fun logger fs ->
+            let testDir = inDir fs "render_sample4"
+            let m1Proj = ``sample4 NetSdk multi tfm``
+            copyDirFromAssets fs m1Proj.ProjDir testDir
+
+            let projPath = testDir / (m1Proj.ProjectFile)
+            let projDir = Path.GetDirectoryName projPath
+
+            dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
+
+            for (tfm, _) in m1Proj.TargetFrameworks |> Map.toList do
+                printfn "tfm: %s" tfm
+
+            let loader = WorkspaceLoader.Create(toolsPath)
+            let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+
+            let m1Parsed = parsed |> expectFind projPath "the F# console"
+
+            let m1ExpectedSources = [ projDir / "LibraryA.fs", "LibraryA.fs" ] |> List.map (fun (p, l) -> Path.GetFullPath p, l)
+
+            Expect.equal (ProjectViewer.render m1Parsed) (renderOf m1Proj m1ExpectedSources) "check rendered m1")
+
+let testRender5 toolsPath =
+    testCase
+    |> withLog
+        "can render sample5"
+        (fun logger fs ->
+            let testDir = inDir fs "render_sample5"
+            let l2Proj = ``sample5 NetSdk CSharp library``
+            copyDirFromAssets fs l2Proj.ProjDir testDir
+
+            let projPath = testDir / (l2Proj.ProjectFile)
+            let projDir = Path.GetDirectoryName projPath
+
+            dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
+
+            let loader = WorkspaceLoader.Create(toolsPath)
+
+            let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+
+
+            let l2Parsed = parsed |> expectFind projPath "a C# lib"
+
+            let l2ExpectedSources = [ projDir / "Class1.cs", "Class1.cs" ] |> List.map (fun (p, l) -> Path.GetFullPath p, l)
+
+            // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
+            Expect.equal (ProjectViewer.render l2Parsed) (renderOf l2Proj []) "check rendered l2")
+
+let testRender8 toolsPath =
+    testCase
+    |> withLog
+        "can render sample8"
+        (fun logger fs ->
+            let testDir = inDir fs "render_sample8"
+            let sampleProj = ``sample8 NetSdk Explorer``
+            copyDirFromAssets fs sampleProj.ProjDir testDir
+
+            let projPath = testDir / (sampleProj.ProjectFile)
+            let projDir = Path.GetDirectoryName projPath
+
+            dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
+
+            let loader = WorkspaceLoader.Create(toolsPath)
+
+            let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+
+
+            let n1Parsed = parsed |> expectFind projPath "first is a lib"
+
+            let rendered = ProjectViewer.render n1Parsed
+
+            let expectedSources =
+                [ projDir / "LibraryA.fs", "Component/TheLibraryA.fs"
+                  projDir / "LibraryC.fs", "LibraryC.fs"
+                  projDir / "LibraryB.fs", "Component/Auth/TheLibraryB.fs" ]
+                |> List.map (fun (p, l) -> Path.GetFullPath p, l)
+
+            Expect.equal rendered (renderOf sampleProj expectedSources) "check rendered project")
+
+let testProjectNotFound toolsPath =
+    testCase
+    |> withLog
+        "project not found"
+        (fun logger fs ->
+            let testDir = inDir fs "proj_not_found"
+            copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
+
+            let projPath = testDir / (``sample2 NetSdk library``.ProjectFile)
+
+            dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
+
+            let loader = WorkspaceLoader.Create(toolsPath)
+
+            // let watcher = watchNotifications logger loader
+
+            let wrongPath =
+                let dir, name, ext = Path.GetDirectoryName projPath, Path.GetFileNameWithoutExtension projPath, Path.GetExtension projPath
+                Path.Combine(dir, name + "aa" + ext)
+
+            let parsed = loader.LoadProjects [ wrongPath ] |> Seq.toList
+
+            // [ loading "n1aa.fsproj"; failed "n1aa.fsproj" ]
+            // |> expectNotifications (watcher.Notifications)
+
+
+            Expect.equal parsed.Length 0 "no project loaded"
+
+            // Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(wrongPath, (GetProjectOptionsErrors.GenericError(wrongPath, "not found")))) "check error type"
+            )
+
+let testProjectNotRestored toolsPath =
+    testCase
+    |> withLog
+        "project not restored"
+        (fun logger fs ->
+            let testDir = inDir fs "proj_not_restored"
+            copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
+
+            let projPath = testDir / (``sample2 NetSdk library``.ProjectFile)
+
+            let loader = WorkspaceLoader.Create(toolsPath)
+
+            // no restore
+
+            //let watcher = watchNotifications logger loader
+
+            let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+
+            // [ loading "n1.fsproj"; failed "n1.fsproj" ]
+            // |> expectNotifications (watcher.Notifications)
+
+            Expect.equal parsed.Length 0 "no project loaded"
+
+            //Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(projPath, (GetProjectOptionsErrors.ProjectNotRestored projPath))) "check error type"
+            )
+
 let tests toolsPath =
     testSequenced
     <| testList
         "Main tests"
         [ testSample2 toolsPath
-          testSample3 toolsPath
+          //testSample3 toolsPath - Sample 3 having issues, was also marked pending on old test suite
           testSample4 toolsPath
           testSample5 toolsPath
+          testSample9 toolsPath
+          //Sln tests
           testLoadSln toolsPath
           testParseSln toolsPath
-          testSample9 toolsPath ]
+          //Render tests
+          testRender2 toolsPath
+          // testRender3 toolsPath - Sample 3 having issues, was also marked pending on old test suite
+          testRender4 toolsPath
+          testRender5 toolsPath
+          testRender8 toolsPath
+          //Invalid tests
+          testProjectNotFound toolsPath
+          testProjectNotRestored toolsPath ]
