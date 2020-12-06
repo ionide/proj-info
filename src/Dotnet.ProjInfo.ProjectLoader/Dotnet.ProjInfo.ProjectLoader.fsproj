@@ -8,8 +8,8 @@
     <Compile Include="Types.fs" />
     <Compile Include="Utils.fs" />
     <Compile Include="VisualTree.fs" />
-    <Compile Include="ProjectLoader.fs" />
     <Compile Include="InspectSln.fs" />
+    <Compile Include="Library.fs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,25 +1,16 @@
 ﻿namespace Dotnet.ProjInfo
 
 open System
+open System.Collections.Generic
 open Microsoft.Build.Evaluation
 open Microsoft.Build.Framework
 open System.Runtime.Loader
 open System.IO
 open Microsoft.Build.Execution
+open Types
 
-module ProjectLoader =
-    open Types
-    open CommonHelpers
-
-    type LoadedProject = private LoadedProject of ProjectInstance
-
-    type ProjectLoadingStatus =
-        private
-        | Success of LoadedProject
-        | Error of string
-
-    type ToolsPath = private ToolsPath of string
-
+[<RequireQualifiedAccess>]
+module Init =
     ///Initialize the MsBuild integration. Returns path to MsBuild tool that was detected by Locator. Needs to be called before doing anything else
     let init () =
         let instance = Microsoft.Build.Locator.MSBuildLocator.RegisterDefaults()
@@ -33,6 +24,17 @@ module ProjectLoader =
                 else null)
 
         ToolsPath instance.MSBuildPath
+
+///Low level APIs for single project loading. Doesn't provide caching, and doesn't follow p2p references.
+/// In most cases you want to use `Dotnet.ProjInf.WorkspaceLoader` type instead
+module ProjectLoader =
+
+    type LoadedProject = private LoadedProject of ProjectInstance
+
+    type ProjectLoadingStatus =
+        private
+        | Success of LoadedProject
+        | Error of string
 
     let internal logger (writer: StringWriter) =
         { new ILogger with
@@ -269,3 +271,80 @@ module ProjectLoader =
 
             Result.Ok proj
         | Error e -> Result.Error e
+
+type WorkspaceLoader private (toolsPath: ToolsPath) =
+
+    member __.LoadProjects(projects: string list, customProperties: string list) =
+        let cache = Dictionary<string, ProjectOptions>()
+
+        let rec loadProjectList (projectList: string list) =
+            for p in projectList do
+                let newList =
+                    if cache.ContainsKey p then
+                        cache.[p].ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
+                    else
+                        let res = ProjectLoader.getProjectInfo p toolsPath customProperties
+
+                        match res with
+                        | Ok project ->
+                            cache.Add(p, project)
+                            project.ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
+                        | Error _ -> []
+
+                loadProjectList newList
+
+        loadProjectList projects
+
+        cache |> Seq.map (fun n -> n.Value)
+
+    member this.LoadProjects(projects) = this.LoadProjects(projects, [])
+
+    member this.LoadProject(project, customProperties: string list) =
+        this.LoadProjects([ project ], customProperties)
+
+    member this.LoadProject(project) = this.LoadProjects([ project ])
+
+    member this.LoadSln(sln, customProperties: string list) =
+        match InspectSln.tryParseSln sln with
+        | Ok (_, slnData) ->
+            let projs = InspectSln.loadingBuildOrder slnData
+            this.LoadProjects(projs, customProperties)
+        | Error d -> failwithf "Cannot load the sln: %A" d
+
+    member this.LoadSln(sln) = this.LoadSln(sln, [])
+
+    static member Create(toolsPath: ToolsPath) = WorkspaceLoader(toolsPath)
+
+type ProjectViewerTree =
+    { Name: string
+      Items: ProjectViewerItem list }
+
+and [<RequireQualifiedAccess>] ProjectViewerItem = Compile of string * ProjectViewerItemConfig
+
+and ProjectViewerItemConfig = { Link: string }
+
+module ProjectViewer =
+
+    let render (proj: ProjectOptions) =
+
+        let compileFiles =
+            let sources = proj.Items
+
+            //the generated assemblyinfo.fs are not shown as sources
+            let isGeneratedAssemblyinfo (name: string) =
+                let projName = proj.ProjectFileName |> Path.GetFileNameWithoutExtension
+                //TODO check is in `obj` dir for the tfm
+                //TODO better, get the name from fsproj
+                //TODO cs too
+                name.EndsWith(sprintf "%s.AssemblyInfo.fs" projName)
+
+            sources
+            |> List.choose
+                (function
+                | ProjectItem.Compile (name, fullpath) -> Some(name, fullpath))
+            |> List.filter (fun (_, p) -> not (isGeneratedAssemblyinfo p))
+
+        { ProjectViewerTree.Name = proj.ProjectFileName |> Path.GetFileNameWithoutExtension
+          Items =
+              compileFiles
+              |> List.map (fun (name, fullpath) -> ProjectViewerItem.Compile(fullpath, { ProjectViewerItemConfig.Link = name })) }
