@@ -9,20 +9,28 @@ open Dotnet.ProjInfo
 open Workspace
 
 type ProjectResult =
-    { projectFileName: string
-      projectFiles: List<string>
-      outFileOpt: string option
-      references: string list
-      extra: ProjectOptions
-      projectItems: ProjectViewerItem list
-      additionals: Map<string, string> }
+    { ProjectFileName: string
+      ProjectFiles: List<string>
+      OutFileOpt: string option
+      References: string list
+      Extra: ProjectOptions
+      ProjectItems: ProjectViewerItem list
+      Additionals: Map<string, string> }
 
 [<RequireQualifiedAccess>]
 type ProjectResponse =
     | Project of project: ProjectResult
-    | ProjectError of errorDetails: GetProjectOptionsErrors
+    | ProjectChanged of projectFileName: string
+    | ProjectError of projectFileName: string * errorDetails: GetProjectOptionsErrors
     | ProjectLoading of projectFileName: string
     | WorkspaceLoad of finished: bool
+    member x.DebugPrint =
+        match x with
+        | Project po -> "Loaded: " + po.ProjectFileName
+        | ProjectChanged path -> "Changed: " + path
+        | ProjectError (path, _) -> "Failed: " + path
+        | ProjectLoading path -> "Loading: " + path
+        | WorkspaceLoad status -> sprintf "Workspace Status: %b" status
 
 /// Public API for any operations related to workspace and projects.
 /// Internally keeps all the information related to project files in current workspace.
@@ -54,7 +62,9 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
 
     member private x.loadProjects (files: string list) (generateBinlog: bool) =
         async {
-            let onChange fn = x.LoadProject(fn, generateBinlog)
+            let onChange fn =
+                ProjectResponse.ProjectChanged fn |> notify.Trigger
+                x.LoadProject(fn, generateBinlog)
 
             let onLoaded p =
                 match p with
@@ -82,16 +92,16 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
                             | ProjectViewerItem.Compile (p, _) -> Some p)
 
                     let projInfo: ProjectResult =
-                        { projectFileName = projectFileName
-                          projectFiles = responseFiles
-                          outFileOpt = response.OutFile
-                          references = response.References
-                          extra = response.ExtraInfo
-                          projectItems = projectFiles
-                          additionals = Map.empty }
+                        { ProjectFileName = projectFileName
+                          ProjectFiles = responseFiles
+                          OutFileOpt = response.OutFile
+                          References = response.References
+                          Extra = response.ExtraInfo
+                          ProjectItems = projectFiles
+                          Additionals = Map.empty }
 
                     ProjectResponse.Project projInfo |> notify.Trigger
-                | ProjectSystemState.Failed (projectFileName, error) -> ProjectResponse.ProjectError error |> notify.Trigger
+                | ProjectSystemState.Failed (projectFileName, error) -> ProjectResponse.ProjectError(projectFileName, error) |> notify.Trigger
 
 
             //TODO check full path
@@ -129,7 +139,7 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
                     let error = e
                     Some(ProjectSystemState.Failed(path, error))
 
-            loader.Notifications.Add(fun arg -> arg |> bindNewOnloaded |> Option.iter onLoaded)
+            // loader.Notifications.Add(fun arg -> arg |> bindNewOnloaded |> Option.iter onLoaded)
 
             Workspace.loadInBackground onLoaded loader (prjs |> List.map snd) generateBinlog
 
@@ -155,7 +165,7 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
 
     member __.WorkspaceReady = workspaceReady.Publish
 
-    member __.NotifyWorkspace = notify.Publish
+    member __.Notifications = notify.Publish
 
     member __.IsWorkspaceReady = isWorkspaceReady
 
