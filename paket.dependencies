@@ -17,6 +17,7 @@ nuget MedallionShell ~> 1.5.0
 
 nuget Microsoft.Build copy_local: false
 nuget Microsoft.Build.Locator
+nuget Newtonsoft.Json
 
 // [ FAKE GROUP ]
 group Build
