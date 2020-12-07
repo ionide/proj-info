@@ -684,7 +684,7 @@ let testFCSmap toolsPath =
 
 
 
-            let testDir = inDir fs "load_sample2"
+            let testDir = inDir fs "load_sample_fsc"
             copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
 
             let projPath = testDir / (``sample2 NetSdk library``.ProjectFile)
@@ -723,6 +723,172 @@ let testFCSmap toolsPath =
 
             )
 
+[<AutoOpen>]
+module ExpectProjectSystemNotification =
+
+    open Dotnet.ProjInfo.ProjectSystem
+
+    let loading (name: string) =
+        let isLoading n =
+            match n with
+            | ProjectResponse.ProjectLoading (path) when path.EndsWith(name) -> true
+            | _ -> false
+
+        sprintf "loading %s" name, isLoading
+
+    let loaded (name: string) =
+        let isLoaded n =
+            match n with
+            | ProjectResponse.Project (po) when po.ProjectFileName.EndsWith(name) -> true
+            | _ -> false
+
+        sprintf "loaded %s" name, isLoaded
+
+    let failed (name: string) =
+        let isFailed n =
+            match n with
+            | ProjectResponse.ProjectError (path, _) when path.EndsWith(name) -> true
+            | _ -> false
+
+        sprintf "failed %s" name, isFailed
+
+    let workspace (status: bool) =
+        let isFailed n =
+            match n with
+            | ProjectResponse.WorkspaceLoad (s) when s = status -> true
+            | _ -> false
+
+        sprintf "workspace %b" status, isFailed
+
+    let changed (name: string) =
+        let isFailed n =
+            match n with
+            | ProjectResponse.ProjectChanged (path) when path.EndsWith(name) -> true
+            | _ -> false
+
+        sprintf "changed %s" name, isFailed
+
+    let expectNotifications actual expected =
+        Expect.equal (List.length actual) (List.length expected) (sprintf "notifications: %A" (expected |> List.map fst))
+
+        expected
+        |> List.zip actual
+        |> List.iter
+            (fun (n, check) ->
+                let name, f = check
+
+                let minimal_info =
+                    match n with
+                    | ProjectResponse.ProjectLoading (path) -> sprintf "loading %s" path
+                    | ProjectResponse.Project (po) -> sprintf "loaded %s" po.ProjectFileName
+                    | ProjectResponse.ProjectError (path, _) -> sprintf "failed %s" path
+                    | ProjectResponse.WorkspaceLoad (finished) -> sprintf "workspace %b" finished
+                    | ProjectResponse.ProjectChanged (projectFileName) -> sprintf "changed %s" projectFileName
+
+                Expect.isTrue (f n) (sprintf "expected %s but was %s" name minimal_info))
+
+    type NotificationWatcher(controller: ProjectController, log) =
+        let notifications = List<_>()
+
+        do
+            controller.Notifications.Add
+                (fun arg ->
+                    notifications.Add(arg)
+                    log arg)
+
+        member __.Notifications = notifications |> List.ofSeq
+
+    let logNotification (logger: Logger) arg =
+        logger.debug (eventX "notified: {notification}'" >> setField "notification" arg)
+
+    let watchNotifications logger controller =
+        NotificationWatcher(controller, logNotification logger)
+
+let testProjectSystem toolsPath =
+    testCase
+    |> withLog
+        "can load sample2 with Project System"
+        (fun logger fs ->
+            let testDir = inDir fs "load_sample2_projectSystem"
+            copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
+
+            let projPath = testDir / (``sample2 NetSdk library``.ProjectFile)
+
+            dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
+
+            let fcs = createFCS ()
+            let controller = ProjectSystem.ProjectController(fcs, toolsPath)
+            let watcher = watchNotifications logger controller
+            controller.LoadProject(projPath)
+
+            System.Threading.Thread.Sleep 1000
+
+            let parsed = controller.ProjectOptions |> Seq.toList |> List.map (snd)
+            let fcsPo = parsed.Head
+
+            [ workspace false
+              loading "n1.fsproj"
+              loaded "n1.fsproj"
+              workspace true ]
+            |> expectNotifications (watcher.Notifications)
+
+
+            Expect.equal fcsPo.ReferencedProjects.Length ``sample2 NetSdk library``.ProjectReferences.Length "refs"
+            Expect.equal fcsPo.SourceFiles.Length 2 "files"
+
+            let result = fcs.ParseAndCheckProject(fcsPo) |> Async.RunSynchronously
+
+            Expect.isEmpty result.Errors (sprintf "no errors but was: %A" result.Errors)
+
+            let uses = result.GetAllUsesOfAllSymbols() |> Async.RunSynchronously
+
+            Expect.isNonEmpty uses "all symbols usages"
+
+            )
+
+let testProjectSystemOnChange toolsPath =
+    ftestCase
+    |> withLog
+        "can load sample2 with Project System, detect change on fsproj"
+        (fun logger fs ->
+            let testDir = inDir fs "load_sample2_projectSystem_onChange"
+            copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
+
+            let projPath = testDir / (``sample2 NetSdk library``.ProjectFile)
+
+            dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
+
+            let fcs = createFCS ()
+            let controller = ProjectSystem.ProjectController(fcs, toolsPath)
+            let watcher = watchNotifications logger controller
+            controller.LoadProject(projPath)
+
+            System.Threading.Thread.Sleep 1000
+
+
+            [ workspace false
+              loading "n1.fsproj"
+              loaded "n1.fsproj"
+              workspace true ]
+            |> expectNotifications (watcher.Notifications)
+
+            fs.touch projPath
+
+            System.Threading.Thread.Sleep 1000
+
+            [ workspace false
+              loading "n1.fsproj"
+              loaded "n1.fsproj"
+              workspace true
+              changed "n1.fsproj"
+              workspace false
+              loading "n1.fsproj"
+              loaded "n1.fsproj"
+              workspace true ]
+            |> expectNotifications (watcher.Notifications)
+
+            )
+
 let tests toolsPath =
     testSequenced
     <| testList
@@ -744,4 +910,7 @@ let tests toolsPath =
           //Invalid tests
           testProjectNotFound toolsPath
           //FCS tests
-          testFCSmap toolsPath ]
+          testFCSmap toolsPath
+          //ProjectSystem tests
+          testProjectSystem toolsPath
+          testProjectSystemOnChange toolsPath ]

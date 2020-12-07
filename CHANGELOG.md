@@ -8,10 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Rewrite using MsBuild API
+- Add `Dotnet.ProjInfo.Sln` (ported from `enricosada/Sln`)
+- Add `Dotnet.ProjInfo.ProjectSystem` (ported from `fsharp/FsAutocomplete`)
 
 ### Removed
 - Remove support for old/verbose project files
 - Remove CLI tool
+- Remove `Dotnet.ProjInfo.Workspace` - functionality now in new `Dotnet.ProjInfo`
+- Remove `Dotnet.ProjInfo.Workspaces.FCS` - functionality now in new `Dotnet.ProjInfo.FCS`
 
 ## [0.44.0] - 2020-08-11
 

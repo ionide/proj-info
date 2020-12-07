@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Dotnet.ProjInfo\Dotnet.ProjInfo.fsproj" />
     <ProjectReference Include="..\..\src\Dotnet.ProjInfo.FCS\Dotnet.ProjInfo.FCS.fsproj" />
+    <ProjectReference Include="..\..\src\Dotnet.ProjInfo.ProjectSystem\Dotnet.ProjInfo.ProjectSystem.fsproj" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
