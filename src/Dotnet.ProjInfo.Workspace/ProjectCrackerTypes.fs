@@ -152,8 +152,8 @@ module internal FscArguments =
       |> Option.map (makeAbs projDir)
 
   let isCompileFile (s:string) =
-      //TODO check if is not an option, check prefix `-` ?
-      s.EndsWith(".fs") || s.EndsWith (".fsi") || s.EndsWith (".fsx")
+      let isArg = s.StartsWith("-") && s.Contains(":")
+      (not isArg) && (s.EndsWith(".fs") || s.EndsWith (".fsi") || s.EndsWith (".fsx"))
 
   let references =
       //TODO valid also --reference:
