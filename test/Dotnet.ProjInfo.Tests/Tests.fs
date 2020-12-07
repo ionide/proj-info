@@ -821,7 +821,7 @@ let testProjectSystem toolsPath =
             let watcher = watchNotifications logger controller
             controller.LoadProject(projPath)
 
-            System.Threading.Thread.Sleep 1000
+            System.Threading.Thread.Sleep 3000
 
             let parsed = controller.ProjectOptions |> Seq.toList |> List.map (snd)
             let fcsPo = parsed.Head
@@ -863,7 +863,7 @@ let testProjectSystemOnChange toolsPath =
             let watcher = watchNotifications logger controller
             controller.LoadProject(projPath)
 
-            System.Threading.Thread.Sleep 1000
+            System.Threading.Thread.Sleep 3000
 
 
             [ workspace false
@@ -874,7 +874,7 @@ let testProjectSystemOnChange toolsPath =
 
             fs.touch projPath
 
-            System.Threading.Thread.Sleep 1000
+            System.Threading.Thread.Sleep 3000
 
             [ workspace false
               loading "n1.fsproj"
