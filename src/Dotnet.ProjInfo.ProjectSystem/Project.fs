@@ -6,21 +6,44 @@ open FSharp.Compiler.SourceCodeServices
 open Newtonsoft.Json
 open Dotnet.ProjInfo
 
-
-
-
-type ProjectCrackerCache =
+type internal ProjectCrackerCache =
     { Options: FSharpProjectOptions
       OutFile: string option
       References: string list
       Items: ProjectViewerItem list
+      ProjectFileName: string
       ExtraInfo: Types.ProjectOptions }
+
+module internal ProjectCrackerCache =
+    let create (opts: FSharpProjectOptions, extraInfo: Types.ProjectOptions, projViewerItems: ProjectViewerItem list) =
+        let outFileOpt = Some(extraInfo.TargetPath)
+        let references = FscArguments.references (opts.OtherOptions |> List.ofArray)
+        let fullPathNormalized = Path.GetFullPath >> Utils.normalizePath
+
+        let projViewerItemsNormalized =
+            if obj.ReferenceEquals(null, projViewerItems)
+            then []
+            else projViewerItems
+
+        let projViewerItemsNormalized =
+            projViewerItemsNormalized
+            |> List.map
+                (function
+                | ProjectViewerItem.Compile (p, c) -> ProjectViewerItem.Compile(fullPathNormalized p, c))
+
+        { ProjectCrackerCache.Options = opts
+          OutFile = outFileOpt
+          References = references
+          ExtraInfo = extraInfo
+          ProjectFileName = opts.ProjectFileName
+          Items = projViewerItemsNormalized }
+
 
 type private ProjectPersistentCacheMessage =
     | Save of lastWriteTime: DateTime * response: ProjectCrackerCache option
     | Load of lastWriteTime: DateTime * channel: AsyncReplyChannel<ProjectCrackerCache option>
 
-type ProjectPersistentCache(projectFile: string) =
+type internal ProjectPersistentCache(projectFile: string) =
     let cachePath = (Path.GetDirectoryName projectFile) </> "obj" </> "fsac.cache"
     let settings = JsonSerializerSettings()
     do settings.MissingMemberHandling <- MissingMemberHandling.Error
@@ -88,7 +111,7 @@ type private ProjectMessage =
     | GetResponse of AsyncReplyChannel<ProjectCrackerCache option>
     | SetResponse of ProjectCrackerCache option
 
-type Project(projectFile, onChange: string -> unit) =
+type internal Project(projectFile, onChange: string -> unit) =
     let persistentCache = ProjectPersistentCache(projectFile)
 
     let fullPath = Path.GetFullPath projectFile

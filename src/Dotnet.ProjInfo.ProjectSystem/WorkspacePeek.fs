@@ -28,7 +28,7 @@ module WorkspacePeek =
 
         Array.fold foldBy ([], [], [])
 
-    let internal peek (rootDir: string) deep (excludedDirs: string list) =
+    let peek (rootDir: string) deep (excludedDirs: string list) =
         if isNull rootDir then
             []
         else
