@@ -83,14 +83,14 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
             (fun agent ->
                 let rec loop () =
                     async {
-                        let! ((fn, tfm, ol, gb), reply: AsyncReplyChannel<_>) = agent.Receive()
+                        let! ((fn, ol, gb), reply: AsyncReplyChannel<_>) = agent.Receive()
                         let mutable wasInvoked = false
 
                         let! x =
                             Async.FromContinuations
                                 (fun (succ, err, cancl) ->
-                                    let opl str cache tfm bl =
-                                        ol str cache tfm bl
+                                    let opl str cache bl =
+                                        ol str cache bl
 
                                         if wasInvoked then
                                             ()
@@ -98,7 +98,7 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
                                             wasInvoked <- true
                                             succ ()
 
-                                    x.LoadWorkspace [ fn ] tfm opl gb |> Async.Ignore |> Async.Start)
+                                    x.LoadWorkspace [ fn ] opl gb |> Async.Ignore |> Async.Start)
 
                         reply.Reply true
                         return ()
@@ -132,17 +132,17 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
 
     member __.Projects = projects |> Seq.map (|KeyValue|)
 
-    member x.LoadProject projectFileName (tfmForScripts: FSIRefs.TFM) onProjectLoaded (generateBinlog: bool) =
-        x.LoaderLoop.PostAndAsyncReply(fun acr -> (projectFileName, tfmForScripts, onProjectLoaded, generateBinlog), acr)
+    member x.LoadProject projectFileName onProjectLoaded (generateBinlog: bool) =
+        x.LoaderLoop.PostAndAsyncReply(fun acr -> (projectFileName, onProjectLoaded, generateBinlog), acr)
 
 
-    member x.LoadWorkspace (files: string list) (tfmForScripts: FSIRefs.TFM) onProjectLoaded (generateBinlog: bool) =
+    member x.LoadWorkspace (files: string list) onProjectLoaded (generateBinlog: bool) =
         async {
             //TODO check full path
             let projectFileNames = files |> List.map Path.GetFullPath
 
             let onChange fn =
-                x.LoadProject fn tfmForScripts onProjectLoaded generateBinlog |> Async.Ignore |> Async.Start
+                x.LoadProject fn onProjectLoaded generateBinlog |> Async.Ignore |> Async.Start
 
             let prjs = projectFileNames |> List.map (fun projectFileName -> projectFileName, new Project(projectFileName, onChange))
 
@@ -168,7 +168,7 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
                 | ProjectSystemState.Loading projectFileName -> ProjectResponse.ProjectLoading projectFileName |> notify.Trigger
                 | ProjectSystemState.Loaded (opts, extraInfo, projectFiles, isFromCache) ->
                     let projectFileName, response = toProjectCache (opts, extraInfo, projectFiles)
-                    projectLoadedSuccessfully projectFileName response tfmForScripts isFromCache
+                    projectLoadedSuccessfully projectFileName response isFromCache
 
                     let responseFiles =
                         response.Items
