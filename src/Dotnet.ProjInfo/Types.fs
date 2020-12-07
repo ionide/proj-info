@@ -94,5 +94,17 @@ module Types =
     [<RequireQualifiedAccess>]
     type WorkspaceProjectState =
         | Loading of string
-        | Loaded of ProjectOptions * fromCache: bool
+        | Loaded of loadedProject: ProjectOptions * knownProjects: ProjectOptions list * fromCache: bool
         | Failed of string * GetProjectOptionsErrors
+
+        member x.ProjFile =
+            match x with
+            | Loading proj -> proj
+            | Loaded (lp, _, _) -> lp.ProjectFileName
+            | Failed (proj, _) -> proj
+
+        member x.DebugPrint =
+            match x with
+            | Loading proj -> "Loading: " + proj
+            | Loaded (lp, _, _) -> "Loaded: " + lp.ProjectFileName
+            | Failed (proj, _) -> "Failed: " + proj

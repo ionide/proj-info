@@ -287,13 +287,17 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
     member __.LoadProjects(projects: string list, customProperties: string list) =
         let cache = Dictionary<string, ProjectOptions>()
 
+        let getAllKnonw () =
+            cache |> Seq.map (fun n -> n.Value) |> Seq.toList
+
         let rec loadProjectList (projectList: string list) =
             for p in projectList do
-                let newList =
+                let newList, toTrigger =
                     if cache.ContainsKey p then
                         let project = cache.[p]
-                        loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, true)) //TODO: Should it even notify here?
-                        project.ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
+                        loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, getAllKnonw (), true)) //TODO: Should it even notify here?
+                        let lst = project.ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
+                        lst, None
                     else
                         loadingNotification.Trigger(WorkspaceProjectState.Loading p)
                         let res = ProjectLoader.getProjectInfo p toolsPath customProperties
@@ -301,23 +305,26 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
                         match res with
                         | Ok project ->
                             try
-                                loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, false))
                                 cache.Add(p, project)
-                                project.ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
+                                let lst = project.ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
+                                let info = Some project
+                                lst, info
                             with exc ->
                                 loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, exc.Message)))
-                                []
+                                [], None
                         | Error msg when msg.Contains "The project file could not be loaded." ->
                             loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
-                            []
+                            [], None
                         | Error msg ->
                             loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg)))
-                            []
+                            [], None
 
                 loadProjectList newList
 
-        loadProjectList projects
+                toTrigger
+                |> Option.iter (fun project -> loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, getAllKnonw (), false)))
 
+        loadProjectList projects
         cache |> Seq.map (fun n -> n.Value)
 
     member this.LoadProjects(projects) = this.LoadProjects(projects, [])
