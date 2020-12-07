@@ -87,7 +87,7 @@ module ExpectNotification =
     let loaded (name: string) =
         let isLoaded n =
             match n with
-            | WorkspaceProjectState.Loaded (po, _) when po.ProjectFileName.EndsWith(name) -> true
+            | WorkspaceProjectState.Loaded (po, _, _) when po.ProjectFileName.EndsWith(name) -> true
             | _ -> false
 
         sprintf "loaded %s" name, isLoaded
@@ -112,7 +112,7 @@ module ExpectNotification =
                 let minimal_info =
                     match n with
                     | WorkspaceProjectState.Loading (path) -> sprintf "loading %s " path
-                    | WorkspaceProjectState.Loaded (po, _) -> sprintf "loaded %s" po.ProjectFileName
+                    | WorkspaceProjectState.Loaded (po, _, _) -> sprintf "loaded %s" po.ProjectFileName
                     | WorkspaceProjectState.Failed (path, _) -> sprintf "failed %s" path
 
                 Expect.isTrue (f n) (sprintf "expected %s but was %s" name minimal_info))
@@ -157,7 +157,7 @@ let testSample2 toolsPath =
               loaded "n1.fsproj" ]
             |> expectNotifications (watcher.Notifications)
 
-            let [ _; WorkspaceProjectState.Loaded (n1Loaded, _) ] = watcher.Notifications
+            let [ _; WorkspaceProjectState.Loaded (n1Loaded, _, _) ] = watcher.Notifications
 
             let n1Parsed = parsed |> expectFind projPath "first is a lib"
 
@@ -203,7 +203,7 @@ let testSample3 toolsPath =
               loaded "l2.fsproj" ]
             |> expectNotifications (watcher.Notifications)
 
-            let [ _; _; _; WorkspaceProjectState.Loaded (c1Loaded, _); WorkspaceProjectState.Loaded (l1Loaded, _); WorkspaceProjectState.Loaded (l2Loaded, _) ] = watcher.Notifications
+            let [ _; _; _; WorkspaceProjectState.Loaded (c1Loaded, _, _); WorkspaceProjectState.Loaded (l1Loaded, _, _); WorkspaceProjectState.Loaded (l2Loaded, _, _) ] = watcher.Notifications
 
 
 
@@ -265,7 +265,7 @@ let testSample4 toolsPath =
               loaded "m1.fsproj" ]
             |> expectNotifications (watcher.Notifications)
 
-            let [ _; WorkspaceProjectState.Loaded (m1Loaded, _) ] = watcher.Notifications
+            let [ _; WorkspaceProjectState.Loaded (m1Loaded, _, _) ] = watcher.Notifications
 
 
             Expect.equal parsed.Length 1 (sprintf "multi-tfm lib (F#), but was %A" (parsed |> List.map (fun x -> x.ProjectFileName)))
@@ -303,7 +303,7 @@ let testSample5 toolsPath =
               loaded "l2.csproj" ]
             |> expectNotifications (watcher.Notifications)
 
-            let [ _; WorkspaceProjectState.Loaded (l2Loaded, _) ] = watcher.Notifications
+            let [ _; WorkspaceProjectState.Loaded (l2Loaded, _, _) ] = watcher.Notifications
 
 
             Expect.equal parsed.Length 1 "lib"
@@ -339,10 +339,13 @@ let testLoadSln toolsPath =
 
             let parsed = loader.LoadSln(slnPath) |> Seq.toList
 
+            for w in watcher.Notifications |> Seq.map (fun n -> n.DebugPrint) do
+                printfn "%s" w
+
             [ loading "c1.fsproj"
-              loaded "c1.fsproj"
               loading "l2.fsproj"
               loaded "l2.fsproj"
+              loaded "c1.fsproj"
               loading "l1.fsproj"
               loaded "l1.fsproj"
               loaded "l2.fsproj" ]
@@ -453,7 +456,7 @@ let testSample9 toolsPath =
               loaded "n1.fsproj" ]
             |> expectNotifications (watcher.Notifications)
 
-            let [ _; WorkspaceProjectState.Loaded (n1Loaded, _) ] = watcher.Notifications
+            let [ _; WorkspaceProjectState.Loaded (n1Loaded, _, _) ] = watcher.Notifications
 
 
             Expect.equal parsed.Length 1 "console and lib"
