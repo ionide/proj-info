@@ -34,30 +34,26 @@ let private bindResults isFromCache res =
 
             Result.Ok(res, optsDPW, items, isFromCache))
 
-let private loaderNotificationHandler (state: WorkspaceProjectState) =
-    match state with
-    | WorkspaceProjectState.Loading (_) -> None //we just ignore loading notifications in this case
-    | WorkspaceProjectState.Loaded (po, allProjects, isFromCache) ->
-        let fpo = FCS.mapToFSharpProjectOptions po allProjects
-        let x = bindResults isFromCache fpo
-
-        Some x
-    | WorkspaceProjectState.Failed (projectFileName, _) -> None
-
-let private getProjectOptions (loader: WorkspaceLoader) (onLoaded: ProjectSystemState -> unit) (generateBinlog: bool) (projectFileNames: string list) =
+let private getProjectOptions (loader: WorkspaceLoader) (onEvent: ProjectSystemState -> unit) (generateBinlog: bool) (projectFileNames: string list) =
     let existing, notExisting = projectFileNames |> List.partition (File.Exists)
 
     for e in notExisting do
         let error = GenericError(e, sprintf "File '%s' does not exist" e)
-        onLoaded (ProjectSystemState.Failed(e, error))
+        onEvent (ProjectSystemState.Failed(e, error))
 
-    let handler res =
-        loaderNotificationHandler res
-        |> Option.iter
-            (fun n ->
-                match n with
-                | Ok (opts, optsDPW, projViewerItems, isFromCache) -> onLoaded (ProjectSystemState.Loaded(opts, optsDPW, projViewerItems, isFromCache))
-                | Error error -> onLoaded (ProjectSystemState.Failed(error.ProjFile, error)))
+    let handler state =
+        match state with
+        | WorkspaceProjectState.Loading (p) -> onEvent (ProjectSystemState.Loading p)
+        | WorkspaceProjectState.Loaded (po, allProjects, isFromCache) ->
+            let fpo = FCS.mapToFSharpProjectOptions po allProjects
+            let x = bindResults isFromCache fpo
+
+            match x with
+            | Ok (opts, optsDPW, projViewerItems, isFromCache) -> onEvent (ProjectSystemState.Loaded(opts, optsDPW, projViewerItems, isFromCache))
+            | Error error -> onEvent (ProjectSystemState.Failed(error.ProjFile, error))
+
+        | WorkspaceProjectState.Failed (projectFileName, error) -> onEvent (ProjectSystemState.Failed(projectFileName, error))
+
 
     use notif = loader.Notifications.Subscribe handler
     loader.LoadProjects(existing) |> ignore // TODO: Maybe we should move away from event driven approach???
