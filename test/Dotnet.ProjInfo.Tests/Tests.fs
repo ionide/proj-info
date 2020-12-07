@@ -847,7 +847,7 @@ let testProjectSystem toolsPath =
             )
 
 let testProjectSystemOnChange toolsPath =
-    ftestCase
+    testCase
     |> withLog
         "can load sample2 with Project System, detect change on fsproj"
         (fun logger fs ->
