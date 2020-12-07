@@ -52,123 +52,28 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
                         | ProjectViewerItem.Compile (p, _) -> Some p) do
             fileCheckOptions.[file] <- normalizeOptions response.Options
 
-
-    let toProjectCache (opts: FSharpProjectOptions, extraInfo: ProjectOptions, projViewerItems: ProjectViewerItem list) =
-        let outFileOpt = Some(extraInfo.TargetPath)
-        let references = FscArguments.references (opts.OtherOptions |> List.ofArray)
-        let fullPathNormalized = Path.GetFullPath >> Utils.normalizePath
-
-        let projViewerItemsNormalized =
-            if obj.ReferenceEquals(null, projViewerItems)
-            then []
-            else projViewerItems
-
-        let projViewerItemsNormalized =
-            projViewerItemsNormalized
-            |> List.map
-                (function
-                | ProjectViewerItem.Compile (p, c) -> ProjectViewerItem.Compile(fullPathNormalized p, c))
-
-        let cached =
-            { ProjectCrackerCache.Options = opts
-              OutFile = outFileOpt
-              References = references
-              ExtraInfo = extraInfo
-              Items = projViewerItemsNormalized }
-
-        (opts.ProjectFileName, cached)
-
-    member private x.LoaderLoop =
-        MailboxProcessor.Start
-            (fun agent ->
-                let rec loop () =
-                    async {
-                        let! ((fn, ol, gb), reply: AsyncReplyChannel<_>) = agent.Receive()
-                        let mutable wasInvoked = false
-
-                        let! x =
-                            Async.FromContinuations
-                                (fun (succ, err, cancl) ->
-                                    let opl str cache bl =
-                                        ol str cache bl
-
-                                        if wasInvoked then
-                                            ()
-                                        else
-                                            wasInvoked <- true
-                                            succ ()
-
-                                    x.LoadWorkspace [ fn ] opl gb |> Async.Ignore |> Async.Start)
-
-                        reply.Reply true
-                        return ()
-                    }
-
-                loop ())
-
-    member __.WorkspaceReady = workspaceReady.Publish
-
-    member __.NotifyWorkspace = notify.Publish
-
-    member __.IsWorkspaceReady = isWorkspaceReady
-
-    member __.GetProjectOptions(file: string): FSharpProjectOptions option =
-        let file = Utils.normalizePath file
-        fileCheckOptions.TryFind file
-
-    member __.SetProjectOptions(file: string, opts: FSharpProjectOptions) =
-        let file = Utils.normalizePath file
-        fileCheckOptions.AddOrUpdate(file, (fun _ -> opts), (fun _ _ -> opts)) |> ignore
-
-    member __.RemoveProjectOptions(file) =
-        let file = Utils.normalizePath file
-        fileCheckOptions.TryRemove file |> ignore
-
-    member __.ProjectOptions = fileCheckOptions |> Seq.map (|KeyValue|)
-
-    member __.GetProject(file: string): Project option =
-        let file = Utils.normalizePath file
-        projects.TryFind file
-
-    member __.Projects = projects |> Seq.map (|KeyValue|)
-
-    member x.LoadProject projectFileName onProjectLoaded (generateBinlog: bool) =
-        x.LoaderLoop.PostAndAsyncReply(fun acr -> (projectFileName, onProjectLoaded, generateBinlog), acr)
-
-
-    member x.LoadWorkspace (files: string list) onProjectLoaded (generateBinlog: bool) =
+    member private x.loadProjects (files: string list) (generateBinlog: bool) =
         async {
-            //TODO check full path
-            let projectFileNames = files |> List.map Path.GetFullPath
-
-            let onChange fn =
-                x.LoadProject fn onProjectLoaded generateBinlog |> Async.Ignore |> Async.Start
-
-            let prjs = projectFileNames |> List.map (fun projectFileName -> projectFileName, new Project(projectFileName, onChange))
-
-            for projectFileName, proj in prjs do
-                projects.[projectFileName] <- proj
-
-            let projectLoadedSuccessfully projectFileName response =
-                let project =
-                    match projects.TryFind projectFileName with
-                    | Some prj -> prj
-                    | None ->
-                        let proj = new Project(projectFileName, onChange)
-                        projects.[projectFileName] <- proj
-                        proj
-
-                project.Response <- Some response
-
-                updateState response
-                onProjectLoaded projectFileName response
+            let onChange fn = x.LoadProject(fn, generateBinlog)
 
             let onLoaded p =
                 match p with
                 | ProjectSystemState.Loading projectFileName -> ProjectResponse.ProjectLoading projectFileName |> notify.Trigger
                 | ProjectSystemState.Loaded (opts, extraInfo, projectFiles, isFromCache) ->
-                    let projectFileName, response = toProjectCache (opts, extraInfo, projectFiles)
-                    projectLoadedSuccessfully projectFileName response isFromCache
+                    let response = ProjectCrackerCache.create (opts, extraInfo, projectFiles)
+                    let projectFileName = response.ProjectFileName
+
+                    let project =
+                        match projects.TryFind projectFileName with
+                        | Some prj -> prj
+                        | None ->
+                            let proj = new Project(projectFileName, onChange)
+                            projects.[projectFileName] <- proj
+                            proj
+
+                    project.Response <- Some response
+
+                    updateState response
 
                     let responseFiles =
                         response.Items
@@ -187,6 +92,16 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
 
                     ProjectResponse.Project projInfo |> notify.Trigger
                 | ProjectSystemState.Failed (projectFileName, error) -> ProjectResponse.ProjectError error |> notify.Trigger
+
+
+            //TODO check full path
+            let projectFileNames = files |> List.map Path.GetFullPath
+
+            let prjs = projectFileNames |> List.map (fun projectFileName -> projectFileName, new Project(projectFileName, onChange))
+
+            for projectFileName, proj in prjs do
+                projects.[projectFileName] <- proj
+
 
             ProjectResponse.WorkspaceLoad false |> notify.Trigger
 
@@ -216,7 +131,7 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
 
             loader.Notifications.Add(fun arg -> arg |> bindNewOnloaded |> Option.iter onLoaded)
 
-            do! Workspace.loadInBackground onLoaded loader (prjs |> List.map snd) generateBinlog
+            Workspace.loadInBackground onLoaded loader (prjs |> List.map snd) generateBinlog
 
             ProjectResponse.WorkspaceLoad true |> notify.Trigger
 
@@ -226,4 +141,45 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
             return true
         }
 
-    member __.PeekWorkspace (dir: string) (deep: int) (excludedDirs: string list) = WorkspacePeek.peek dir deep excludedDirs
+    member private x.LoaderLoop =
+        MailboxProcessor.Start
+            (fun agent ->
+                let rec loop () =
+                    async {
+                        let! (fn, gb) = agent.Receive()
+                        let! _ = x.loadProjects fn gb
+                        return ()
+                    }
+
+                loop ())
+
+    member __.WorkspaceReady = workspaceReady.Publish
+
+    member __.NotifyWorkspace = notify.Publish
+
+    member __.IsWorkspaceReady = isWorkspaceReady
+
+    member __.GetProjectOptions(file: string): FSharpProjectOptions option =
+        let file = Utils.normalizePath file
+        fileCheckOptions.TryFind file
+
+    member __.SetProjectOptions(file: string, opts: FSharpProjectOptions) =
+        let file = Utils.normalizePath file
+        fileCheckOptions.AddOrUpdate(file, (fun _ -> opts), (fun _ _ -> opts)) |> ignore
+
+    member __.RemoveProjectOptions(file) =
+        let file = Utils.normalizePath file
+        fileCheckOptions.TryRemove file |> ignore
+
+    member __.ProjectOptions = fileCheckOptions |> Seq.map (|KeyValue|)
+
+    member x.LoadProject(projectFileName: string, generateBinlog: bool) =
+        x.LoaderLoop.Post([ projectFileName ], generateBinlog)
+
+    member x.LoadProject(projectFileName: string) = x.LoadProject(projectFileName, false)
+
+    member x.LoadWorkspace(files: string list, generateBinlog: bool) = x.LoaderLoop.Post(files, generateBinlog)
+
+    member x.LoadWorkspace(files: string list) = x.LoadWorkspace(files, false)
+
+    member __.PeekWorkspace(dir: string, deep: int, excludedDirs: string list) = WorkspacePeek.peek dir deep excludedDirs
