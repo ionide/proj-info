@@ -13,7 +13,7 @@ type internal ProjectSystemState =
     | Failed of string * GetProjectOptionsErrors
 
 
-let extractOptionsDPW (opts: FSharp.Compiler.SourceCodeServices.FSharpProjectOptions) =
+let internal extractOptionsDPW (opts: FSharp.Compiler.SourceCodeServices.FSharpProjectOptions) =
     match opts.ExtraProjectInfo with
     | None -> Error(GenericError(opts.ProjectFileName, "expected ExtraProjectInfo after project parsing, was None"))
     | Some x ->
@@ -63,13 +63,11 @@ let private getProjectOptions (loader: WorkspaceLoader) (onLoaded: ProjectSystem
     loader.LoadProjects(existing) |> ignore // TODO: Maybe we should move away from event driven approach???
 
 let internal loadInBackground onLoaded (loader: WorkspaceLoader) (projects: Project list) (generateBinlog: bool) =
-    async {
-        let (resProjects, otherProjects) = projects |> List.partition (fun n -> n.Response.IsSome)
+    let (resProjects, otherProjects) = projects |> List.partition (fun n -> n.Response.IsSome)
 
-        for project in resProjects do
-            match project.Response with
-            | Some res -> onLoaded (ProjectSystemState.Loaded(res.Options, res.ExtraInfo, res.Items, false))
-            | None -> () //Shouldn't happen
+    for project in resProjects do
+        match project.Response with
+        | Some res -> onLoaded (ProjectSystemState.Loaded(res.Options, res.ExtraInfo, res.Items, false))
+        | None -> () //Shouldn't happen
 
-        otherProjects |> List.map (fun n -> n.FileName) |> getProjectOptions loader onLoaded generateBinlog
-    }
+    otherProjects |> List.map (fun n -> n.FileName) |> getProjectOptions loader onLoaded generateBinlog
