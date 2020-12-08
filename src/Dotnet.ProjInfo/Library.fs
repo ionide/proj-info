@@ -98,7 +98,7 @@ module ProjectLoader =
                 pi.Build(
                     [| "ResolvePackageDependenciesDesignTime"
                        "_GenerateCompileDependencyCache"
-                       "Compile" |],
+                       "CoreCompile" |],
                     [ logger ]
                 )
 

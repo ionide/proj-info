@@ -197,21 +197,22 @@ let testSample3 toolsPath =
 
             [ loading "c1.fsproj"
               loading "l1.csproj"
-              loading "l2.fsproj"
-              loaded "c1.fsproj"
               loaded "l1.csproj"
-              loaded "l2.fsproj" ]
+              loading "l2.fsproj"
+              loaded "l2.fsproj"
+              loaded "c1.fsproj" ]
             |> expectNotifications (watcher.Notifications)
 
-            let [ _; _; _; WorkspaceProjectState.Loaded (c1Loaded, _, _); WorkspaceProjectState.Loaded (l1Loaded, _, _); WorkspaceProjectState.Loaded (l2Loaded, _, _) ] = watcher.Notifications
+
+            let [ _; _; WorkspaceProjectState.Loaded (l1Loaded, _, _); _; WorkspaceProjectState.Loaded (l2Loaded, _, _); WorkspaceProjectState.Loaded (c1Loaded, _, _) ] = watcher.Notifications
 
 
 
             let l1Parsed = parsed |> expectFind l1 "the C# lib"
 
             let l1ExpectedSources =
-                [ l1Dir / "obj/Debug/netstandard2.0/l1.AssemblyInfo.cs"
-                  l1Dir / "Class1.cs" ]
+                [ l1Dir / "Class1.cs"
+                  l1Dir / "obj/Debug/netstandard2.0/l1.AssemblyInfo.cs" ]
                 |> List.map Path.GetFullPath
 
             // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
@@ -235,7 +236,7 @@ let testSample3 toolsPath =
 
             Expect.equal parsed.Length 3 (sprintf "console (F#) and lib (F#) and lib (C#), but was %A" (parsed |> List.map (fun x -> x.ProjectFileName)))
             Expect.equal c1Parsed.SourceFiles c1ExpectedSources "check sources - C1"
-            Expect.equal l1Parsed.SourceFiles [] "check sources - L1"
+            Expect.equal l1Parsed.SourceFiles l1ExpectedSources "check sources - L1"
             Expect.equal l2Parsed.SourceFiles l2ExpectedSources "check sources - L2"
 
             Expect.equal l1Parsed l1Loaded "l1 notificaton and parsed should be the same"
@@ -310,14 +311,14 @@ let testSample5 toolsPath =
 
             let l2Parsed = parsed |> expectFind projPath "a C# lib"
 
-            let _l2ExpectedSources =
-                [ projDir / "obj/Debug/netstandard2.0/l2.AssemblyInfo.cs"
-                  projDir / "Class1.cs" ]
+            let l2ExpectedSources =
+                [ projDir / "Class1.cs"
+                  projDir / "obj/Debug/netstandard2.0/l2.AssemblyInfo.cs" ]
                 |> List.map Path.GetFullPath
 
             // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
             // Expect.equal l2Parsed.SourceFiles l2ExpectedSources "check sources"
-            Expect.equal l2Parsed.SourceFiles [] "check sources"
+            Expect.equal l2Parsed.SourceFiles l2ExpectedSources "check sources"
 
             Expect.equal l2Parsed l2Loaded "l2 notificaton and parsed should be the same")
 
@@ -338,9 +339,6 @@ let testLoadSln toolsPath =
             let watcher = watchNotifications logger loader
 
             let parsed = loader.LoadSln(slnPath) |> Seq.toList
-
-            for w in watcher.Notifications |> Seq.map (fun n -> n.DebugPrint) do
-                printfn "%s" w
 
             [ loading "c1.fsproj"
               loading "l2.fsproj"
@@ -530,10 +528,12 @@ let testRender3 toolsPath =
             let c1Parsed = parsed |> expectFind projPath "the F# console"
 
 
-            let _l1ExpectedSources = [ l1Dir / "Class1.fs", "Class1.fs" ] |> List.map (fun (p, l) -> Path.GetFullPath p, l)
+            let l1ExpectedSources =
+                [ l1Dir / "Class1.cs", "Class1.cs"
+                  l1Dir / "obj/Debug/netstandard2.0/l1.AssemblyInfo.cs", "obj/Debug/netstandard2.0/l1.AssemblyInfo.cs" ]
+                |> List.map (fun (p, l) -> Path.GetFullPath p, l)
 
-            // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
-            Expect.equal (ProjectViewer.render l1Parsed) (renderOf l1Proj []) "check rendered l1"
+            Expect.equal (ProjectViewer.render l1Parsed) (renderOf l1Proj l1ExpectedSources) "check rendered l1"
 
             let l2ExpectedSources = [ l2Dir / "Library.fs", "Library.fs" ] |> List.map (fun (p, l) -> Path.GetFullPath p, l)
 
@@ -588,10 +588,13 @@ let testRender5 toolsPath =
 
             let l2Parsed = parsed |> expectFind projPath "a C# lib"
 
-            let l2ExpectedSources = [ projDir / "Class1.cs", "Class1.cs" ] |> List.map (fun (p, l) -> Path.GetFullPath p, l)
+            let l2ExpectedSources =
+                [ projDir / "Class1.cs", "Class1.cs"
+                  projDir / "obj/Debug/netstandard2.0/l2.AssemblyInfo.cs", "obj/Debug/netstandard2.0/l2.AssemblyInfo.cs" ]
+                |> List.map (fun (p, l) -> Path.GetFullPath p, l)
 
             // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
-            Expect.equal (ProjectViewer.render l2Parsed) (renderOf l2Proj []) "check rendered l2")
+            Expect.equal (ProjectViewer.render l2Parsed) (renderOf l2Proj l2ExpectedSources) "check rendered l2")
 
 let testRender8 toolsPath =
     testCase
@@ -911,7 +914,7 @@ let tests toolsPath =
     <| testList
         "Main tests"
         [ testSample2 toolsPath
-          //testSample3 toolsPath - Sample 3 having issues, was also marked pending on old test suite
+          testSample3 toolsPath //- Sample 3 having issues, was also marked pending on old test suite
           testSample4 toolsPath
           testSample5 toolsPath
           testSample9 toolsPath
@@ -920,7 +923,7 @@ let tests toolsPath =
           testParseSln toolsPath
           //Render tests
           testRender2 toolsPath
-          // testRender3 toolsPath - Sample 3 having issues, was also marked pending on old test suite
+          testRender3 toolsPath //- Sample 3 having issues, was also marked pending on old test suite
           testRender4 toolsPath
           testRender5 toolsPath
           testRender8 toolsPath
