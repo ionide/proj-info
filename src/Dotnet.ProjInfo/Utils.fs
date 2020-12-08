@@ -67,3 +67,39 @@ module internal FscArguments =
         if System.IO.Path.GetExtension(file) = ".fsproj"
         then isCompileFile
         else (fun n -> n.EndsWith ".cs")
+
+module internal CscArguments =
+    open CommonHelpers
+    open System.IO
+    open Types
+
+    let private outputFileArg = [ "--out:"; "-o:" ]
+
+    let private makeAbs (projDir: string) (f: string) =
+        if Path.IsPathRooted f
+        then f
+        else Path.Combine(projDir, f)
+
+    let isCompileFile (s: string) =
+        let isArg = s.StartsWith("-") && s.Contains(":")
+        (not isArg) && s.EndsWith(".cs")
+
+    let useFullPaths projDir (s: string) =
+        if isCompileFile s
+        then s |> makeAbs projDir |> Path.GetFullPath
+        else s
+
+    let isSourceFile (file: string): (string -> bool) =
+        if System.IO.Path.GetExtension(file) = ".csproj"
+        then isCompileFile
+        else (fun n -> n.EndsWith ".fs")
+
+    let outputFile projDir rsp =
+        rsp |> List.tryPick (chooseByPrefix2 outputFileArg) |> Option.map (makeAbs projDir)
+
+    let outType rsp =
+        match List.tryPick (chooseByPrefix "/target:") rsp with
+        | Some "library" -> ProjectOutputType.Library
+        | Some "exe" -> ProjectOutputType.Exe
+        | Some v -> ProjectOutputType.Custom v
+        | None -> ProjectOutputType.Exe // default if arg is not passed to fsc

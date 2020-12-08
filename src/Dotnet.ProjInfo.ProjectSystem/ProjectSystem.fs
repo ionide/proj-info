@@ -69,6 +69,7 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
             let onLoaded p =
                 match p with
                 | ProjectSystemState.Loading projectFileName -> ProjectResponse.ProjectLoading projectFileName |> notify.Trigger
+                | ProjectSystemState.Failed (projectFileName, error) -> ProjectResponse.ProjectError(projectFileName, error) |> notify.Trigger
                 | ProjectSystemState.Loaded (opts, extraInfo, projectFiles, isFromCache) ->
                     let response = ProjectCrackerCache.create (opts, extraInfo, projectFiles)
                     let projectFileName = response.ProjectFileName
@@ -101,7 +102,23 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
                           Additionals = Map.empty }
 
                     ProjectResponse.Project(projInfo, isFromCache) |> notify.Trigger
-                | ProjectSystemState.Failed (projectFileName, error) -> ProjectResponse.ProjectError(projectFileName, error) |> notify.Trigger
+                | ProjectSystemState.LoadedOther (extraInfo, projectFiles, fromDpiCache) ->
+                    let responseFiles =
+                        projectFiles
+                        |> List.choose
+                            (function
+                            | ProjectViewerItem.Compile (p, _) -> Some p)
+
+                    let projInfo: ProjectResult =
+                        { ProjectFileName = extraInfo.ProjectFileName
+                          ProjectFiles = responseFiles
+                          OutFileOpt = Some(extraInfo.TargetPath)
+                          References = FscArguments.references extraInfo.OtherOptions
+                          Extra = extraInfo
+                          ProjectItems = projectFiles
+                          Additionals = Map.empty }
+
+                    ProjectResponse.Project(projInfo, fromDpiCache) |> notify.Trigger
 
 
             //TODO check full path

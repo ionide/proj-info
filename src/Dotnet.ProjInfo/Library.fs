@@ -80,7 +80,9 @@ module ProjectLoader =
                        "UseCommonOutputDirectory", "false"
                        "DotnetProjInfo", "true"
                        if tfm.IsSome
-                       then "TargetFramework", tfm.Value ]
+                       then "TargetFramework", tfm.Value
+                       if path.EndsWith ".csproj"
+                       then "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__") ]
 
             use pc = new ProjectCollection(globalProperties)
 
@@ -91,13 +93,16 @@ module ProjectLoader =
 
             let pi = pi.CreateProjectInstance()
 
+
             let build =
                 pi.Build(
                     [| "ResolvePackageDependenciesDesignTime"
                        "_GenerateCompileDependencyCache"
-                       "CoreCompile" |],
+                       "Compile" |],
                     [ logger ]
                 )
+
+            let t = sw.ToString()
 
             if build
             then Success(LoadedProject pi)
@@ -106,6 +111,9 @@ module ProjectLoader =
 
     let getFscArgs (LoadedProject project) =
         project.Items |> Seq.filter (fun p -> p.ItemType = "FscCommandLineArgs") |> Seq.map (fun p -> p.EvaluatedInclude)
+
+    let getCscArgs (LoadedProject project) =
+        project.Items |> Seq.filter (fun p -> p.ItemType = "CscCommandLineArgs") |> Seq.map (fun p -> p.EvaluatedInclude)
 
     let getP2Prefs (LoadedProject project) =
         project.Items
@@ -214,14 +222,26 @@ module ProjectLoader =
 
           IsPublishable = msbuildPropBool "IsPublishable" }
 
-    let mapToProject (path: string) (fscArgs: string seq) (p2p: ProjectReference seq) (compile: CompileItem seq) (nugetRefs: PackageReference seq) (sdkInfo: ProjectSdkInfo) (props: Property seq) (customProps: Property seq) =
+    let mapToProject (path: string) (compilerArgs: string seq) (p2p: ProjectReference seq) (compile: CompileItem seq) (nugetRefs: PackageReference seq) (sdkInfo: ProjectSdkInfo) (props: Property seq) (customProps: Property seq) =
         let projDir = Path.GetDirectoryName path
 
-        let fscArgsNormalized =
-            //workaround, arguments in rsp can use relative paths
-            fscArgs |> Seq.map (FscArguments.useFullPaths projDir) |> Seq.toList
+        let outputType, sourceFiles, otherOptions =
+            if path.EndsWith ".fsproj" then
+                let fscArgsNormalized =
+                    //workaround, arguments in rsp can use relative paths
+                    compilerArgs |> Seq.map (FscArguments.useFullPaths projDir) |> Seq.toList
 
-        let sourceFiles, otherOptions = fscArgsNormalized |> List.partition (FscArguments.isSourceFile path)
+                let sourceFiles, otherOptions = fscArgsNormalized |> List.partition (FscArguments.isSourceFile path)
+                let outputType = FscArguments.outType fscArgsNormalized
+                outputType, sourceFiles, otherOptions
+            else
+                let cscArgsNormalized =
+                    //workaround, arguments in rsp can use relative paths
+                    compilerArgs |> Seq.map (CscArguments.useFullPaths projDir) |> Seq.toList
+
+                let sourceFiles, otherOptions = cscArgsNormalized |> List.partition (CscArguments.isSourceFile path)
+                let outputType = CscArguments.outType cscArgsNormalized
+                outputType, sourceFiles, otherOptions
 
         let compileItems = sourceFiles |> List.map (VisualTree.getCompileProjectItem (compile |> Seq.toList) path)
 
@@ -235,7 +255,7 @@ module ProjectLoader =
               PackageReferences = List.ofSeq nugetRefs
               LoadTime = DateTime.Now
               TargetPath = props |> Seq.tryFind (fun n -> n.Name = "TargetPath") |> Option.map (fun n -> n.Value) |> Option.defaultValue ""
-              ProjectOutputType = FscArguments.outType fscArgsNormalized
+              ProjectOutputType = outputType
               ProjectSdkInfo = sdkInfo
               Items = compileItems
               CustomProperties = List.ofSeq customProps }
@@ -280,10 +300,10 @@ module ProjectLoader =
 
             let p2pRefs = getP2Prefs project
 
-            let fscArgs = getFscArgs project
-            // |> Seq.map
-            //     (fun n -> //Hack beacuse FCSArgs contain bin/Debug paths without traget framework. No idea why.
-            //         if n.StartsWith "-r:" then n else n)
+            let comandlineArgs =
+                if path.EndsWith ".fsproj"
+                then getFscArgs project
+                else getCscArgs project
 
             let compileItems = getCompileItems project
             let nuGetRefs = getNuGetReferences project
@@ -295,7 +315,7 @@ module ProjectLoader =
                 Result.Error "not restored"
             else
 
-                let proj = mapToProject path fscArgs p2pRefs compileItems nuGetRefs sdkInfo props customProps
+                let proj = mapToProject path comandlineArgs p2pRefs compileItems nuGetRefs sdkInfo props customProps
 
                 Result.Ok proj
         | Error e -> Result.Error e
