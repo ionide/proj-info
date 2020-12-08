@@ -5,7 +5,7 @@ open FSharp.Compiler.SourceCodeServices
 
 module FCS =
     let rec mapToFSharpProjectOptions (projectOptions: ProjectOptions) (allKnownProjects: ProjectOptions seq): FSharpProjectOptions =
-        { ProjectId = projectOptions.ProjectId
+        { ProjectId = None
           ProjectFileName = projectOptions.ProjectFileName
           SourceFiles = List.toArray projectOptions.SourceFiles
           OtherOptions = List.toArray projectOptions.OtherOptions
@@ -15,7 +15,7 @@ module FCS =
               |> Array.choose
                   (fun d ->
                       let findProjOpt = allKnownProjects |> Seq.tryFind (fun n -> n.ProjectFileName = d.ProjectFileName)
-                      findProjOpt |> Option.map (fun p -> p.ProjectFileName, (mapToFSharpProjectOptions p allKnownProjects)))
+                      findProjOpt |> Option.map (fun p -> p.TargetPath, (mapToFSharpProjectOptions p allKnownProjects)))
           IsIncompleteTypeCheckEnvironment = false
           UseScriptResolutionRules = false
           LoadTime = projectOptions.LoadTime
