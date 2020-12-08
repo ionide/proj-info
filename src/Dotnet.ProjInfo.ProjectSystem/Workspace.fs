@@ -10,6 +10,7 @@ type internal GetProjectOptionsErrors = Types.GetProjectOptionsErrors
 type internal ProjectSystemState =
     | Loading of string
     | Loaded of FSharp.Compiler.SourceCodeServices.FSharpProjectOptions * Types.ProjectOptions * ProjectViewerItem list * fromDpiCache: bool
+    | LoadedOther of Types.ProjectOptions * ProjectViewerItem list * fromDpiCache: bool
     | Failed of string * GetProjectOptionsErrors
 
 
@@ -43,17 +44,19 @@ let private getProjectOptions (loader: WorkspaceLoader) (onEvent: ProjectSystemS
 
     let handler state =
         match state with
+        | WorkspaceProjectState.Failed (projectFileName, error) -> onEvent (ProjectSystemState.Failed(projectFileName, error))
         | WorkspaceProjectState.Loading (p) -> onEvent (ProjectSystemState.Loading p)
-        | WorkspaceProjectState.Loaded (po, allProjects, isFromCache) ->
+        | WorkspaceProjectState.Loaded (po, allProjects, isFromCache) when po.ProjectFileName.EndsWith ".fsproj" ->
             let fpo = FCS.mapToFSharpProjectOptions po allProjects
             let x = bindResults isFromCache fpo
 
             match x with
             | Ok (opts, optsDPW, projViewerItems, isFromCache) -> onEvent (ProjectSystemState.Loaded(opts, optsDPW, projViewerItems, isFromCache))
             | Error error -> onEvent (ProjectSystemState.Failed(error.ProjFile, error))
-
-        | WorkspaceProjectState.Failed (projectFileName, error) -> onEvent (ProjectSystemState.Failed(projectFileName, error))
-
+        | WorkspaceProjectState.Loaded (po, allProjects, isFromCache) ->
+            let view = ProjectViewer.render po
+            let items = view.Items
+            onEvent (ProjectSystemState.LoadedOther(po, items, isFromCache))
 
     use notif = loader.Notifications.Subscribe handler
     loader.LoadProjects(existing) |> ignore // TODO: Maybe we should move away from event driven approach???

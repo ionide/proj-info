@@ -891,21 +891,18 @@ let testProjectSystemOnChange toolsPath =
             )
 
 let debugTets toolsPath =
-    testCase
+    ptestCase
     |> withLog
         "debug"
         (fun logger fs ->
 
-            let projPath = @"D:\Programowanie\Projekty\Ionide\dotnet-proj-info\src\Dotnet.ProjInfo.FCS\Dotnet.ProjInfo.FCS.fsproj"
+            let projPath = @"D:\Programowanie\Projekty\Ionide\dotnet-proj-info\src\Dotnet.ProjInfo.Sln\Dotnet.ProjInfo.Sln.csproj"
 
-            let fcs = createFCS ()
-            let controller = ProjectSystem.ProjectController(fcs, toolsPath)
-            let watcher = watchNotifications logger controller
-            controller.LoadProject(projPath)
+            let loader = WorkspaceLoader.Create(toolsPath)
 
-            System.Threading.Thread.Sleep 3000
+            let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
 
-            printfn "%A" (controller.GetProjectOptions @"D:\Programowanie\Projekty\Ionide\dotnet-proj-info\src\Dotnet.ProjInfo.FCS\Library.fs")
+            printfn "%A" parsed
 
             )
 
