@@ -39,7 +39,8 @@ module ProjectLoader =
     let internal logger (writer: StringWriter) =
         { new ILogger with
             member this.Initialize(eventSource: IEventSource): unit =
-                eventSource.ErrorRaised.Add(fun t -> writer.WriteLine t.Message) //Only log errors
+                // eventSource.ErrorRaised.Add(fun t -> writer.WriteLine t.Message) //Only log errors
+                eventSource.AnyEventRaised.Add(fun t -> writer.WriteLine t.Message)
 
             member this.Parameters: string = ""
 
@@ -52,35 +53,51 @@ module ProjectLoader =
             member this.Verbosity
                 with set (v: LoggerVerbosity): unit = () }
 
+    let getTfm (path: string) =
+        let pi = ProjectInstance(path)
+        let tfm = pi.GetPropertyValue "TargetFramework"
+
+        if String.IsNullOrWhiteSpace tfm then
+            let tfms = pi.GetPropertyValue "TargetFrameworks"
+            let actualTFM = tfms.Split(';').[0]
+            Some actualTFM
+        else
+            None
+
     let loadProject (path: string) (ToolsPath toolsPath) =
         try
-            let globalProperties = dict [ "IsCrossTargetingBuild", "false" ] //Make sure we always target single TFM for Design Time Build
+            let tfm = getTfm path
+
+
+            let globalProperties =
+                dict [ "ProvideCommandLineArgs", "true"
+                       "DesignTimeBuild", "true"
+                       "SkipCompilerExecution", "true"
+                       "GeneratePackageOnBuild", "false"
+                       "Configuration", "Debug"
+                       "DefineExplicitDefaults", "true"
+                       "BuildProjectReferences", "false"
+                       "UseCommonOutputDirectory", "false"
+                       "DotnetProjInfo", "true"
+                       if tfm.IsSome
+                       then "TargetFramework", tfm.Value ]
 
             use pc = new ProjectCollection(globalProperties)
 
             let pi = pc.LoadProject(path)
 
-            let tfm =
-                let tfm = pi.GetPropertyValue "TargetFramework"
-
-                if String.IsNullOrWhiteSpace tfm
-                then pi.GetPropertyValue "TargetFrameworks"
-                else tfm
-
-            let actualTFM = tfm.Split(';').[0] //Always parse targeting first defined TFM
-
             use sw = new StringWriter()
             let logger = logger (sw)
-            pi.SetGlobalProperty("SkipCompilerExecution", "true") |> ignore
-            pi.SetGlobalProperty("ProvideCommandLineArgs", "true") |> ignore
-            pi.SetGlobalProperty("CopyBuildOutputToOutputDirectory", "false") |> ignore
-            pi.SetGlobalProperty("UseCommonOutputDirectory", "true") |> ignore
-            pi.SetGlobalProperty("DesignTimeBuild", "true") |> ignore
-            pi.SetGlobalProperty("BuildProjectReferences", "false") |> ignore
-            pi.SetGlobalProperty("TargetFramework", actualTFM) |> ignore
+
             let pi = pi.CreateProjectInstance()
 
-            let build = pi.Build([| "ResolveReferences"; "CoreCompile" |], [ logger ])
+            let build =
+                pi.Build(
+                    [| "ResolvePackageDependenciesDesignTime"
+                       "_GenerateCompileDependencyCache"
+                       "CoreCompile" |],
+                    [ logger ]
+                )
 
             if build
             then Success(LoadedProject pi)
@@ -261,8 +278,13 @@ module ProjectLoader =
                   "IsCrossTargetingBuild"
                   "TargetFrameworks" ]
 
-            let fscArgs = getFscArgs project
             let p2pRefs = getP2Prefs project
+
+            let fscArgs = getFscArgs project
+            // |> Seq.map
+            //     (fun n -> //Hack beacuse FCSArgs contain bin/Debug paths without traget framework. No idea why.
+            //         if n.StartsWith "-r:" then n else n)
+
             let compileItems = getCompileItems project
             let nuGetRefs = getNuGetReferences project
             let props = getProperties project properties
