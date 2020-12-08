@@ -45,16 +45,18 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
     let updateState (response: ProjectCrackerCache) =
         let normalizeOptions (opts: FSharpProjectOptions) =
             { opts with
-                  SourceFiles = opts.SourceFiles |> Array.map (Path.GetFullPath)
+                  SourceFiles = opts.SourceFiles |> Array.filter (FscArguments.isCompileFile) |> Array.map (Path.GetFullPath)
                   OtherOptions =
                       opts.OtherOptions
-                      |> Array.map (fun n ->
-                          if FscArguments.isCompileFile (n)
-                          then Path.GetFullPath n
-                          else n) }
+                      |> Array.map
+                          (fun n ->
+                              if FscArguments.isCompileFile (n)
+                              then Path.GetFullPath n
+                              else n) }
 
         for file in response.Items
-                    |> List.choose (function
+                    |> List.choose
+                        (function
                         | ProjectViewerItem.Compile (p, _) -> Some p) do
             fileCheckOptions.[file] <- normalizeOptions response.Options
 
@@ -85,7 +87,8 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
 
                     let responseFiles =
                         response.Items
-                        |> List.choose (function
+                        |> List.choose
+                            (function
                             | ProjectViewerItem.Compile (p, _) -> Some p)
 
                     let projInfo: ProjectResult =
@@ -149,15 +152,16 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
         }
 
     member private x.LoaderLoop =
-        MailboxProcessor.Start(fun agent ->
-            let rec loop () =
-                async {
-                    let! (fn, gb) = agent.Receive()
-                    let! _ = x.loadProjects fn gb
-                    return ()
-                }
+        MailboxProcessor.Start
+            (fun agent ->
+                let rec loop () =
+                    async {
+                        let! (fn, gb) = agent.Receive()
+                        let! _ = x.loadProjects fn gb
+                        return ()
+                    }
 
-            loop ())
+                loop ())
 
     member __.WorkspaceReady = workspaceReady.Publish
 
