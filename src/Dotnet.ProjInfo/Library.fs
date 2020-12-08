@@ -337,6 +337,9 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
                         | Error msg when msg.Contains "The project file could not be loaded." ->
                             loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
                             [], None
+                        | Error msg when msg.Contains "not restored" ->
+                            loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotRestored(p)))
+                            [], None
                         | Error msg ->
                             loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg)))
                             [], None
