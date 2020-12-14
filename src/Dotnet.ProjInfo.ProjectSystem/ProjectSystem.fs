@@ -35,7 +35,7 @@ type ProjectResponse =
 /// Public API for any operations related to workspace and projects.
 /// Internally keeps all the information related to project files in current workspace.
 /// It's responsible for refreshing and caching - should be used only as source of information and public API
-type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
+type ProjectController(toolsPath: ToolsPath) =
     let fileCheckOptions = ConcurrentDictionary<string, FSharpProjectOptions>()
     let projects = ConcurrentDictionary<string, Project>()
     let mutable isWorkspaceReady = false
@@ -180,12 +180,15 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
 
                 loop ())
 
+    ///Event notifies that whole workspace has been loaded
     member __.WorkspaceReady = workspaceReady.Publish
 
+    ///Event notifies about any loading events
     member __.Notifications = notify.Publish
 
     member __.IsWorkspaceReady = isWorkspaceReady
 
+    ///Try to get instance of `FSharpProjectOptions` for given `.fs` file
     member __.GetProjectOptions(file: string): FSharpProjectOptions option =
         let file = Utils.normalizePath file
         fileCheckOptions.TryFind file
@@ -198,15 +201,25 @@ type ProjectController(checker: FSharpChecker, toolsPath: ToolsPath) =
         let file = Utils.normalizePath file
         fileCheckOptions.TryRemove file |> ignore
 
+    ///Try to get instance of `FSharpProjectOptions` for given `.fsproj` file
+    member __.GetProjectOptionsForFsproj(fsprojPath: string): FSharpProjectOptions option =
+        fileCheckOptions.Values |> Seq.tryFind (fun n -> n.ProjectFileName = fsprojPath)
+
+    ///Returns a sequance of all known path-to-`.fs` * `FSharpProjectOptions` pairs
     member __.ProjectOptions = fileCheckOptions |> Seq.map (|KeyValue|)
 
+    ///Loads a single project file
     member x.LoadProject(projectFileName: string, generateBinlog: bool) =
         x.LoaderLoop.Post([ projectFileName ], generateBinlog)
 
+    ///Loads a single project file
     member x.LoadProject(projectFileName: string) = x.LoadProject(projectFileName, false)
 
+    ///Loads a set of project files
     member x.LoadWorkspace(files: string list, generateBinlog: bool) = x.LoaderLoop.Post(files, generateBinlog)
 
+    ///Loads a set of project files
     member x.LoadWorkspace(files: string list) = x.LoadWorkspace(files, false)
 
+    ///Finds a list of potential workspaces (solution files/lists of projects) in given dir
     member __.PeekWorkspace(dir: string, deep: int, excludedDirs: string list) = WorkspacePeek.peek dir deep excludedDirs
