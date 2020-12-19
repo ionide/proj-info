@@ -8,7 +8,9 @@
     "tasks": [
         {
             "taskName": "build",
-            "args": [ "src/dotnet-proj.sln" ],
+            "args": [
+                "ionide-proj-info.sln"
+            ],
             "isBuildCommand": true,
             "showOutput": "silent",
             "problemMatcher": "$msCompile"
