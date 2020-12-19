@@ -93,7 +93,7 @@ Target.create "Build" (fun _ -> DotNet.build id "")
 
 Target.create
     "Test"
-    (fun _ -> exec "dotnet" @"run --project .\test\Dotnet.ProjInfo.Tests\Dotnet.ProjInfo.Tests.fsproj" ".")
+    (fun _ -> exec "dotnet" @"run --project .\test\Ionide.ProjInfo.Tests\Ionide.ProjInfo.Tests.fsproj" ".")
 
 
 // --------------------------------------------------------------------------------------
@@ -124,7 +124,7 @@ Target.create
                       MSBuildParams =
                           { p.MSBuildParams with
                                 Properties = properties } })
-            "dotnet-proj-info.sln")
+            "ionide-proj-info.sln")
 
 
 // --------------------------------------------------------------------------------------

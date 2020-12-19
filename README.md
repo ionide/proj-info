@@ -1,7 +1,7 @@
 # dotnet-proj-info
 
 - as .NET Core Tool: [![NuGet](https://img.shields.io/nuget/v/dotnet-proj.svg)](https://www.nuget.org/packages/dotnet-proj/)
-- as library: `Dotnet.ProjInfo` [![NuGet](https://img.shields.io/nuget/v/Dotnet.ProjInfo.svg)](https://www.nuget.org/packages/Dotnet.ProjInfo)
+- as library: `Ionide.ProjInfo` [![NuGet](https://img.shields.io/nuget/v/Ionide.ProjInfo.svg)](https://www.nuget.org/packages/Ionide.ProjInfo)
 
 ## Features
 
@@ -36,7 +36,7 @@ Usage:
 
 ```
 dotnet-proj.
- 
+
 USAGE: dotnet-proj [--help] [--verbose] [<subcommand> [<options>]]
 
 SUBCOMMANDS:

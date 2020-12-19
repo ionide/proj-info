@@ -5,27 +5,15 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": ".NET Core Launch (console)",
+            "name": "Ionide.ProjInfo.Tests",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/src/dotnet-proj/bin/Debug/netcoreapp2.1/dotnet-proj.dll",
-            "args": [],
-            "cwd": "${workspaceFolder}",
-            "stopAtEntry": false,
-            "console": "internalConsole"
-        },
-        {
-            "name": "Dotnet.ProjInfo.Workspace.Tests",
-            "type": "coreclr",
-            "request": "launch",
-            "preLaunchTask": "build",
-            "program": "${workspaceFolder}/test/Dotnet.ProjInfo.Workspace.Tests/bin/Debug/netcoreapp2.1/Dotnet.ProjInfo.Workspace.Tests.dll",
+            "program": "${workspaceFolder}/test/Ionide.ProjInfo.Tests/bin/Debug/net5.0/Ionide.ProjInfo.Tests.dll",
             "args": [],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
             "console": "internalConsole"
         }
-
     ]
 }
