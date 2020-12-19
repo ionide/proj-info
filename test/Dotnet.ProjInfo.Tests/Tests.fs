@@ -820,8 +820,8 @@ let testProjectSystem toolsPath =
 
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
-            let fcs = createFCS ()
-            let controller = ProjectSystem.ProjectController(fcs, toolsPath)
+
+            let controller = ProjectSystem.ProjectController(toolsPath)
             let watcher = watchNotifications logger controller
             controller.LoadProject(projPath)
 
@@ -840,6 +840,7 @@ let testProjectSystem toolsPath =
             Expect.equal fcsPo.ReferencedProjects.Length ``sample2 NetSdk library``.ProjectReferences.Length "refs"
             Expect.equal fcsPo.SourceFiles.Length 2 "files"
 
+            let fcs = createFCS ()
             let result = fcs.ParseAndCheckProject(fcsPo) |> Async.RunSynchronously
 
             Expect.isEmpty result.Errors (sprintf "no errors but was: %A" result.Errors)
@@ -862,8 +863,7 @@ let testProjectSystemOnChange toolsPath =
 
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
-            let fcs = createFCS ()
-            let controller = ProjectSystem.ProjectController(fcs, toolsPath)
+            let controller = ProjectSystem.ProjectController(toolsPath)
             let watcher = watchNotifications logger controller
             controller.LoadProject(projPath)
 
