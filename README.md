@@ -1,111 +1,58 @@
-# dotnet-proj-info
+# Ionide.ProjInfo
 
-- as .NET Core Tool: [![NuGet](https://img.shields.io/nuget/v/dotnet-proj.svg)](https://www.nuget.org/packages/dotnet-proj/)
-- as library: `Ionide.ProjInfo` [![NuGet](https://img.shields.io/nuget/v/Ionide.ProjInfo.svg)](https://www.nuget.org/packages/Ionide.ProjInfo)
+[![NuGet](https://img.shields.io/nuget/v/Iondie.ProjInfo.svg)](https://www.nuget.org/packages/Ionide.ProjInfo/) ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/Ionide/dotnet-proj-info/Build?style=flat-square)
 
-## Features
+Parsing and evaluating of `.fsproj` files. This repository contains several packages:
+* `Ionide.ProjInfo` - library for parsing and evaluating `.fsproj` files, using `Microsoft.Build` libraries
+* `Ionide.ProjInfo.Sln` - library for parsing `.sln` files
+* `Ionide.ProjInfo.FCS` - library providing utility for mapping project data types used by `Ionide.ProjInfo` into `FSharpProjectOptions` type used by `FSharp.Compiler.Service`
+* `Ionide.ProjInfo.ProjectSystem` - library providing high level project system component that can be used by editor tooling. It supports features like tracking changes, event-driven notifications about project loading status, and persistent caching of the data for fast initial load.
 
-- get properties
-- get `fsc`/`csc` command line arguments
-- get project to project references
-- list installed .NET Framework versions
-- get references path of .NET asseblies like `System`, `System.Data`
+---
+You can support Ionide development on [Open Collective](https://opencollective.com/ionide).
 
-Support both project sdk:
+[![Open Collective](https://opencollective.com/ionide/donate/button.png?color=blue)](https://opencollective.com/ionide)
 
-- dotnet/sdk style projects (slim proj, usually .net core)
-- old sdk projects (verbose proj, usually .NET)
+---
 
-Works on mono and windows .NET, and allow to specify the `dotnet` (.NET Core) or `msbuild` (.NET) to use
-
-## as .NET Tool
-
-Install with:
-
-```bash
-dotnet tool install -g dotnet-proj
-```
-
-and
-
-```bash
-dotnet proj --help
-```
-
-Usage:
-
-```
-dotnet-proj.
-
-USAGE: dotnet-proj [--help] [--verbose] [<subcommand> [<options>]]
-
-SUBCOMMANDS:
-
-    prop <options>        get properties
-    fsc-args <options>    get fsc arguments
-    csc-args <options>    get csc arguments
-    p2p <options>         get project references
-    net-fw <options>      list the installed .NET Frameworks
-    net-fw-ref <options>  get the reference path of given .NET Framework assembly
-
-    Use 'dotnet-proj <subcommand> --help' for additional information.
-
-OPTIONS:
-
-    --verbose, -v         verbose log
-    --help                display this list of options.
-```
-
-Subcommands support usual arguments of .NET cli (`dotnet`) where make sense, like:
-
-- the project to use
-- `-c` or `--configuration`
-- `-f` or `--framework`
-- `-r` or `--runtime`
-
-See [examples](https://github.com/enricosada/dotnet-proj-info/tree/master/examples) directory for a quick tutorial
-
-## as Library
-
-Used by:
+## Used by:
 
 - [Fable compiler](https://github.com/fable-compiler/fable) to parse fsproj projects with `dotnet fable`
 - [FsAutocomplete (FSAC)](https://github.com/fsharp/FsAutoComplete/) to parse projects. That's the language server that add F# support in:
   - [Ionide in Visual Studio Code](https://github.com/ionide/ionide-vscode-fsharp)
   - [F# vim binding](https://github.com/fsharp/vim-fsharp)
   - [F# Emacs mode](https://github.com/fsharp/emacs-fsharp-mode)
-
-## Build
-
-Clone repo.
-
-Run:
-
-```bash
-dotnet build
-```
-
-To run tests:
-
-```bash
-# create packages first (see below)
-dotnet test -v n
-```
-
-To create packages:
-
-```bash
-dotnet pack
-```
-
-will create packages in `bin\nupkgs`
-
-pass `/p:Version=1.2.3` to create a package with version `1.2.3`
-
-## Release
-
-Make a new version tag and push that to the repo.  Appveyor builds that are based off tags will create a github release. Nuget packages need to be pushed separately, but can be downloaded from Appveyor to do so.
+- [F# Formatting](https://github.com/fsprojects/FSharp.Formatting)
+- [FSharpLint](https://github.com/fsprojects/FSharpLint)
 
 ## Deprecated
 
-- as dotnet cli tool: `dotnet proj-info` [![NuGet](https://img.shields.io/nuget/v/dotnet-proj-info.svg)](https://www.nuget.org/packages/dotnet-proj-info). Use `dotnet proj` as .NET Core Tool instead, can be installed locally with `dotnet tool install --tool-path` instead of `-g`
+- as .NET Core Tool: [![NuGet](https://img.shields.io/nuget/v/dotnet-proj.svg)](https://www.nuget.org/packages/dotnet-proj/)
+- as dotnet cli tool: `dotnet proj-info` [![NuGet](https://img.shields.io/nuget/v/dotnet-proj-info.svg)](https://www.nuget.org/packages/dotnet-proj-info).
+- old libraries (`Dotnet.ProjInfo.*`): [![NuGet](https://img.shields.io/nuget/v/Dotnet.ProjInfo.svg)](https://www.nuget.org/packages/Dotnet.ProjInfo/)
+
+## How to contribute
+
+*Imposter syndrome disclaimer*: I want your help. No really, I do.
+
+There might be a little voice inside that tells you you're not ready; that you need to do one more tutorial, or learn another framework, or write a few more blog posts before you can help me with this project.
+
+I assure you, that's not the case.
+
+This project has some clear Contribution Guidelines and expectations that you can [read here](https://github.com/ionide/dotnet-proj-info/blob/master/CONTRIBUTING.md).
+
+The contribution guidelines outline the process that you'll need to follow to get a patch merged. By making expectations and process explicit, I hope it will make it easier for you to contribute.
+
+And you don't just have to write code. You can help out by writing documentation, tests, or even by giving feedback about this work. (And yes, that includes giving feedback about the contribution guidelines.)
+
+Thank you for contributing!
+
+
+## Contributing and copyright
+
+The project is hosted on [GitHub](https://github.com/ionide/dotnet-proj-info) where you can [report issues](https://github.com/ionide/dotnet-proj-info/issues), fork
+the project and submit pull requests.
+
+The library is available under [MIT license](https://github.com/ionide/dotnet-proj-info/blob/master/LICENSE.md), which allows modification and redistribution for both commercial and non-commercial purposes.
+
+Please note that this project is released with a [Contributor Code of Conduct](CODE_OF_CONDUCT.md). By participating in this project you agree to abide by its terms.
