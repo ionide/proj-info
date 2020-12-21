@@ -14,8 +14,11 @@ module FCS =
               |> List.toArray
               |> Array.choose
                   (fun d ->
-                      let findProjOpt = allKnownProjects |> Seq.tryFind (fun n -> n.ProjectFileName = d.ProjectFileName)
-                      findProjOpt |> Option.map (fun p -> p.TargetPath, (mapToFSharpProjectOptions p allKnownProjects)))
+                      if d.ProjectFileName.EndsWith ".fsproj" then
+                          let findProjOpt = allKnownProjects |> Seq.tryFind (fun n -> n.ProjectFileName = d.ProjectFileName)
+                          findProjOpt |> Option.map (fun p -> p.TargetPath, (mapToFSharpProjectOptions p allKnownProjects))
+                      else
+                          None)
           IsIncompleteTypeCheckEnvironment = false
           UseScriptResolutionRules = false
           LoadTime = projectOptions.LoadTime

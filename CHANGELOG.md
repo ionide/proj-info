@@ -4,11 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.45.1-preview03] - 2020-12-21
+## [0.45.1-preview04] - 2020-12-21
 
 ### Fixed
 
 - Fixed a bug with loading same project multiple times at the same time.
+- Fix a bug where C# projects were passed as project references when creating `FSharpProjectOptions`
 
 
 ## [0.45.0] - 2020-12-19
