@@ -332,6 +332,33 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
         let getAllKnonw () =
             cache |> Seq.map (fun n -> n.Value) |> Seq.toList
 
+        let rec loadProject p =
+            let res = ProjectLoader.getProjectInfo p toolsPath customProperties
+
+            match res with
+            | Ok project ->
+                try
+                    cache.Add(p, project)
+                    let lst = project.ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
+                    let info = Some project
+                    lst, info
+                with exc ->
+                    loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, exc.Message)))
+                    [], None
+            | Error msg when msg.Contains "The project file could not be loaded." ->
+                loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
+                [], None
+            | Error msg when msg.Contains "not restored" ->
+                loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotRestored(p)))
+                [], None
+            | Error msg when msg.Contains "The operation cannot be completed because a build is already in progress." ->
+                //Try to load project again
+                Threading.Thread.Sleep(50)
+                loadProject p
+            | Error msg ->
+                loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg)))
+                [], None
+
         let rec loadProjectList (projectList: string list) =
             for p in projectList do
                 let newList, toTrigger =
@@ -342,27 +369,8 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
                         lst, None
                     else
                         loadingNotification.Trigger(WorkspaceProjectState.Loading p)
-                        let res = ProjectLoader.getProjectInfo p toolsPath customProperties
+                        loadProject p
 
-                        match res with
-                        | Ok project ->
-                            try
-                                cache.Add(p, project)
-                                let lst = project.ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
-                                let info = Some project
-                                lst, info
-                            with exc ->
-                                loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, exc.Message)))
-                                [], None
-                        | Error msg when msg.Contains "The project file could not be loaded." ->
-                            loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
-                            [], None
-                        | Error msg when msg.Contains "not restored" ->
-                            loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotRestored(p)))
-                            [], None
-                        | Error msg ->
-                            loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg)))
-                            [], None
 
                 loadProjectList newList
 

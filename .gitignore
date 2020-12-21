@@ -241,6 +241,7 @@ _Pvt_Extensions
 msbuild.binlog
 /test/testrun_ws_fcs/
 /.ionide/
+/build
 
 .fake
 .ionide

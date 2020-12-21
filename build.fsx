@@ -95,6 +95,15 @@ Target.create
     "Test"
     (fun _ -> exec "dotnet" @"run --project .\test\Ionide.ProjInfo.Tests\Ionide.ProjInfo.Tests.fsproj" ".")
 
+Target.create
+    "BuildRelease"
+    (fun _ ->
+        DotNet.build
+            (fun p ->
+                { p with
+                      Configuration = DotNet.BuildConfiguration.Release
+                      OutputPath = Some buildDir })
+            "ionide-proj-info.sln")
 
 // --------------------------------------------------------------------------------------
 // Release Targets

@@ -170,15 +170,26 @@ type ProjectController(toolsPath: ToolsPath) =
 
     member private x.LoaderLoop =
         MailboxProcessor.Start
-            (fun agent ->
-                let rec loop () =
+            (fun agent -> //If couldn't recive new event in 50 ms then just load previous one
+                let rec loop (previousStatus: (string list * bool) option) =
                     async {
-                        let! (fn, gb) = agent.Receive()
-                        let! _ = x.loadProjects fn gb
-                        return ()
+                        match previousStatus with
+                        | Some (fn, gb) ->
+                            match! agent.TryReceive(50) with
+                            | None -> //If couldn't recive new event in 50 ms then just load previous one
+                                let! _ = x.loadProjects fn gb
+                                return! loop None
+                            | Some (fn2, gb2) when fn2 = fn -> //If recived same load request then wait again (in practice shouldn't happen more than 2 times)
+                                return! loop previousStatus
+                            | Some (fn2, gb2) -> //If recived some other project load previous one, and then wait with the new one
+                                let! _ = x.loadProjects fn gb
+                                return! loop (Some(fn2, gb2))
+                        | None ->
+                            let! (fn, gb) = agent.Receive()
+                            return! loop (Some(fn, gb))
                     }
 
-                loop ())
+                loop None)
 
     ///Event notifies that whole workspace has been loaded
     member __.WorkspaceReady = workspaceReady.Publish
