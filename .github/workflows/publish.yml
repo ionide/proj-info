@@ -51,5 +51,7 @@ jobs:
         tag: ${{ github.ref }}
         overwrite: true
         file_glob: true
-    - name: Push To NuGet
-      run: dotnet nuget push out/*.nupkg -k ${{ secrets.NUGET_TOKEN }} -s https://api.nuget.org/v3/index.json
+    - name: Publish to NuGet
+      run: dotnet fake build -t Push
+      env:
+        nuget-key: ${{ secrets.NUGET_TOKEN }}
