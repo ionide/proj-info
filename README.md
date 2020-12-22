@@ -1,6 +1,6 @@
 # Ionide.ProjInfo
 
-[![NuGet](https://img.shields.io/nuget/v/Iondie.ProjInfo.svg)](https://www.nuget.org/packages/Ionide.ProjInfo/) ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/Ionide/dotnet-proj-info/Build?style=flat-square)
+[![NuGet](https://img.shields.io/nuget/v/Ionide.ProjInfo.svg)](https://www.nuget.org/packages/Ionide.ProjInfo/) ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/Ionide/dotnet-proj-info/Build?style=flat-square)
 
 Parsing and evaluating of `.fsproj` files. This repository contains several packages:
 * `Ionide.ProjInfo` - library for parsing and evaluating `.fsproj` files, using `Microsoft.Build` libraries
