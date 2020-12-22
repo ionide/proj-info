@@ -3,18 +3,20 @@ namespace Ionide.ProjInfo
 module internal CommonHelpers =
 
     let chooseByPrefix (prefix: string) (s: string) =
-        if s.StartsWith(prefix) then Some(s.Substring(prefix.Length)) else None
+        if s.StartsWith(prefix)
+        then Some(s.Substring(prefix.Length))
+        else None
 
     let chooseByPrefix2 prefixes (s: string) =
-        prefixes
-        |> List.tryPick (fun prefix -> chooseByPrefix prefix s)
+        prefixes |> List.tryPick (fun prefix -> chooseByPrefix prefix s)
 
     let splitByPrefix (prefix: string) (s: string) =
-        if s.StartsWith(prefix) then Some(prefix, s.Substring(prefix.Length)) else None
+        if s.StartsWith(prefix)
+        then Some(prefix, s.Substring(prefix.Length))
+        else None
 
     let splitByPrefix2 prefixes (s: string) =
-        prefixes
-        |> List.tryPick (fun prefix -> splitByPrefix prefix s)
+        prefixes |> List.tryPick (fun prefix -> splitByPrefix prefix s)
 
 module internal FscArguments =
 
@@ -32,18 +34,16 @@ module internal FscArguments =
     let private outputFileArg = [ "--out:"; "-o:" ]
 
     let private makeAbs (projDir: string) (f: string) =
-        if Path.IsPathRooted f then f else Path.Combine(projDir, f)
+        if Path.IsPathRooted f
+        then f
+        else Path.Combine(projDir, f)
 
     let outputFile projDir rsp =
-        rsp
-        |> List.tryPick (chooseByPrefix2 outputFileArg)
-        |> Option.map (makeAbs projDir)
+        rsp |> List.tryPick (chooseByPrefix2 outputFileArg) |> Option.map (makeAbs projDir)
 
     let isCompileFile (s: string) =
-        //TODO check if is not an option, check prefix `-` ?
-        s.EndsWith(".fs")
-        || s.EndsWith(".fsi")
-        || s.EndsWith(".fsx")
+        let isArg = s.StartsWith("-") && s.Contains(":")
+        (not isArg) && (s.EndsWith(".fs") || s.EndsWith(".fsi") || s.EndsWith(".fsx"))
 
     let references =
         //TODO valid also --reference:
@@ -52,7 +52,10 @@ module internal FscArguments =
     let useFullPaths projDir (s: string) =
         match s |> splitByPrefix2 outputFileArg with
         | Some (prefix, v) -> prefix + (v |> makeAbs projDir)
-        | None -> if isCompileFile s then s |> makeAbs projDir |> Path.GetFullPath else s
+        | None ->
+            if isCompileFile s
+            then s |> makeAbs projDir |> Path.GetFullPath
+            else s
 
     let isTempFile (name: string) =
         let tempPath = System.IO.Path.GetTempPath()
