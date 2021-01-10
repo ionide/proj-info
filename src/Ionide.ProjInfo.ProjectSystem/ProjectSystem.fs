@@ -50,9 +50,10 @@ type ProjectController(toolsPath: ToolsPath) =
                       opts.OtherOptions
                       |> Array.map
                           (fun n ->
-                              if FscArguments.isCompileFile (n)
-                              then Path.GetFullPath n
-                              else n) }
+                              if FscArguments.isCompileFile (n) then
+                                  Path.GetFullPath n
+                              else
+                                  n) }
 
         for file in response.Items
                     |> List.choose
@@ -141,7 +142,7 @@ type ProjectController(toolsPath: ToolsPath) =
 
             let loader = WorkspaceLoader.Create(toolsPath)
 
-            let bindNewOnloaded (n: WorkspaceProjectState): ProjectSystemState option =
+            let bindNewOnloaded(n: WorkspaceProjectState): ProjectSystemState option =
                 match n with
                 | WorkspaceProjectState.Loading (path) -> Some(ProjectSystemState.Loading path)
                 | WorkspaceProjectState.Loaded (opts, allKNownProjects, isFromCache) ->
@@ -171,7 +172,7 @@ type ProjectController(toolsPath: ToolsPath) =
     member private x.LoaderLoop =
         MailboxProcessor.Start
             (fun agent -> //If couldn't recive new event in 50 ms then just load previous one
-                let rec loop (previousStatus: (string list * bool) option) =
+                let rec loop(previousStatus: (string list * bool) option) =
                     async {
                         match previousStatus with
                         | Some (fn, gb) ->
@@ -227,10 +228,12 @@ type ProjectController(toolsPath: ToolsPath) =
     member x.LoadProject(projectFileName: string) = x.LoadProject(projectFileName, false)
 
     ///Loads a set of project files
-    member x.LoadWorkspace(files: string list, generateBinlog: bool) = x.LoaderLoop.Post(files, generateBinlog)
+    member x.LoadWorkspace(files: string list, generateBinlog: bool) =
+        x.LoaderLoop.Post(files, generateBinlog)
 
     ///Loads a set of project files
     member x.LoadWorkspace(files: string list) = x.LoadWorkspace(files, false)
 
     ///Finds a list of potential workspaces (solution files/lists of projects) in given dir
-    member __.PeekWorkspace(dir: string, deep: int, excludedDirs: string list) = WorkspacePeek.peek dir deep excludedDirs
+    member __.PeekWorkspace(dir: string, deep: int, excludedDirs: string list) =
+        WorkspacePeek.peek dir deep excludedDirs

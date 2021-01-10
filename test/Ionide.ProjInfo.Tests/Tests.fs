@@ -23,7 +23,12 @@ let checkExitCodeZero (cmd: Command) =
 
 let findByPath path parsed =
     parsed
-    |> Array.tryPick (fun (kv: KeyValuePair<string, ProjectOptions>) -> if kv.Key = path then Some kv else None)
+    |> Array.tryPick
+        (fun (kv: KeyValuePair<string, ProjectOptions>) ->
+            if kv.Key = path then
+                Some kv
+            else
+                None)
     |> function
     | Some x -> x
     | None -> failwithf "key '%s' not found in %A" path (parsed |> Array.map (fun kv -> kv.Key))
@@ -727,6 +732,46 @@ let testFCSmap toolsPath =
 
             )
 
+let testSample2WithBinLog toolsPath =
+    testCase
+    |> withLog
+        "can load sample2 with bin log"
+        (fun logger fs ->
+            let testDir = inDir fs "load_sample2_bin_log"
+            copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
+
+            let projPath = testDir / (``sample2 NetSdk library``.ProjectFile)
+            let projDir = Path.GetDirectoryName projPath
+
+            dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
+
+            let loader = WorkspaceLoader.Create(toolsPath)
+
+            let watcher = watchNotifications logger loader
+
+            let parsed = loader.LoadProjects([ projPath ], [], true) |> Seq.toList
+
+            [ loading "n1.fsproj"
+              loaded "n1.fsproj" ]
+            |> expectNotifications (watcher.Notifications)
+
+            let [ _; WorkspaceProjectState.Loaded (n1Loaded, _, _) ] = watcher.Notifications
+
+            let n1Parsed = parsed |> expectFind projPath "first is a lib"
+
+            let expectedSources =
+                [ projDir / "obj/Debug/netstandard2.0/n1.AssemblyInfo.fs"
+                  projDir / "Library.fs" ]
+                |> List.map Path.GetFullPath
+
+            let blPath = projDir / "msbuild.binlog"
+            let blExists = File.Exists blPath
+
+            Expect.isTrue blExists "binlog file should exist"
+            Expect.equal parsed.Length 1 "console and lib"
+            Expect.equal n1Parsed n1Loaded "notificaton and parsed should be the same"
+            Expect.equal n1Parsed.SourceFiles expectedSources "check sources")
+
 [<AutoOpen>]
 module ExpectProjectSystemNotification =
 
@@ -934,4 +979,6 @@ let tests toolsPath =
           //ProjectSystem tests
           testProjectSystem toolsPath
           testProjectSystemOnChange toolsPath
-          debugTets toolsPath ]
+          debugTets toolsPath
+          //Binlog test
+          testSample2WithBinLog toolsPath ]

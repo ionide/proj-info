@@ -29,9 +29,10 @@ let private bindResults isFromCache res =
             let view = ProjectViewer.render optsDPW
 
             let items =
-                if obj.ReferenceEquals(view.Items, null)
-                then []
-                else view.Items
+                if obj.ReferenceEquals(view.Items, null) then
+                    []
+                else
+                    view.Items
 
             Result.Ok(res, optsDPW, items, isFromCache))
 
@@ -59,7 +60,7 @@ let private getProjectOptions (loader: WorkspaceLoader) (onEvent: ProjectSystemS
             onEvent (ProjectSystemState.LoadedOther(po, items, isFromCache))
 
     use notif = loader.Notifications.Subscribe handler
-    loader.LoadProjects(existing) |> ignore // TODO: Maybe we should move away from event driven approach???
+    loader.LoadProjects(existing, [], generateBinlog) |> ignore // TODO: Maybe we should move away from event driven approach???
 
 let internal loadInBackground onLoaded (loader: WorkspaceLoader) (projects: Project list) (generateBinlog: bool) =
     let (resProjects, otherProjects) = projects |> List.partition (fun n -> n.Response.IsSome)

@@ -19,9 +19,10 @@ module Init =
             (fun assemblyLoadContext assemblyName ->
                 let path = Path.Combine(instance.MSBuildPath, assemblyName.Name + ".dll")
 
-                if File.Exists path
-                then assemblyLoadContext.LoadFromAssemblyPath path
-                else null)
+                if File.Exists path then
+                    assemblyLoadContext.LoadFromAssemblyPath path
+                else
+                    null)
 
         ToolsPath instance.MSBuildPath
 
@@ -64,7 +65,7 @@ module ProjectLoader =
         else
             None
 
-    let loadProject (path: string) (ToolsPath toolsPath) =
+    let loadProject (path: string) (generateBinlog: bool) (ToolsPath toolsPath) =
         try
             let tfm = getTfm path
 
@@ -79,10 +80,10 @@ module ProjectLoader =
                        "BuildProjectReferences", "false"
                        "UseCommonOutputDirectory", "false"
                        "DotnetProjInfo", "true"
-                       if tfm.IsSome
-                       then "TargetFramework", tfm.Value
-                       if path.EndsWith ".csproj"
-                       then "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__") ]
+                       if tfm.IsSome then
+                           "TargetFramework", tfm.Value
+                       if path.EndsWith ".csproj" then
+                           "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__") ]
 
             use pc = new ProjectCollection(globalProperties)
 
@@ -90,6 +91,14 @@ module ProjectLoader =
 
             use sw = new StringWriter()
             let logger = logger (sw)
+
+            let loggers =
+                if generateBinlog then
+                    let bl = Microsoft.Build.Logging.BinaryLogger() :> ILogger
+                    bl.Parameters <- Path.Combine(Path.GetDirectoryName(path), "msbuild.binlog")
+                    [ logger; bl ]
+                else
+                    [ logger ]
 
             let pi = pi.CreateProjectInstance()
 
@@ -99,14 +108,16 @@ module ProjectLoader =
                     [| "ResolvePackageDependenciesDesignTime"
                        "_GenerateCompileDependencyCache"
                        "CoreCompile" |],
-                    [ logger ]
+                    loggers
+
                 )
 
             let t = sw.ToString()
 
-            if build
-            then Success(LoadedProject pi)
-            else Error(sw.ToString())
+            if build then
+                Success(LoadedProject pi)
+            else
+                Error(sw.ToString())
         with exc -> Error(exc.Message)
 
     let getFscArgs (LoadedProject project) =
@@ -124,9 +135,10 @@ module ProjectLoader =
                 let path = p.GetMetadataValue "FullPath"
 
                 let tfms =
-                    if p.HasMetadata "TargetFramework"
-                    then p.GetMetadataValue "TargetFramework"
-                    else p.GetMetadataValue "TargetFrameworks"
+                    if p.HasMetadata "TargetFramework" then
+                        p.GetMetadataValue "TargetFramework"
+                    else
+                        p.GetMetadataValue "TargetFrameworks"
 
                 { RelativePath = relativePath
                   ProjectFileName = path
@@ -140,9 +152,10 @@ module ProjectLoader =
                 let name = p.EvaluatedInclude
 
                 let link =
-                    if p.HasMetadata "Link"
-                    then Some(p.GetMetadataValue "Link")
-                    else None
+                    if p.HasMetadata "Link" then
+                        Some(p.GetMetadataValue "Link")
+                    else
+                        None
 
                 let fullPath = p.GetMetadataValue "FullPath"
 
@@ -173,9 +186,10 @@ module ProjectLoader =
 
     let getSdkInfo (props: Property seq) =
         let (|ConditionEquals|_|) (str: string) (arg: string) =
-            if System.String.Compare(str, arg, System.StringComparison.OrdinalIgnoreCase) = 0
-            then Some()
-            else None
+            if System.String.Compare(str, arg, System.StringComparison.OrdinalIgnoreCase) = 0 then
+                Some()
+            else
+                None
 
         let (|StringList|_|) (str: string) =
             str.Split([| ';' |], System.StringSplitOptions.RemoveEmptyEntries) |> List.ofArray |> Some
@@ -269,10 +283,11 @@ module ProjectLoader =
     /// </summary>
     /// <param name="path">Full path to the `.fsproj` file</param>
     /// <param name="toolsPath">Path to MsBuild obtained from `ProjectLoader.init ()`</param>
+    /// <param name="generateBinlog">Enable Binary Log generation</param>
     /// <param name="customProperties">List of additional MsBuild properties that you want to obtain.</param>
     /// <returns>Returns the record instance representing the loaded project or string containing error message</returns>
-    let getProjectInfo (path: string) (toolsPath: ToolsPath) (customProperties: string list): Result<Types.ProjectOptions, string> =
-        let loadedProject = loadProject path toolsPath
+    let getProjectInfo (path: string) (toolsPath: ToolsPath) (generateBinlog: bool) (customProperties: string list): Result<Types.ProjectOptions, string> =
+        let loadedProject = loadProject path generateBinlog toolsPath
 
         match loadedProject with
         | Success project ->
@@ -301,9 +316,10 @@ module ProjectLoader =
             let p2pRefs = getP2Prefs project
 
             let comandlineArgs =
-                if path.EndsWith ".fsproj"
-                then getFscArgs project
-                else getCscArgs project
+                if path.EndsWith ".fsproj" then
+                    getFscArgs project
+                else
+                    getCscArgs project
 
             let compileItems = getCompileItems project
             let nuGetRefs = getNuGetReferences project
@@ -326,14 +342,14 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
     [<CLIEvent>]
     member __.Notifications = loadingNotification.Publish
 
-    member __.LoadProjects(projects: string list, customProperties: string list) =
+    member __.LoadProjects(projects: string list, customProperties: string list, generateBinlog: bool) =
         let cache = Dictionary<string, ProjectOptions>()
 
-        let getAllKnonw () =
+        let getAllKnonw() =
             cache |> Seq.map (fun n -> n.Value) |> Seq.toList
 
         let rec loadProject p =
-            let res = ProjectLoader.getProjectInfo p toolsPath customProperties
+            let res = ProjectLoader.getProjectInfo p toolsPath generateBinlog customProperties
 
             match res with
             | Ok project ->
@@ -359,7 +375,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
                 loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg)))
                 [], None
 
-        let rec loadProjectList (projectList: string list) =
+        let rec loadProjectList(projectList: string list) =
             for p in projectList do
                 let newList, toTrigger =
                     if cache.ContainsKey p then
@@ -380,21 +396,32 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
         loadProjectList projects
         cache |> Seq.map (fun n -> n.Value)
 
-    member this.LoadProjects(projects) = this.LoadProjects(projects, [])
+    member this.LoadProjects(projects, customProperties) =
+        this.LoadProjects(projects, customProperties, false)
+
+    member this.LoadProjects(projects) = this.LoadProjects(projects, [], false)
+
+
+    member this.LoadProject(project, customProperties: string list, generateBinlog: bool) =
+        this.LoadProjects([ project ], customProperties, generateBinlog)
 
     member this.LoadProject(project, customProperties: string list) =
         this.LoadProjects([ project ], customProperties)
 
     member this.LoadProject(project) = this.LoadProjects([ project ])
 
-    member this.LoadSln(sln, customProperties: string list) =
+
+    member this.LoadSln(sln, customProperties: string list, generateBinlog: bool) =
         match InspectSln.tryParseSln sln with
         | Ok (_, slnData) ->
             let projs = InspectSln.loadingBuildOrder slnData
-            this.LoadProjects(projs, customProperties)
+            this.LoadProjects(projs, customProperties, generateBinlog)
         | Error d -> failwithf "Cannot load the sln: %A" d
 
-    member this.LoadSln(sln) = this.LoadSln(sln, [])
+    member this.LoadSln(sln, customProperties) =
+        this.LoadSln(sln, customProperties, false)
+
+    member this.LoadSln(sln) = this.LoadSln(sln, [], false)
 
     static member Create(toolsPath: ToolsPath) = WorkspaceLoader(toolsPath)
 
