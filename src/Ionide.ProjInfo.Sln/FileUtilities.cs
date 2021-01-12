@@ -6,6 +6,9 @@ using System.IO;
 
 namespace Ionide.ProjInfo.Sln.Shared
 {
+    ///<summary>
+    /// A collection of utils for safer handling of file names and paths
+    ///</summary>
     public static class FileUtilities
     {
         /// <summary>
