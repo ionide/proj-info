@@ -1,9 +1,9 @@
 source https://api.nuget.org/v3/index.json
 storage: none
-framework: netstandard2.0, net5.0, netcoreapp3.1
+framework: net5.0, netcoreapp3.1
 
 nuget FSharp.Core
-nuget FSharp.Compiler.Service ~> 38.0
+nuget FSharp.Compiler.Service ~> 39.0
 nuget Argu ~> 5.1
 
 nuget Microsoft.NETFramework.ReferenceAssemblies # for net461 builds
