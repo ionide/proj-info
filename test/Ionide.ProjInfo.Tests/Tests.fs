@@ -683,9 +683,9 @@ let testFCSmap toolsPath =
 
             let rec allP2P (po: FSharpProjectOptions) =
                 [ for (key, p2p) in po.ReferencedProjects do
-                    let poDPW = findProjectExtraInfo p2p
-                    yield (key, p2p, poDPW)
-                    yield! allP2P p2p ]
+                      let poDPW = findProjectExtraInfo p2p
+                      yield (key, p2p, poDPW)
+                      yield! allP2P p2p ]
 
             let expectP2PKeyIsTargetPath po =
                 for (tar, fcsPO, poDPW) in allP2P po do
@@ -726,7 +726,7 @@ let testFCSmap toolsPath =
 
             Expect.isEmpty result.Errors (sprintf "no errors but was: %A" result.Errors)
 
-            let uses = result.GetAllUsesOfAllSymbols() |> Async.RunSynchronously
+            let uses = result.GetAllUsesOfAllSymbols()
 
             Expect.isNonEmpty uses "all symbols usages"
 
@@ -890,7 +890,7 @@ let testProjectSystem toolsPath =
 
             Expect.isEmpty result.Errors (sprintf "no errors but was: %A" result.Errors)
 
-            let uses = result.GetAllUsesOfAllSymbols() |> Async.RunSynchronously
+            let uses = result.GetAllUsesOfAllSymbols()
 
             Expect.isNonEmpty uses "all symbols usages"
 
