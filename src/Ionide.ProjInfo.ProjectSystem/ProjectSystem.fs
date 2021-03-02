@@ -7,6 +7,7 @@ open FSharp.Compiler.SourceCodeServices
 open Ionide.ProjInfo.Types
 open Ionide.ProjInfo
 open Workspace
+open FSharp.Control.Reactive
 
 type ProjectResult =
     { ProjectFileName: string
@@ -35,12 +36,32 @@ type ProjectResponse =
 /// Public API for any operations related to workspace and projects.
 /// Internally keeps all the information related to project files in current workspace.
 /// It's responsible for refreshing and caching - should be used only as source of information and public API
-type ProjectController(toolsPath: ToolsPath) =
+type ProjectController(toolsPath: ToolsPath) as x =
     let fileCheckOptions = ConcurrentDictionary<string, FSharpProjectOptions>()
     let projects = ConcurrentDictionary<string, Project>()
     let mutable isWorkspaceReady = false
     let workspaceReady = Event<unit>()
     let notify = Event<ProjectResponse>()
+
+
+    let deduplicateBy keySelector (obs: IObservable<'a>) =
+        obs
+        |> Observable.synchronize // deals with concurrency issues
+        |> Observable.groupByUntil (keySelector) (Observable.throttle (TimeSpan.FromMilliseconds 1000.)) // Groups and Debounces by keySelector.  We use `groupByUntil` instead of just `groupBy` because it forces streams to close which if left open forever could cause memory issues.
+        |> Observable.bind (Observable.takeLast 1) // Takes the last in the debounced grouping and merged all streams back together with `bind`
+        |> Observable.bufferSpan (TimeSpan.FromMilliseconds 1000.)
+        |> Observable.map (List.ofSeq >> List.distinct) // Buffers the file changes together
+
+    // This gets pushed to every time `onChange` get called in `loadProjects`
+    let projectsChanged = new System.Reactive.Subjects.Subject<string * bool>()
+
+    let sub =
+        let loadProject (fileName, generateBinlog) =
+            fileName |> ProjectResponse.ProjectChanged |> notify.Trigger
+            x.LoadProject(fileName, generateBinlog)
+
+        projectsChanged |> deduplicateBy fst |> Observable.subscribe (fun projs -> projs |> List.iter (loadProject))
+
 
     let updateState (response: ProjectCrackerCache) =
         let normalizeOptions (opts: FSharpProjectOptions) =
@@ -61,11 +82,11 @@ type ProjectController(toolsPath: ToolsPath) =
                         | ProjectViewerItem.Compile (p, _) -> Some p) do
             fileCheckOptions.[file] <- normalizeOptions response.Options
 
+
     member private x.loadProjects (files: string list) (generateBinlog: bool) =
         async {
             let onChange fn =
-                ProjectResponse.ProjectChanged fn |> notify.Trigger
-                x.LoadProject(fn, generateBinlog)
+                projectsChanged.OnNext(fn, generateBinlog)
 
             let onLoaded p =
                 match p with
@@ -132,7 +153,6 @@ type ProjectController(toolsPath: ToolsPath) =
 
 
             ProjectResponse.WorkspaceLoad false |> notify.Trigger
-
             // this is to delay the project loading notification (of this thread)
             // after the workspaceload started response returned below in outer async
             // Make test output repeteable, and notification in correct order
@@ -142,7 +162,7 @@ type ProjectController(toolsPath: ToolsPath) =
 
             let loader = WorkspaceLoader.Create(toolsPath)
 
-            let bindNewOnloaded(n: WorkspaceProjectState): ProjectSystemState option =
+            let bindNewOnloaded (n: WorkspaceProjectState): ProjectSystemState option =
                 match n with
                 | WorkspaceProjectState.Loading (path) -> Some(ProjectSystemState.Loading path)
                 | WorkspaceProjectState.Loaded (opts, allKNownProjects, isFromCache) ->
@@ -172,9 +192,10 @@ type ProjectController(toolsPath: ToolsPath) =
     member private x.LoaderLoop =
         MailboxProcessor.Start
             (fun agent -> //If couldn't recive new event in 50 ms then just load previous one
-                let rec loop(previousStatus: (string list * bool) option) =
+                let rec loop (previousStatus: (string list * bool) option) =
                     async {
                         match previousStatus with
+
                         | Some (fn, gb) ->
                             match! agent.TryReceive(50) with
                             | None -> //If couldn't recive new event in 50 ms then just load previous one
@@ -237,3 +258,8 @@ type ProjectController(toolsPath: ToolsPath) =
     ///Finds a list of potential workspaces (solution files/lists of projects) in given dir
     member __.PeekWorkspace(dir: string, deep: int, excludedDirs: string list) =
         WorkspacePeek.peek dir deep excludedDirs
+
+    interface IDisposable with
+        member _.Dispose() =
+            sub.Dispose()
+            projectsChanged.Dispose()
