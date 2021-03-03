@@ -85,6 +85,11 @@ module ProjectLoader =
                        if path.EndsWith ".csproj" then
                            "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__") ]
 
+            match System.Environment.GetEnvironmentVariable "DOTNET_HOST_PATH" with
+            | null
+            | "" -> System.Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", Ionide.ProjInfo.Paths.dotnetRoot)
+            | _alreadySet -> ()
+
             use pc = new ProjectCollection(globalProperties)
 
             let pi = pc.LoadProject(path)
@@ -345,7 +350,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
     member __.LoadProjects(projects: string list, customProperties: string list, generateBinlog: bool) =
         let cache = Dictionary<string, ProjectOptions>()
 
-        let getAllKnonw() =
+        let getAllKnown () =
             cache |> Seq.map (fun n -> n.Value) |> Seq.toList
 
         let rec loadProject p =
@@ -375,12 +380,12 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
                 loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg)))
                 [], None
 
-        let rec loadProjectList(projectList: string list) =
+        let rec loadProjectList (projectList: string list) =
             for p in projectList do
                 let newList, toTrigger =
                     if cache.ContainsKey p then
                         let project = cache.[p]
-                        loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, getAllKnonw (), true)) //TODO: Should it even notify here?
+                        loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, getAllKnown (), true)) //TODO: Should it even notify here?
                         let lst = project.ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
                         lst, None
                     else
@@ -391,7 +396,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
                 loadProjectList newList
 
                 toTrigger
-                |> Option.iter (fun project -> loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, getAllKnonw (), false)))
+                |> Option.iter (fun project -> loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, getAllKnown (), false)))
 
         loadProjectList projects
         cache |> Seq.map (fun n -> n.Value)

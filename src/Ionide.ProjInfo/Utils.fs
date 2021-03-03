@@ -1,19 +1,32 @@
 namespace Ionide.ProjInfo
 
+module internal Paths =
+    /// provides the path to the `dotnet` binary running this library, duplicated from
+    /// https://github.com/dotnet/sdk/blob/b91b88aec2684e3d2988df8d838d3aa3c6240a35/src/Cli/Microsoft.DotNet.Cli.Utils/Muxer.cs#L39
+    let dotnetRoot =
+        System
+            .Diagnostics
+            .Process
+            .GetCurrentProcess()
+            .MainModule
+            .FileName
+
 module internal CommonHelpers =
 
     let chooseByPrefix (prefix: string) (s: string) =
-        if s.StartsWith(prefix)
-        then Some(s.Substring(prefix.Length))
-        else None
+        if s.StartsWith(prefix) then
+            Some(s.Substring(prefix.Length))
+        else
+            None
 
     let chooseByPrefix2 prefixes (s: string) =
         prefixes |> List.tryPick (fun prefix -> chooseByPrefix prefix s)
 
     let splitByPrefix (prefix: string) (s: string) =
-        if s.StartsWith(prefix)
-        then Some(prefix, s.Substring(prefix.Length))
-        else None
+        if s.StartsWith(prefix) then
+            Some(prefix, s.Substring(prefix.Length))
+        else
+            None
 
     let splitByPrefix2 prefixes (s: string) =
         prefixes |> List.tryPick (fun prefix -> splitByPrefix prefix s)
@@ -34,9 +47,10 @@ module internal FscArguments =
     let private outputFileArg = [ "--out:"; "-o:" ]
 
     let private makeAbs (projDir: string) (f: string) =
-        if Path.IsPathRooted f
-        then f
-        else Path.Combine(projDir, f)
+        if Path.IsPathRooted f then
+            f
+        else
+            Path.Combine(projDir, f)
 
     let outputFile projDir rsp =
         rsp |> List.tryPick (chooseByPrefix2 outputFileArg) |> Option.map (makeAbs projDir)
@@ -53,9 +67,10 @@ module internal FscArguments =
         match s |> splitByPrefix2 outputFileArg with
         | Some (prefix, v) -> prefix + (v |> makeAbs projDir)
         | None ->
-            if isCompileFile s
-            then s |> makeAbs projDir |> Path.GetFullPath
-            else s
+            if isCompileFile s then
+                s |> makeAbs projDir |> Path.GetFullPath
+            else
+                s
 
     let isTempFile (name: string) =
         let tempPath = System.IO.Path.GetTempPath()
@@ -67,9 +82,10 @@ module internal FscArguments =
         (n = "--times") || (n = "--no-jit-optimize")
 
     let isSourceFile (file: string): (string -> bool) =
-        if System.IO.Path.GetExtension(file) = ".fsproj"
-        then isCompileFile
-        else (fun n -> n.EndsWith ".cs")
+        if System.IO.Path.GetExtension(file) = ".fsproj" then
+            isCompileFile
+        else
+            (fun n -> n.EndsWith ".cs")
 
 module internal CscArguments =
     open CommonHelpers
@@ -79,23 +95,26 @@ module internal CscArguments =
     let private outputFileArg = [ "--out:"; "-o:" ]
 
     let private makeAbs (projDir: string) (f: string) =
-        if Path.IsPathRooted f
-        then f
-        else Path.Combine(projDir, f)
+        if Path.IsPathRooted f then
+            f
+        else
+            Path.Combine(projDir, f)
 
     let isCompileFile (s: string) =
         let isArg = s.StartsWith("-") && s.Contains(":")
         (not isArg) && s.EndsWith(".cs")
 
     let useFullPaths projDir (s: string) =
-        if isCompileFile s
-        then s |> makeAbs projDir |> Path.GetFullPath
-        else s
+        if isCompileFile s then
+            s |> makeAbs projDir |> Path.GetFullPath
+        else
+            s
 
     let isSourceFile (file: string): (string -> bool) =
-        if System.IO.Path.GetExtension(file) = ".csproj"
-        then isCompileFile
-        else (fun n -> n.EndsWith ".fs")
+        if System.IO.Path.GetExtension(file) = ".csproj" then
+            isCompileFile
+        else
+            (fun n -> n.EndsWith ".fs")
 
     let outputFile projDir rsp =
         rsp |> List.tryPick (chooseByPrefix2 outputFileArg) |> Option.map (makeAbs projDir)

@@ -75,9 +75,10 @@ let exec cmd args dir =
         CreateProcess.fromRawCommandLine cmd args
         |> CreateProcess.ensureExitCodeWithMessage (sprintf "Error while running '%s' with args: %s" cmd args)
 
-    (if isNullOrWhiteSpace dir
-     then proc
-     else proc |> CreateProcess.withWorkingDirectory dir)
+    (if isNullOrWhiteSpace dir then
+         proc
+     else
+         proc |> CreateProcess.withWorkingDirectory dir)
     |> Proc.run
     |> ignore
 
