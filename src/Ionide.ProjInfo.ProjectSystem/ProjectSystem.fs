@@ -56,11 +56,13 @@ type ProjectController(toolsPath: ToolsPath) as x =
     let projectsChanged = new System.Reactive.Subjects.Subject<string * bool>()
 
     let sub =
-        let loadProject (fileName, generateBinlog) =
-            fileName |> ProjectResponse.ProjectChanged |> notify.Trigger
-            x.LoadProject(fileName, generateBinlog)
+        let loadProjects (projs: list<string * bool>) =
+            let gbs, nonGbs = projs |> List.partition (snd) |> fun (a, b) -> (a |> List.map fst, b |> List.map fst)
+            projs |> List.iter (fun (fileName, _) -> fileName |> ProjectResponse.ProjectChanged |> notify.Trigger)
+            x.LoadWorkspace(gbs, true)
+            x.LoadWorkspace(nonGbs, false)
 
-        projectsChanged |> deduplicateBy fst |> Observable.subscribe (fun projs -> projs |> List.iter (loadProject))
+        projectsChanged |> deduplicateBy fst |> Observable.subscribe (loadProjects)
 
 
     let updateState (response: ProjectCrackerCache) =
@@ -85,108 +87,111 @@ type ProjectController(toolsPath: ToolsPath) as x =
 
     member private x.loadProjects (files: string list) (generateBinlog: bool) =
         async {
-            let onChange fn =
-                projectsChanged.OnNext(fn, generateBinlog)
+            if files |> Seq.isEmpty then
+                return false
+            else
+                let onChange fn =
+                    projectsChanged.OnNext(fn, generateBinlog)
 
-            let onLoaded p =
-                match p with
-                | ProjectSystemState.Loading projectFileName -> ProjectResponse.ProjectLoading projectFileName |> notify.Trigger
-                | ProjectSystemState.Failed (projectFileName, error) -> ProjectResponse.ProjectError(projectFileName, error) |> notify.Trigger
-                | ProjectSystemState.Loaded (opts, extraInfo, projectFiles, isFromCache) ->
-                    let response = ProjectCrackerCache.create (opts, extraInfo, projectFiles)
-                    let projectFileName = response.ProjectFileName
+                let onLoaded p =
+                    match p with
+                    | ProjectSystemState.Loading projectFileName -> ProjectResponse.ProjectLoading projectFileName |> notify.Trigger
+                    | ProjectSystemState.Failed (projectFileName, error) -> ProjectResponse.ProjectError(projectFileName, error) |> notify.Trigger
+                    | ProjectSystemState.Loaded (opts, extraInfo, projectFiles, isFromCache) ->
+                        let response = ProjectCrackerCache.create (opts, extraInfo, projectFiles)
+                        let projectFileName = response.ProjectFileName
 
-                    let project =
-                        match projects.TryFind projectFileName with
-                        | Some prj -> prj
-                        | None ->
-                            let proj = new Project(projectFileName, onChange)
-                            projects.[projectFileName] <- proj
-                            proj
+                        let project =
+                            match projects.TryFind projectFileName with
+                            | Some prj -> prj
+                            | None ->
+                                let proj = new Project(projectFileName, onChange)
+                                projects.[projectFileName] <- proj
+                                proj
 
-                    project.Response <- Some response
+                        project.Response <- Some response
 
-                    updateState response
+                        updateState response
 
-                    let responseFiles =
-                        response.Items
-                        |> List.choose
-                            (function
-                            | ProjectViewerItem.Compile (p, _) -> Some p)
+                        let responseFiles =
+                            response.Items
+                            |> List.choose
+                                (function
+                                | ProjectViewerItem.Compile (p, _) -> Some p)
 
-                    let projInfo: ProjectResult =
-                        { ProjectFileName = projectFileName
-                          ProjectFiles = responseFiles
-                          OutFileOpt = response.OutFile
-                          References = response.References
-                          Extra = response.ExtraInfo
-                          ProjectItems = projectFiles
-                          Additionals = Map.empty }
+                        let projInfo : ProjectResult =
+                            { ProjectFileName = projectFileName
+                              ProjectFiles = responseFiles
+                              OutFileOpt = response.OutFile
+                              References = response.References
+                              Extra = response.ExtraInfo
+                              ProjectItems = projectFiles
+                              Additionals = Map.empty }
 
-                    ProjectResponse.Project(projInfo, isFromCache) |> notify.Trigger
-                | ProjectSystemState.LoadedOther (extraInfo, projectFiles, fromDpiCache) ->
-                    let responseFiles =
-                        projectFiles
-                        |> List.choose
-                            (function
-                            | ProjectViewerItem.Compile (p, _) -> Some p)
+                        ProjectResponse.Project(projInfo, isFromCache) |> notify.Trigger
+                    | ProjectSystemState.LoadedOther (extraInfo, projectFiles, fromDpiCache) ->
+                        let responseFiles =
+                            projectFiles
+                            |> List.choose
+                                (function
+                                | ProjectViewerItem.Compile (p, _) -> Some p)
 
-                    let projInfo: ProjectResult =
-                        { ProjectFileName = extraInfo.ProjectFileName
-                          ProjectFiles = responseFiles
-                          OutFileOpt = Some(extraInfo.TargetPath)
-                          References = FscArguments.references extraInfo.OtherOptions
-                          Extra = extraInfo
-                          ProjectItems = projectFiles
-                          Additionals = Map.empty }
+                        let projInfo : ProjectResult =
+                            { ProjectFileName = extraInfo.ProjectFileName
+                              ProjectFiles = responseFiles
+                              OutFileOpt = Some(extraInfo.TargetPath)
+                              References = FscArguments.references extraInfo.OtherOptions
+                              Extra = extraInfo
+                              ProjectItems = projectFiles
+                              Additionals = Map.empty }
 
-                    ProjectResponse.Project(projInfo, fromDpiCache) |> notify.Trigger
-
-
-            //TODO check full path
-            let projectFileNames = files |> List.map Path.GetFullPath
-
-            let prjs = projectFileNames |> List.map (fun projectFileName -> projectFileName, new Project(projectFileName, onChange))
-
-            for projectFileName, proj in prjs do
-                projects.[projectFileName] <- proj
+                        ProjectResponse.Project(projInfo, fromDpiCache) |> notify.Trigger
 
 
-            ProjectResponse.WorkspaceLoad false |> notify.Trigger
-            // this is to delay the project loading notification (of this thread)
-            // after the workspaceload started response returned below in outer async
-            // Make test output repeteable, and notification in correct order
-            match Environment.workspaceLoadDelay () with
-            | delay when delay > TimeSpan.Zero -> do! Async.Sleep(Environment.workspaceLoadDelay().TotalMilliseconds |> int)
-            | _ -> ()
+                //TODO check full path
+                let projectFileNames = files |> List.map Path.GetFullPath
 
-            let loader = WorkspaceLoader.Create(toolsPath)
+                let prjs = projectFileNames |> List.map (fun projectFileName -> projectFileName, new Project(projectFileName, onChange))
 
-            let bindNewOnloaded (n: WorkspaceProjectState): ProjectSystemState option =
-                match n with
-                | WorkspaceProjectState.Loading (path) -> Some(ProjectSystemState.Loading path)
-                | WorkspaceProjectState.Loaded (opts, allKNownProjects, isFromCache) ->
-                    let fcsOpts = FCS.mapToFSharpProjectOptions opts allKNownProjects
+                for projectFileName, proj in prjs do
+                    projects.[projectFileName] <- proj
 
-                    match Workspace.extractOptionsDPW fcsOpts with
-                    | Ok optsDPW ->
-                        let view = ProjectViewer.render optsDPW
-                        Some(ProjectSystemState.Loaded(fcsOpts, optsDPW, view.Items, isFromCache))
-                    | Error _ -> None //TODO not ignore the error
-                | WorkspaceProjectState.Failed (path, e) ->
-                    let error = e
-                    Some(ProjectSystemState.Failed(path, error))
 
-            // loader.Notifications.Add(fun arg -> arg |> bindNewOnloaded |> Option.iter onLoaded)
+                ProjectResponse.WorkspaceLoad false |> notify.Trigger
+                // this is to delay the project loading notification (of this thread)
+                // after the workspaceload started response returned below in outer async
+                // Make test output repeteable, and notification in correct order
+                match Environment.workspaceLoadDelay () with
+                | delay when delay > TimeSpan.Zero -> do! Async.Sleep(Environment.workspaceLoadDelay().TotalMilliseconds |> int)
+                | _ -> ()
 
-            Workspace.loadInBackground onLoaded loader (prjs |> List.map snd) generateBinlog
+                let loader = WorkspaceLoader.Create(toolsPath)
 
-            ProjectResponse.WorkspaceLoad true |> notify.Trigger
+                let bindNewOnloaded (n: WorkspaceProjectState) : ProjectSystemState option =
+                    match n with
+                    | WorkspaceProjectState.Loading (path) -> Some(ProjectSystemState.Loading path)
+                    | WorkspaceProjectState.Loaded (opts, allKNownProjects, isFromCache) ->
+                        let fcsOpts = FCS.mapToFSharpProjectOptions opts allKNownProjects
 
-            isWorkspaceReady <- true
-            workspaceReady.Trigger()
+                        match Workspace.extractOptionsDPW fcsOpts with
+                        | Ok optsDPW ->
+                            let view = ProjectViewer.render optsDPW
+                            Some(ProjectSystemState.Loaded(fcsOpts, optsDPW, view.Items, isFromCache))
+                        | Error _ -> None //TODO not ignore the error
+                    | WorkspaceProjectState.Failed (path, e) ->
+                        let error = e
+                        Some(ProjectSystemState.Failed(path, error))
 
-            return true
+                // loader.Notifications.Add(fun arg -> arg |> bindNewOnloaded |> Option.iter onLoaded)
+
+                Workspace.loadInBackground onLoaded loader (prjs |> List.map snd) generateBinlog
+
+                ProjectResponse.WorkspaceLoad true |> notify.Trigger
+
+                isWorkspaceReady <- true
+                workspaceReady.Trigger()
+
+                return true
         }
 
     member private x.LoaderLoop =
@@ -222,7 +227,7 @@ type ProjectController(toolsPath: ToolsPath) as x =
     member __.IsWorkspaceReady = isWorkspaceReady
 
     ///Try to get instance of `FSharpProjectOptions` for given `.fs` file
-    member __.GetProjectOptions(file: string): FSharpProjectOptions option =
+    member __.GetProjectOptions(file: string) : FSharpProjectOptions option =
         let file = Utils.normalizePath file
         fileCheckOptions.TryFind file
 
@@ -235,7 +240,7 @@ type ProjectController(toolsPath: ToolsPath) as x =
         fileCheckOptions.TryRemove file |> ignore
 
     ///Try to get instance of `FSharpProjectOptions` for given `.fsproj` file
-    member __.GetProjectOptionsForFsproj(fsprojPath: string): FSharpProjectOptions option =
+    member __.GetProjectOptionsForFsproj(fsprojPath: string) : FSharpProjectOptions option =
         fileCheckOptions.Values |> Seq.tryFind (fun n -> n.ProjectFileName = fsprojPath)
 
     ///Returns a sequance of all known path-to-`.fs` * `FSharpProjectOptions` pairs
