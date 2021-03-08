@@ -352,6 +352,9 @@ module ProjectLoader =
 
 open Ioniode.ProjInfo.Logging
 
+module WorkspaceLoader2 =
+    let locker = obj ()
+
 type WorkspaceLoader2 private (toolsPath: ToolsPath) =
     let logger = LogProvider.getLoggerFor<WorkspaceLoader2> ()
     let loadingNotification = new Event<Types.WorkspaceProjectState>()
@@ -385,70 +388,78 @@ type WorkspaceLoader2 private (toolsPath: ToolsPath) =
            "_GenerateCompileDependencyCache"
            "CoreCompile" |]
 
+
     [<CLIEvent>]
     member __.Notifications = loadingNotification.Publish
 
-
-
     member __.LoadProjects(projects: ProjectGraph, customProperties: string list, generateBinlog: bool) =
         try
+            lock WorkspaceLoader2.locker
+            <| fun () ->
+                let allKnown = projects.ProjectNodesTopologicallySorted |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
 
-            let allKnown = projects.ProjectNodesTopologicallySorted |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
+                let allKnownNames = allKnown |> Seq.map (fun p -> p.ProjectInstance.FullPath) |> Seq.toList
 
-            let allKnownNames = allKnown |> Seq.map (fun p -> p.ProjectInstance.FullPath) |> Seq.toList
+                logger.info (
+                    Log.setMessage "Started loading projects {count} {projects}"
+                    >> Log.addContextDestructured "count" (allKnownNames |> Seq.length)
+                    >> Log.addContextDestructured "projects" (allKnownNames)
+                )
 
-            logger.info (
-                Log.setMessage "Started loading projects {count} {projects}"
-                >> Log.addContextDestructured "count" (allKnownNames |> Seq.length)
-                >> Log.addContextDestructured "projects" (allKnownNames)
-            )
-
-            allKnownNames |> Seq.iter (fun p -> loadingNotification.Trigger(WorkspaceProjectState.Loading p))
+                allKnownNames |> Seq.iter (fun p -> loadingNotification.Trigger(WorkspaceProjectState.Loading p))
 
 
-            let gbr = GraphBuildRequestData(projects, buildArgs)
-            let bm = BuildManager.DefaultBuildManager
-            bm.BeginBuild(new BuildParameters())
-            let result = bm.BuildRequest gbr
-            bm.EndBuild()
+                let gbr = GraphBuildRequestData(projects, buildArgs, null, BuildRequestDataFlags.ReplaceExistingProjectInstance)
+                let bm = BuildManager.DefaultBuildManager
+                bm.BeginBuild(new BuildParameters())
+                let result = bm.BuildRequest gbr
+                bm.EndBuild()
 
-            let resultsByNode = result.ResultsByNode |> Seq.cache
-            let buildProjs = resultsByNode |> Seq.map (fun kvp -> kvp.Key.ProjectInstance.FullPath) |> Seq.toList
+                let resultsByNode = result.ResultsByNode |> Seq.cache
+                let buildProjs = resultsByNode |> Seq.map (fun kvp -> kvp.Key.ProjectInstance.FullPath) |> Seq.toList
 
-            logger.info (
-                Log.setMessage "{overallCode}, projects built {count} {projects} "
-                >> Log.addContextDestructured "count" (buildProjs |> Seq.length)
-                >> Log.addContextDestructured "projects" (buildProjs)
-                >> Log.addContextDestructured "overallCode" result.OverallResult
-                >> Log.addExn result.Exception
-            )
+                logger.info (
+                    Log.setMessage "{overallCode}, projects built {count} {projects} "
+                    >> Log.addContextDestructured "count" (buildProjs |> Seq.length)
+                    >> Log.addContextDestructured "projects" (buildProjs)
+                    >> Log.addContextDestructured "overallCode" result.OverallResult
+                    >> Log.addExn result.Exception
+                )
 
-            let projects =
-                resultsByNode
-                |> Seq.map
-                    (fun kvp ->
+                let projects =
+                    resultsByNode
+                    |> Seq.map
+                        (fun kvp ->
+                            // kvp.Key.ProjectInstance.UpdateStateFrom kvp.Value.ProjectStateAfterBuild
+                            let foo = ProjectLoader.LoadedProject kvp.Key.ProjectInstance
+                            let bar = ProjectLoader.LoadedProject kvp.Value.ProjectStateAfterBuild
 
-                        let foo = ProjectLoader.LoadedProject kvp.Key.ProjectInstance
-                        let bar = ProjectLoader.LoadedProject kvp.Value.ProjectStateAfterBuild
+                            kvp.Key.ProjectInstance.FullPath,
+                            // ProjectLoader.LoadedProject kvp.Value.ProjectStateAfterBuild
+                            ProjectLoader.getLoadedProjectInfo kvp.Key.ProjectInstance.FullPath customProperties bar foo)
 
-                        kvp.Key.ProjectInstance.FullPath,
-                        // ProjectLoader.LoadedProject kvp.Value.ProjectStateAfterBuild
-                        ProjectLoader.getLoadedProjectInfo kvp.Key.ProjectInstance.FullPath customProperties bar foo)
+                    |> Seq.choose
+                        (fun (projectPath, projectOptionResult) ->
+                            match projectOptionResult with
+                            | Ok projectOptions ->
 
-                |> Seq.choose
-                    (fun (projectPath, projectOptionResult) ->
-                        match projectOptionResult with
-                        | Ok projectOptions ->
-                            logger.info (Log.setMessage "Project loaded {project}" >> Log.addContextDestructured "project" projectPath)
-                            loadingNotification.Trigger(WorkspaceProjectState.Loaded(projectOptions, [], false))
-                            Async.Sleep 150 |> Async.RunSynchronously
-                            Some projectOptions
-                        | Error e ->
-                            logger.error (Log.setMessage "Failed loading projects {error}" >> Log.addContextDestructured "error" e)
-                            loadingNotification.Trigger(WorkspaceProjectState.Failed(projectPath, GenericError(projectPath, e)))
-                            None)
+                                Some projectOptions
+                            | Error e ->
+                                logger.error (Log.setMessage "Failed loading projects {error}" >> Log.addContextDestructured "error" e)
+                                loadingNotification.Trigger(WorkspaceProjectState.Failed(projectPath, GenericError(projectPath, e)))
+                                None)
 
-            projects |> Seq.toList |> Seq.cache
+                let allProjectOptions = projects |> Seq.toList
+
+                allProjectOptions
+                |> Seq.iter
+                    (fun po ->
+                        logger.info (Log.setMessage "Project loaded {project}" >> Log.addContextDestructured "project" po.ProjectFileName)
+                        loadingNotification.Trigger(WorkspaceProjectState.Loaded(po, allProjectOptions |> Seq.toList, false))
+                        // Async.Sleep 150 |> Async.RunSynchronously
+                        )
+
+                allProjectOptions :> seq<_>
         with e ->
             let msg = e.Message
 

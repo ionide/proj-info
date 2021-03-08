@@ -98,7 +98,6 @@ type ProjectController(toolsPath: ToolsPath) as x =
                     | ProjectSystemState.Loading projectFileName -> ProjectResponse.ProjectLoading projectFileName |> notify.Trigger
                     | ProjectSystemState.Failed (projectFileName, error) -> ProjectResponse.ProjectError(projectFileName, error) |> notify.Trigger
                     | ProjectSystemState.Loaded (opts, extraInfo, projectFiles, isFromCache) ->
-                        printfn "%A" "HERE!"
                         let response = ProjectCrackerCache.create (opts, extraInfo, projectFiles)
                         let projectFileName = response.ProjectFileName
 
