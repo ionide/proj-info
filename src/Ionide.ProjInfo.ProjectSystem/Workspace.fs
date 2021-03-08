@@ -36,7 +36,7 @@ let private bindResults isFromCache res =
 
             Result.Ok(res, optsDPW, items, isFromCache))
 
-let private getProjectOptions (loader: WorkspaceLoader2) (onEvent: ProjectSystemState -> unit) (generateBinlog: bool) (projectFileNames: string list) =
+let private getProjectOptions (loader: IWorkspaceLoader) (onEvent: ProjectSystemState -> unit) (generateBinlog: bool) (projectFileNames: string list) =
     let existing, notExisting = projectFileNames |> List.partition (File.Exists)
 
     for e in notExisting do
@@ -62,7 +62,7 @@ let private getProjectOptions (loader: WorkspaceLoader2) (onEvent: ProjectSystem
     use notif = loader.Notifications.Subscribe handler
     loader.LoadProjects(existing, [], generateBinlog) |> ignore // TODO: Maybe we should move away from event driven approach???
 
-let internal loadInBackground onLoaded (loader: WorkspaceLoader2) (projects: Project list) (generateBinlog: bool) =
+let internal loadInBackground onLoaded (loader: IWorkspaceLoader) (projects: Project list) (generateBinlog: bool) =
     let (resProjects, otherProjects) = projects |> List.partition (fun n -> n.Response.IsSome)
 
     for project in resProjects do

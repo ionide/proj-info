@@ -284,7 +284,7 @@ module ProjectLoader =
         project
 
 
-    let getLoadedProjectInfo (path: string) customProperties (project) project2 =
+    let getLoadedProjectInfo (path: string) customProperties project =
         // let (LoadedProject p) = project
         // let path = p.FullPath
 
@@ -310,19 +310,19 @@ module ProjectLoader =
               "IsCrossTargetingBuild"
               "TargetFrameworks" ]
 
-        let p2pRefs = getP2Prefs project2
+        let p2pRefs = getP2Prefs project
 
         let comandlineArgs =
             if path.EndsWith ".fsproj" then
-                getFscArgs project2
+                getFscArgs project
             else
                 getCscArgs project
 
-        let compileItems = getCompileItems project2
-        let nuGetRefs = getNuGetReferences project2
-        let props = getProperties project2 properties
+        let compileItems = getCompileItems project
+        let nuGetRefs = getNuGetReferences project
+        let props = getProperties project properties
         let sdkInfo = getSdkInfo props
-        let customProps = getProperties project2 customProperties
+        let customProps = getProperties project customProperties
 
         if not sdkInfo.RestoreSuccess then
             Result.Error "not restored"
@@ -344,7 +344,7 @@ module ProjectLoader =
         let loadedProject = loadProject path generateBinlog toolsPath
 
         match loadedProject with
-        | Success project -> getLoadedProjectInfo path customProperties project project
+        | Success project -> getLoadedProjectInfo path customProperties project
         | Error e -> Result.Error e
 
 
@@ -352,14 +352,21 @@ module ProjectLoader =
 
 open Ioniode.ProjInfo.Logging
 
-module WorkspaceLoader2 =
+module WorkspaceLoaderViaProjectGraph =
     let locker = obj ()
 
-type WorkspaceLoader2 private (toolsPath: ToolsPath) =
-    let logger = LogProvider.getLoggerFor<WorkspaceLoader2> ()
+
+type IWorkspaceLoader =
+    abstract member LoadProjects : string list * list<string> * bool -> seq<ProjectOptions>
+
+    [<CLIEvent>]
+    abstract Notifications : IEvent<WorkspaceProjectState>
+
+type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
+    let logger = LogProvider.getLoggerFor<WorkspaceLoaderViaProjectGraph> ()
     let loadingNotification = new Event<Types.WorkspaceProjectState>()
 
-    let getGlobalProps (tfm: string option) =
+    let getGlobalProps (path: string) (tfm: string option) =
         dict [ "ProvideCommandLineArgs", "true"
                "DesignTimeBuild", "true"
                "SkipCompilerExecution", "true"
@@ -370,11 +377,13 @@ type WorkspaceLoader2 private (toolsPath: ToolsPath) =
                "UseCommonOutputDirectory", "false"
                if tfm.IsSome then
                    "TargetFramework", tfm.Value
+               if path.EndsWith ".csproj" then
+                   "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__")
                "DotnetProjInfo", "true" ]
 
     let projectInstanceFactory projectPath globalProperties (projectCollection: ProjectCollection) =
         let tfm = ProjectLoader.getTfm projectPath
-        ProjectInstance(projectPath, getGlobalProps tfm, null, projectCollection)
+        ProjectInstance(projectPath, getGlobalProps projectPath tfm, null, projectCollection)
 
     let projectGraphSln (path: string) =
         ProjectGraph(path, ProjectCollection.GlobalProjectCollection, projectInstanceFactory)
@@ -389,12 +398,10 @@ type WorkspaceLoader2 private (toolsPath: ToolsPath) =
            "CoreCompile" |]
 
 
-    [<CLIEvent>]
-    member __.Notifications = loadingNotification.Publish
 
-    member __.LoadProjects(projects: ProjectGraph, customProperties: string list, generateBinlog: bool) =
+    let loadProjects (projects: ProjectGraph, customProperties: string list, generateBinlog: bool) =
         try
-            lock WorkspaceLoader2.locker
+            lock WorkspaceLoaderViaProjectGraph.locker
             <| fun () ->
                 let allKnown = projects.ProjectNodesTopologicallySorted |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
 
@@ -430,13 +437,11 @@ type WorkspaceLoader2 private (toolsPath: ToolsPath) =
                     resultsByNode
                     |> Seq.map
                         (fun kvp ->
-                            // kvp.Key.ProjectInstance.UpdateStateFrom kvp.Value.ProjectStateAfterBuild
                             let foo = ProjectLoader.LoadedProject kvp.Key.ProjectInstance
-                            let bar = ProjectLoader.LoadedProject kvp.Value.ProjectStateAfterBuild
 
                             kvp.Key.ProjectInstance.FullPath,
                             // ProjectLoader.LoadedProject kvp.Value.ProjectStateAfterBuild
-                            ProjectLoader.getLoadedProjectInfo kvp.Key.ProjectInstance.FullPath customProperties bar foo)
+                            ProjectLoader.getLoadedProjectInfo kvp.Key.ProjectInstance.FullPath customProperties foo)
 
                     |> Seq.choose
                         (fun (projectPath, projectOptionResult) ->
@@ -475,22 +480,31 @@ type WorkspaceLoader2 private (toolsPath: ToolsPath) =
             reraise ()
 
 
-    member this.LoadProjects(projects: string seq, customProperties, generateBinlog: bool) =
-        let pg = projectGraphProjs projects
-        this.LoadProjects(pg, customProperties, generateBinlog)
+
+    interface IWorkspaceLoader with
+        override this.LoadProjects(projects: string list, customProperties, generateBinlog: bool) =
+            let pg = projectGraphProjs projects
+            loadProjects (pg, customProperties, generateBinlog)
+
+        [<CLIEvent>]
+        override this.Notifications = loadingNotification.Publish
+
+    member this.LoadProjects(projects: string list, customProperties: string list, generateBinlog: bool) =
+        (this :> IWorkspaceLoader)
+            .LoadProjects(projects, customProperties, generateBinlog)
 
     member this.LoadProjects(projects: string seq, customProperties) =
         let pg = projectGraphProjs projects
-        this.LoadProjects(pg, customProperties, false)
+        loadProjects (pg, customProperties, false)
 
     member this.LoadProjects(projects: string seq) =
         let pg = projectGraphProjs projects
-        this.LoadProjects(pg, [], false)
+        loadProjects (pg, [], false)
 
 
     member this.LoadProject(project: string, customProperties: string list, generateBinlog: bool) =
         let pg = projectGraphProjs [ project ]
-        this.LoadProjects(pg, customProperties, generateBinlog)
+        loadProjects (pg, customProperties, generateBinlog)
 
     member this.LoadProject(project: string, customProperties: string list) =
         this.LoadProjects([ project ], customProperties)
@@ -500,74 +514,83 @@ type WorkspaceLoader2 private (toolsPath: ToolsPath) =
 
     member this.LoadSln(sln: string, customProperties: string list, generateBinlog: bool) =
         let pg = projectGraphSln sln
-        this.LoadProjects(pg, customProperties, generateBinlog)
+        loadProjects (pg, customProperties, generateBinlog)
 
     member this.LoadSln(sln, customProperties) =
         this.LoadSln(sln, customProperties, false)
 
     member this.LoadSln(sln) = this.LoadSln(sln, [], false)
 
-    static member Create(toolsPath: ToolsPath) = WorkspaceLoader2(toolsPath)
+    static member Create(toolsPath: ToolsPath) =
+        WorkspaceLoaderViaProjectGraph(toolsPath) :> IWorkspaceLoader
 
 type WorkspaceLoader private (toolsPath: ToolsPath) =
     let loadingNotification = new Event<Types.WorkspaceProjectState>()
 
-    [<CLIEvent>]
-    member __.Notifications = loadingNotification.Publish
 
-    member __.LoadProjects(projects: string list, customProperties: string list, generateBinlog: bool) =
-        let cache = Dictionary<string, ProjectOptions>()
 
-        let getAllKnown () =
-            cache |> Seq.map (fun n -> n.Value) |> Seq.toList
+    interface IWorkspaceLoader with
 
-        let rec loadProject p =
-            let res = ProjectLoader.getProjectInfo p toolsPath generateBinlog customProperties
+        [<CLIEvent>]
+        override __.Notifications = loadingNotification.Publish
 
-            match res with
-            | Ok project ->
-                try
-                    cache.Add(p, project)
-                    let lst = project.ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
-                    let info = Some project
-                    lst, info
-                with exc ->
-                    loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, exc.Message)))
-                    [], None
-            | Error msg when msg.Contains "The project file could not be loaded." ->
-                loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
-                [], None
-            | Error msg when msg.Contains "not restored" ->
-                loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotRestored(p)))
-                [], None
-            | Error msg when msg.Contains "The operation cannot be completed because a build is already in progress." ->
-                //Try to load project again
-                Threading.Thread.Sleep(50)
-                loadProject p
-            | Error msg ->
-                loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg)))
-                [], None
+        override __.LoadProjects(projects: string list, customProperties: string list, generateBinlog: bool) =
+            let cache = Dictionary<string, ProjectOptions>()
 
-        let rec loadProjectList (projectList: string list) =
-            for p in projectList do
-                let newList, toTrigger =
-                    if cache.ContainsKey p then
-                        let project = cache.[p]
-                        loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, getAllKnown (), true)) //TODO: Should it even notify here?
+            let getAllKnonw () =
+                cache |> Seq.map (fun n -> n.Value) |> Seq.toList
+
+            let rec loadProject p =
+                let res = ProjectLoader.getProjectInfo p toolsPath generateBinlog customProperties
+
+                match res with
+                | Ok project ->
+                    try
+                        cache.Add(p, project)
                         let lst = project.ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
-                        lst, None
-                    else
-                        loadingNotification.Trigger(WorkspaceProjectState.Loading p)
-                        loadProject p
+                        let info = Some project
+                        lst, info
+                    with exc ->
+                        loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, exc.Message)))
+                        [], None
+                | Error msg when msg.Contains "The project file could not be loaded." ->
+                    loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
+                    [], None
+                | Error msg when msg.Contains "not restored" ->
+                    loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotRestored(p)))
+                    [], None
+                | Error msg when msg.Contains "The operation cannot be completed because a build is already in progress." ->
+                    //Try to load project again
+                    Threading.Thread.Sleep(50)
+                    loadProject p
+                | Error msg ->
+                    loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg)))
+                    [], None
+
+            let rec loadProjectList (projectList: string list) =
+                for p in projectList do
+                    let newList, toTrigger =
+                        if cache.ContainsKey p then
+                            let project = cache.[p]
+                            loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, getAllKnonw (), true)) //TODO: Should it even notify here?
+                            let lst = project.ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
+                            lst, None
+                        else
+                            loadingNotification.Trigger(WorkspaceProjectState.Loading p)
+                            loadProject p
 
 
-                loadProjectList newList
+                    loadProjectList newList
 
-                toTrigger
-                |> Option.iter (fun project -> loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, getAllKnown (), false)))
+                    toTrigger
+                    |> Option.iter (fun project -> loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, getAllKnonw (), false)))
 
-        loadProjectList projects
-        cache |> Seq.map (fun n -> n.Value)
+            loadProjectList projects
+            cache |> Seq.map (fun n -> n.Value)
+
+    member this.LoadProjects(projects: string list, customProperties: string list, generateBinlog: bool) =
+        (this :> IWorkspaceLoader)
+            .LoadProjects(projects, customProperties, generateBinlog)
 
     member this.LoadProjects(projects, customProperties) =
         this.LoadProjects(projects, customProperties, false)
@@ -596,7 +619,8 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
 
     member this.LoadSln(sln) = this.LoadSln(sln, [], false)
 
-    static member Create(toolsPath: ToolsPath) = WorkspaceLoader(toolsPath)
+    static member Create(toolsPath: ToolsPath) =
+        WorkspaceLoader(toolsPath) :> IWorkspaceLoader
 
 type ProjectViewerTree =
     { Name: string
