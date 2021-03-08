@@ -8,6 +8,7 @@ open System.Runtime.Loader
 open System.IO
 open Microsoft.Build.Execution
 open Types
+open Microsoft.Build.Graph
 
 [<RequireQualifiedAccess>]
 module Init =
@@ -30,7 +31,7 @@ module Init =
 /// In most cases you want to use `Ionide.ProjInf.WorkspaceLoader` type instead
 module ProjectLoader =
 
-    type LoadedProject = private LoadedProject of ProjectInstance
+    type LoadedProject = LoadedProject of ProjectInstance
 
     type ProjectLoadingStatus =
         private
@@ -39,17 +40,17 @@ module ProjectLoader =
 
     let internal logger (writer: StringWriter) =
         { new ILogger with
-            member this.Initialize(eventSource: IEventSource): unit =
+            member this.Initialize(eventSource: IEventSource) : unit =
                 // eventSource.ErrorRaised.Add(fun t -> writer.WriteLine t.Message) //Only log errors
                 eventSource.AnyEventRaised.Add(fun t -> writer.WriteLine t.Message)
 
-            member this.Parameters: string = ""
+            member this.Parameters : string = ""
 
             member this.Parameters
                 with set (v: string): unit = printfn "v"
 
-            member this.Shutdown(): unit = ()
-            member this.Verbosity: LoggerVerbosity = LoggerVerbosity.Detailed
+            member this.Shutdown() : unit = ()
+            member this.Verbosity : LoggerVerbosity = LoggerVerbosity.Detailed
 
             member this.Verbosity
                 with set (v: LoggerVerbosity): unit = () }
@@ -283,6 +284,54 @@ module ProjectLoader =
         project
 
 
+    let getLoadedProjectInfo (path: string) customProperties (project) project2 =
+        // let (LoadedProject p) = project
+        // let path = p.FullPath
+
+        let properties =
+            [ "OutputType"
+              "IsTestProject"
+              "TargetPath"
+              "Configuration"
+              "IsPackable"
+              "TargetFramework"
+              "TargetFrameworkIdentifier"
+              "TargetFrameworkVersion"
+              "MSBuildAllProjects"
+              "ProjectAssetsFile"
+              "RestoreSuccess"
+              "Configurations"
+              "TargetFrameworks"
+              "RunArguments"
+              "RunCommand"
+              "IsPublishable"
+              "BaseIntermediateOutputPath"
+              "TargetPath"
+              "IsCrossTargetingBuild"
+              "TargetFrameworks" ]
+
+        let p2pRefs = getP2Prefs project2
+
+        let comandlineArgs =
+            if path.EndsWith ".fsproj" then
+                getFscArgs project2
+            else
+                getCscArgs project
+
+        let compileItems = getCompileItems project2
+        let nuGetRefs = getNuGetReferences project2
+        let props = getProperties project2 properties
+        let sdkInfo = getSdkInfo props
+        let customProps = getProperties project2 customProperties
+
+        if not sdkInfo.RestoreSuccess then
+            Result.Error "not restored"
+        else
+
+            let proj = mapToProject path comandlineArgs p2pRefs compileItems nuGetRefs sdkInfo props customProps
+
+            Result.Ok proj
+
     /// <summary>
     /// Main entry point for project loading.
     /// </summary>
@@ -291,55 +340,163 @@ module ProjectLoader =
     /// <param name="generateBinlog">Enable Binary Log generation</param>
     /// <param name="customProperties">List of additional MsBuild properties that you want to obtain.</param>
     /// <returns>Returns the record instance representing the loaded project or string containing error message</returns>
-    let getProjectInfo (path: string) (toolsPath: ToolsPath) (generateBinlog: bool) (customProperties: string list): Result<Types.ProjectOptions, string> =
+    let getProjectInfo (path: string) (toolsPath: ToolsPath) (generateBinlog: bool) (customProperties: string list) : Result<Types.ProjectOptions, string> =
         let loadedProject = loadProject path generateBinlog toolsPath
 
         match loadedProject with
-        | Success project ->
-            let properties =
-                [ "OutputType"
-                  "IsTestProject"
-                  "TargetPath"
-                  "Configuration"
-                  "IsPackable"
-                  "TargetFramework"
-                  "TargetFrameworkIdentifier"
-                  "TargetFrameworkVersion"
-                  "MSBuildAllProjects"
-                  "ProjectAssetsFile"
-                  "RestoreSuccess"
-                  "Configurations"
-                  "TargetFrameworks"
-                  "RunArguments"
-                  "RunCommand"
-                  "IsPublishable"
-                  "BaseIntermediateOutputPath"
-                  "TargetPath"
-                  "IsCrossTargetingBuild"
-                  "TargetFrameworks" ]
-
-            let p2pRefs = getP2Prefs project
-
-            let comandlineArgs =
-                if path.EndsWith ".fsproj" then
-                    getFscArgs project
-                else
-                    getCscArgs project
-
-            let compileItems = getCompileItems project
-            let nuGetRefs = getNuGetReferences project
-            let props = getProperties project properties
-            let sdkInfo = getSdkInfo props
-            let customProps = getProperties project customProperties
-
-            if not sdkInfo.RestoreSuccess then
-                Result.Error "not restored"
-            else
-
-                let proj = mapToProject path comandlineArgs p2pRefs compileItems nuGetRefs sdkInfo props customProps
-
-                Result.Ok proj
+        | Success project -> getLoadedProjectInfo path customProperties project project
         | Error e -> Result.Error e
+
+
+
+
+open Ioniode.ProjInfo.Logging
+
+type WorkspaceLoader2 private (toolsPath: ToolsPath) =
+    let logger = LogProvider.getLoggerFor<WorkspaceLoader2> ()
+    let loadingNotification = new Event<Types.WorkspaceProjectState>()
+
+    let getGlobalProps (tfm: string option) =
+        dict [ "ProvideCommandLineArgs", "true"
+               "DesignTimeBuild", "true"
+               "SkipCompilerExecution", "true"
+               "GeneratePackageOnBuild", "false"
+               "Configuration", "Debug"
+               "DefineExplicitDefaults", "true"
+               "BuildProjectReferences", "false"
+               "UseCommonOutputDirectory", "false"
+               if tfm.IsSome then
+                   "TargetFramework", tfm.Value
+               "DotnetProjInfo", "true" ]
+
+    let projectInstanceFactory projectPath globalProperties (projectCollection: ProjectCollection) =
+        let tfm = ProjectLoader.getTfm projectPath
+        ProjectInstance(projectPath, getGlobalProps tfm, null, projectCollection)
+
+    let projectGraphSln (path: string) =
+        ProjectGraph(path, ProjectCollection.GlobalProjectCollection, projectInstanceFactory)
+
+    let projectGraphProjs (paths: string seq) =
+        let entryPoints = paths |> Seq.map ProjectGraphEntryPoint
+        ProjectGraph(entryPoints, ProjectCollection.GlobalProjectCollection, projectInstanceFactory)
+
+    let buildArgs =
+        [| "ResolvePackageDependenciesDesignTime"
+           "_GenerateCompileDependencyCache"
+           "CoreCompile" |]
+
+    [<CLIEvent>]
+    member __.Notifications = loadingNotification.Publish
+
+
+
+    member __.LoadProjects(projects: ProjectGraph, customProperties: string list, generateBinlog: bool) =
+        try
+
+            let allKnown = projects.ProjectNodesTopologicallySorted |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
+
+            let allKnownNames = allKnown |> Seq.map (fun p -> p.ProjectInstance.FullPath) |> Seq.toList
+
+            logger.info (
+                Log.setMessage "Started loading projects {count} {projects}"
+                >> Log.addContextDestructured "count" (allKnownNames |> Seq.length)
+                >> Log.addContextDestructured "projects" (allKnownNames)
+            )
+
+            allKnownNames |> Seq.iter (fun p -> loadingNotification.Trigger(WorkspaceProjectState.Loading p))
+
+
+            let gbr = GraphBuildRequestData(projects, buildArgs)
+            let bm = BuildManager.DefaultBuildManager
+            bm.BeginBuild(new BuildParameters())
+            let result = bm.BuildRequest gbr
+            bm.EndBuild()
+
+            let resultsByNode = result.ResultsByNode |> Seq.cache
+            let buildProjs = resultsByNode |> Seq.map (fun kvp -> kvp.Key.ProjectInstance.FullPath) |> Seq.toList
+
+            logger.info (
+                Log.setMessage "{overallCode}, projects built {count} {projects} "
+                >> Log.addContextDestructured "count" (buildProjs |> Seq.length)
+                >> Log.addContextDestructured "projects" (buildProjs)
+                >> Log.addContextDestructured "overallCode" result.OverallResult
+                >> Log.addExn result.Exception
+            )
+
+            let projects =
+                resultsByNode
+                |> Seq.map
+                    (fun kvp ->
+
+                        let foo = ProjectLoader.LoadedProject kvp.Key.ProjectInstance
+                        let bar = ProjectLoader.LoadedProject kvp.Value.ProjectStateAfterBuild
+
+                        kvp.Key.ProjectInstance.FullPath,
+                        // ProjectLoader.LoadedProject kvp.Value.ProjectStateAfterBuild
+                        ProjectLoader.getLoadedProjectInfo kvp.Key.ProjectInstance.FullPath customProperties bar foo)
+
+                |> Seq.choose
+                    (fun (projectPath, projectOptionResult) ->
+                        match projectOptionResult with
+                        | Ok projectOptions ->
+                            logger.info (Log.setMessage "Project loaded {project}" >> Log.addContextDestructured "project" projectPath)
+                            loadingNotification.Trigger(WorkspaceProjectState.Loaded(projectOptions, [], false))
+                            Async.Sleep 150 |> Async.RunSynchronously
+                            Some projectOptions
+                        | Error e ->
+                            logger.error (Log.setMessage "Failed loading projects {error}" >> Log.addContextDestructured "error" e)
+                            loadingNotification.Trigger(WorkspaceProjectState.Failed(projectPath, GenericError(projectPath, e)))
+                            None)
+
+            projects |> Seq.toList |> Seq.cache
+        with e ->
+            let msg = e.Message
+
+            logger.error (Log.setMessage "Failed loading" >> Log.addExn e)
+
+            projects.ProjectNodesTopologicallySorted
+            |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
+            |> Seq.iter
+                (fun p ->
+                    let p = p.ProjectInstance.FullPath
+                    loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg))))
+
+            reraise ()
+
+
+    member this.LoadProjects(projects: string seq, customProperties, generateBinlog: bool) =
+        let pg = projectGraphProjs projects
+        this.LoadProjects(pg, customProperties, generateBinlog)
+
+    member this.LoadProjects(projects: string seq, customProperties) =
+        let pg = projectGraphProjs projects
+        this.LoadProjects(pg, customProperties, false)
+
+    member this.LoadProjects(projects: string seq) =
+        let pg = projectGraphProjs projects
+        this.LoadProjects(pg, [], false)
+
+
+    member this.LoadProject(project: string, customProperties: string list, generateBinlog: bool) =
+        let pg = projectGraphProjs [ project ]
+        this.LoadProjects(pg, customProperties, generateBinlog)
+
+    member this.LoadProject(project: string, customProperties: string list) =
+        this.LoadProjects([ project ], customProperties)
+
+    member this.LoadProject(project: string) = this.LoadProjects([ project ])
+
+
+    member this.LoadSln(sln: string, customProperties: string list, generateBinlog: bool) =
+        let pg = projectGraphSln sln
+        this.LoadProjects(pg, customProperties, generateBinlog)
+
+    member this.LoadSln(sln, customProperties) =
+        this.LoadSln(sln, customProperties, false)
+
+    member this.LoadSln(sln) = this.LoadSln(sln, [], false)
+
+    static member Create(toolsPath: ToolsPath) = WorkspaceLoader2(toolsPath)
 
 type WorkspaceLoader private (toolsPath: ToolsPath) =
     let loadingNotification = new Event<Types.WorkspaceProjectState>()

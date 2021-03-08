@@ -98,6 +98,7 @@ type ProjectController(toolsPath: ToolsPath) as x =
                     | ProjectSystemState.Loading projectFileName -> ProjectResponse.ProjectLoading projectFileName |> notify.Trigger
                     | ProjectSystemState.Failed (projectFileName, error) -> ProjectResponse.ProjectError(projectFileName, error) |> notify.Trigger
                     | ProjectSystemState.Loaded (opts, extraInfo, projectFiles, isFromCache) ->
+                        printfn "%A" "HERE!"
                         let response = ProjectCrackerCache.create (opts, extraInfo, projectFiles)
                         let projectFileName = response.ProjectFileName
 
@@ -165,7 +166,7 @@ type ProjectController(toolsPath: ToolsPath) as x =
                 | delay when delay > TimeSpan.Zero -> do! Async.Sleep(Environment.workspaceLoadDelay().TotalMilliseconds |> int)
                 | _ -> ()
 
-                let loader = WorkspaceLoader.Create(toolsPath)
+                let loader = WorkspaceLoader2.Create(toolsPath)
 
                 let bindNewOnloaded (n: WorkspaceProjectState) : ProjectSystemState option =
                     match n with
@@ -177,7 +178,8 @@ type ProjectController(toolsPath: ToolsPath) as x =
                         | Ok optsDPW ->
                             let view = ProjectViewer.render optsDPW
                             Some(ProjectSystemState.Loaded(fcsOpts, optsDPW, view.Items, isFromCache))
-                        | Error _ -> None //TODO not ignore the error
+                        | Error e -> Some(ProjectSystemState.Failed(e.ProjFile, e))
+
                     | WorkspaceProjectState.Failed (path, e) ->
                         let error = e
                         Some(ProjectSystemState.Failed(path, error))
