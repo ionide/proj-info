@@ -31,7 +31,7 @@ module Init =
 /// In most cases you want to use `Ionide.ProjInf.WorkspaceLoader` type instead
 module ProjectLoader =
 
-    type LoadedProject = LoadedProject of ProjectInstance
+    type LoadedProject = internal LoadedProject of ProjectInstance
 
     type ProjectLoadingStatus =
         private
@@ -418,12 +418,15 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
 
                 let gbr = GraphBuildRequestData(projects, buildArgs, null, BuildRequestDataFlags.ReplaceExistingProjectInstance)
                 let bm = BuildManager.DefaultBuildManager
+
                 bm.BeginBuild(new BuildParameters())
                 let result = bm.BuildRequest gbr
+                let foo = bm.PendBuildRequest(gbr)
+
                 bm.EndBuild()
 
                 let resultsByNode = result.ResultsByNode |> Seq.cache
-                let buildProjs = resultsByNode |> Seq.map (fun kvp -> kvp.Key.ProjectInstance.FullPath) |> Seq.toList
+                let buildProjs = resultsByNode |> Seq.map (fun (KeyValue (k, v)) -> k.ProjectInstance.FullPath) |> Seq.toList
 
                 logger.info (
                     Log.setMessage "{overallCode}, projects built {count} {projects} "
@@ -436,12 +439,10 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
                 let projects =
                     resultsByNode
                     |> Seq.map
-                        (fun kvp ->
-                            let foo = ProjectLoader.LoadedProject kvp.Key.ProjectInstance
+                        (fun (KeyValue (k, v)) ->
+                            let foo = ProjectLoader.LoadedProject k.ProjectInstance
 
-                            kvp.Key.ProjectInstance.FullPath,
-                            // ProjectLoader.LoadedProject kvp.Value.ProjectStateAfterBuild
-                            ProjectLoader.getLoadedProjectInfo kvp.Key.ProjectInstance.FullPath customProperties foo)
+                            k.ProjectInstance.FullPath, ProjectLoader.getLoadedProjectInfo k.ProjectInstance.FullPath customProperties foo)
 
                     |> Seq.choose
                         (fun (projectPath, projectOptionResult) ->
