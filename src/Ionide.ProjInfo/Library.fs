@@ -66,6 +66,18 @@ module ProjectLoader =
         else
             None
 
+    let createLoggers (paths: string seq) (generateBinlog: bool) (sw: StringWriter) =
+        let logger = logger (sw)
+
+        if generateBinlog then
+            let loggers =
+                paths
+                |> Seq.map (fun path -> Microsoft.Build.Logging.BinaryLogger(Parameters = Path.Combine(Path.GetDirectoryName(path), "msbuild.binlog")) :> ILogger)
+
+            [ logger; yield! loggers ]
+        else
+            [ logger ]
+
     let loadProject (path: string) (generateBinlog: bool) (ToolsPath toolsPath) =
         try
             let tfm = getTfm path
@@ -96,15 +108,8 @@ module ProjectLoader =
             let pi = pc.LoadProject(path)
 
             use sw = new StringWriter()
-            let logger = logger (sw)
 
-            let loggers =
-                if generateBinlog then
-                    let bl = Microsoft.Build.Logging.BinaryLogger() :> ILogger
-                    bl.Parameters <- Path.Combine(Path.GetDirectoryName(path), "msbuild.binlog")
-                    [ logger; bl ]
-                else
-                    [ logger ]
+            let loggers = createLoggers [ path ] generateBinlog sw
 
             let pi = pi.CreateProjectInstance()
 
@@ -418,8 +423,9 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
 
                 let gbr = GraphBuildRequestData(projects, buildArgs, null, BuildRequestDataFlags.ReplaceExistingProjectInstance)
                 let bm = BuildManager.DefaultBuildManager
-
-                bm.BeginBuild(new BuildParameters())
+                use sw = new StringWriter()
+                let loggers = ProjectLoader.createLoggers allKnownNames generateBinlog sw
+                bm.BeginBuild(new BuildParameters(Loggers = loggers))
                 let result = bm.BuildRequest gbr
                 let foo = bm.PendBuildRequest(gbr)
 
