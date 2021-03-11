@@ -90,6 +90,18 @@ let DoNothing = ignore
 
 Target.create "Clean" (fun _ -> Shell.cleanDirs [ buildDir; nugetDir ])
 
+Target.create "ReplaceFsLibLogNamespaces"
+<| fun _ ->
+    let replacements =
+        [ "FsLibLog\\n", "Ionide.ProjInfo.Logging\n"
+          "FsLibLog\\.", "Ionide.ProjInfo.Logging" ]
+
+    replacements
+    |> List.iter
+        (fun (``match``, replace) ->
+            (!! "paket-files/TheAngryByrd/FsLibLog/**/FsLibLog*.fs")
+            |> Shell.regexReplaceInFilesWithEncoding ``match`` replace System.Text.Encoding.UTF8)
+
 Target.create "Build" (fun _ -> DotNet.build id "")
 
 Target.create
@@ -160,6 +172,7 @@ Target.create "Default" DoNothing
 Target.create "Release" DoNothing
 
 "Clean"
+==> "ReplaceFsLibLogNamespaces"
 ==> "Build"
 ==> "Test"
 ==> "Default"

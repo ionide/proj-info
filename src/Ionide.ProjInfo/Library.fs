@@ -350,7 +350,7 @@ module ProjectLoader =
 
 
 
-open Ioniode.ProjInfo.Logging
+open Ionide.ProjInfo.Logging
 
 module WorkspaceLoaderViaProjectGraph =
     let locker = obj ()
