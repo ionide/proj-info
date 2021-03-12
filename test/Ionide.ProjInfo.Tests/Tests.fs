@@ -116,15 +116,12 @@ module ExpectNotification =
         Expect.equal (List.length actual) (List.length expected) (sprintf "expected notifications: %A \n actual notifications: - %A" (expected |> List.map fst) (actual |> List.map getMessages))
 
         expected
-        |> List.zip actual
         |> List.iter
-            (fun (n, check) ->
-                let name, f = check
+            (fun (name, f) ->
+                let item = actual |> List.tryFind (fun a -> f a)
+                let minimal_info = item |> Option.map getMessages |> Option.defaultValue ""
+                Expect.isSome item (sprintf "expected %s but was %s" name minimal_info))
 
-                let minimal_info = getMessages n
-
-
-                Expect.isTrue (f n) (sprintf "expected %s but was %s" name minimal_info))
 
     type NotificationWatcher(loader: Ionide.ProjInfo.IWorkspaceLoader, log) =
         let notifications = List<_>()
