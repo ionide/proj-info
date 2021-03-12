@@ -363,6 +363,8 @@ module WorkspaceLoaderViaProjectGraph =
 
 type IWorkspaceLoader =
     abstract member LoadProjects : string list * list<string> * bool -> seq<ProjectOptions>
+    abstract member LoadProjects : string list -> seq<ProjectOptions>
+    abstract member LoadSln : string -> seq<ProjectOptions>
 
     [<CLIEvent>]
     abstract Notifications : IEvent<WorkspaceProjectState>
@@ -386,16 +388,39 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
                    "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__")
                "DotnetProjInfo", "true" ]
 
+    let handleProjectGraphFailures f =
+        try
+            f () |> Some
+        with :? Microsoft.Build.Exceptions.InvalidProjectFileException as e ->
+            let p = e.ProjectFile
+            loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
+            None
+
     let projectInstanceFactory projectPath globalProperties (projectCollection: ProjectCollection) =
         let tfm = ProjectLoader.getTfm projectPath
         ProjectInstance(projectPath, getGlobalProps projectPath tfm, null, projectCollection)
 
-    let projectGraphSln (path: string) =
-        ProjectGraph(path, ProjectCollection.GlobalProjectCollection, projectInstanceFactory)
-
     let projectGraphProjs (paths: string seq) =
-        let entryPoints = paths |> Seq.map ProjectGraphEntryPoint
-        ProjectGraph(entryPoints, ProjectCollection.GlobalProjectCollection, projectInstanceFactory)
+
+        handleProjectGraphFailures
+        <| fun () ->
+            paths |> Seq.iter (fun p -> loadingNotification.Trigger(WorkspaceProjectState.Loading p))
+            let entryPoints = paths |> Seq.map ProjectGraphEntryPoint
+            ProjectGraph(entryPoints, ProjectCollection.GlobalProjectCollection, projectInstanceFactory)
+
+    let projectGraphSln (path: string) =
+        handleProjectGraphFailures
+        <| fun () ->
+            let pg = ProjectGraph(path, ProjectCollection.GlobalProjectCollection, projectInstanceFactory)
+
+            pg.ProjectNodesTopologicallySorted
+            |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
+            |> Seq.map (fun p -> p.ProjectInstance.FullPath)
+            |> Seq.iter (fun p -> loadingNotification.Trigger(WorkspaceProjectState.Loading p))
+
+            pg
+
+
 
     let buildArgs =
         [| "ResolvePackageDependenciesDesignTime"
@@ -418,7 +443,6 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
                     >> Log.addContextDestructured "projects" (allKnownNames)
                 )
 
-                allKnownNames |> Seq.iter (fun p -> loadingNotification.Trigger(WorkspaceProjectState.Loading p))
 
 
                 let gbr = GraphBuildRequestData(projects, buildArgs, null, BuildRequestDataFlags.ReplaceExistingProjectInstance)
@@ -431,8 +455,8 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
 
                 bm.EndBuild()
 
-                let resultsByNode = result.ResultsByNode |> Seq.cache
-                let buildProjs = resultsByNode |> Seq.map (fun (KeyValue (k, v)) -> k.ProjectInstance.FullPath) |> Seq.toList
+                let resultsByNode = result.ResultsByNode |> Seq.map (fun kvp -> kvp.Key) |> Seq.cache
+                let buildProjs = resultsByNode |> Seq.map (fun p -> p.ProjectInstance.FullPath) |> Seq.toList
 
                 logger.info (
                     Log.setMessage "{overallCode}, projects built {count} {projects} "
@@ -445,10 +469,10 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
                 let projects =
                     resultsByNode
                     |> Seq.map
-                        (fun (KeyValue (k, v)) ->
-                            let foo = ProjectLoader.LoadedProject k.ProjectInstance
+                        (fun p ->
+                            let foo = ProjectLoader.LoadedProject p.ProjectInstance
 
-                            k.ProjectInstance.FullPath, ProjectLoader.getLoadedProjectInfo k.ProjectInstance.FullPath customProperties foo)
+                            p.ProjectInstance.FullPath, ProjectLoader.getLoadedProjectInfo p.ProjectInstance.FullPath customProperties foo)
 
                     |> Seq.choose
                         (fun (projectPath, projectOptionResult) ->
@@ -481,17 +505,29 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
             |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
             |> Seq.iter
                 (fun p ->
-                    let p = p.ProjectInstance.FullPath
-                    loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg))))
 
-            reraise ()
+                    let p = p.ProjectInstance.FullPath
+
+                    if msg.Contains "The project file could not be loaded." then
+                        loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
+                    elif msg.Contains "not restored" then
+                        loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotRestored(p)))
+                    else
+                        loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg))))
+
+            Seq.empty
 
 
 
     interface IWorkspaceLoader with
         override this.LoadProjects(projects: string list, customProperties, generateBinlog: bool) =
-            let pg = projectGraphProjs projects
-            loadProjects (pg, customProperties, generateBinlog)
+            projectGraphProjs projects
+            |> Option.map (fun pg -> loadProjects (pg, customProperties, generateBinlog))
+            |> Option.defaultValue Seq.empty
+
+        override this.LoadProjects(projects: string list) = this.LoadProjects(projects, [], false)
+
+        override this.LoadSln(sln) = this.LoadSln(sln, [], false)
 
         [<CLIEvent>]
         override this.Notifications = loadingNotification.Publish
@@ -500,33 +536,31 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
         (this :> IWorkspaceLoader)
             .LoadProjects(projects, customProperties, generateBinlog)
 
-    member this.LoadProjects(projects: string seq, customProperties) =
-        let pg = projectGraphProjs projects
-        loadProjects (pg, customProperties, false)
+    member this.LoadProjects(projects: string list, customProperties) =
+        this.LoadProjects(projects, customProperties, false)
 
-    member this.LoadProjects(projects: string seq) =
-        let pg = projectGraphProjs projects
-        loadProjects (pg, [], false)
+
 
 
     member this.LoadProject(project: string, customProperties: string list, generateBinlog: bool) =
-        let pg = projectGraphProjs [ project ]
-        loadProjects (pg, customProperties, generateBinlog)
+        this.LoadProjects([ project ], customProperties, generateBinlog)
 
     member this.LoadProject(project: string, customProperties: string list) =
         this.LoadProjects([ project ], customProperties)
 
-    member this.LoadProject(project: string) = this.LoadProjects([ project ])
+    member this.LoadProject(project: string) =
+        (this :> IWorkspaceLoader)
+            .LoadProjects([ project ])
 
 
     member this.LoadSln(sln: string, customProperties: string list, generateBinlog: bool) =
-        let pg = projectGraphSln sln
-        loadProjects (pg, customProperties, generateBinlog)
+        projectGraphSln sln
+        |> Option.map (fun pg -> loadProjects (pg, customProperties, generateBinlog))
+        |> Option.defaultValue Seq.empty
 
     member this.LoadSln(sln, customProperties) =
         this.LoadSln(sln, customProperties, false)
 
-    member this.LoadSln(sln) = this.LoadSln(sln, [], false)
 
     static member Create(toolsPath: ToolsPath) =
         WorkspaceLoaderViaProjectGraph(toolsPath) :> IWorkspaceLoader
@@ -595,6 +629,10 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
             loadProjectList projects
             cache |> Seq.map (fun n -> n.Value)
 
+        override this.LoadProjects(projects) = this.LoadProjects(projects, [], false)
+
+        override this.LoadSln(sln) = this.LoadSln(sln, [], false)
+
     member this.LoadProjects(projects: string list, customProperties: string list, generateBinlog: bool) =
         (this :> IWorkspaceLoader)
             .LoadProjects(projects, customProperties, generateBinlog)
@@ -602,7 +640,6 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
     member this.LoadProjects(projects, customProperties) =
         this.LoadProjects(projects, customProperties, false)
 
-    member this.LoadProjects(projects) = this.LoadProjects(projects, [], false)
 
 
     member this.LoadProject(project, customProperties: string list, generateBinlog: bool) =
@@ -611,7 +648,9 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
     member this.LoadProject(project, customProperties: string list) =
         this.LoadProjects([ project ], customProperties)
 
-    member this.LoadProject(project) = this.LoadProjects([ project ])
+    member this.LoadProject(project) =
+        (this :> IWorkspaceLoader)
+            .LoadProjects([ project ])
 
 
     member this.LoadSln(sln, customProperties: string list, generateBinlog: bool) =
@@ -624,7 +663,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
     member this.LoadSln(sln, customProperties) =
         this.LoadSln(sln, customProperties, false)
 
-    member this.LoadSln(sln) = this.LoadSln(sln, [], false)
+
 
     static member Create(toolsPath: ToolsPath) =
         WorkspaceLoader(toolsPath) :> IWorkspaceLoader

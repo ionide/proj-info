@@ -106,7 +106,14 @@ module ExpectNotification =
         sprintf "failed %s" name, isFailed
 
     let expectNotifications actual expected =
-        Expect.equal (List.length actual) (List.length expected) (sprintf "notifications: %A" (expected |> List.map fst))
+
+        let getMessages =
+            function
+            | WorkspaceProjectState.Loading (path) -> sprintf "loading %s " path
+            | WorkspaceProjectState.Loaded (po, _, _) -> sprintf "loaded %s" po.ProjectFileName
+            | WorkspaceProjectState.Failed (path, _) -> sprintf "failed %s" path
+
+        Expect.equal (List.length actual) (List.length expected) (sprintf "expected notifications: %A \n actual notifications: - %A" (expected |> List.map fst) (actual |> List.map getMessages))
 
         expected
         |> List.zip actual
@@ -114,15 +121,12 @@ module ExpectNotification =
             (fun (n, check) ->
                 let name, f = check
 
-                let minimal_info =
-                    match n with
-                    | WorkspaceProjectState.Loading (path) -> sprintf "loading %s " path
-                    | WorkspaceProjectState.Loaded (po, _, _) -> sprintf "loaded %s" po.ProjectFileName
-                    | WorkspaceProjectState.Failed (path, _) -> sprintf "failed %s" path
+                let minimal_info = getMessages n
+
 
                 Expect.isTrue (f n) (sprintf "expected %s but was %s" name minimal_info))
 
-    type NotificationWatcher(loader: Ionide.ProjInfo.WorkspaceLoader, log) =
+    type NotificationWatcher(loader: Ionide.ProjInfo.IWorkspaceLoader, log) =
         let notifications = List<_>()
 
         do
@@ -139,10 +143,10 @@ module ExpectNotification =
     let watchNotifications logger loader =
         NotificationWatcher(loader, logNotification logger)
 
-let testSample2 toolsPath =
+let testSample2 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog
-        "can load sample2"
+        (sprintf "can load sample2 - %s" workspaceLoader)
         (fun logger fs ->
             let testDir = inDir fs "load_sample2"
             copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
@@ -152,7 +156,7 @@ let testSample2 toolsPath =
 
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
-            let loader = WorkspaceLoader.Create(toolsPath)
+            let loader = workspaceFactory toolsPath
 
             let watcher = watchNotifications logger loader
 
@@ -175,10 +179,10 @@ let testSample2 toolsPath =
             Expect.equal n1Parsed n1Loaded "notificaton and parsed should be the same"
             Expect.equal n1Parsed.SourceFiles expectedSources "check sources")
 
-let testSample3 toolsPath =
+let testSample3 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) expected =
     testCase
     |> withLog
-        "can load sample3"
+        (sprintf "can load sample3 - %s" workspaceLoader)
         (fun logger fs ->
             let testDir = inDir fs "load_sample3"
             copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
@@ -194,19 +198,13 @@ let testSample3 toolsPath =
 
             dotnet fs [ "build"; projPath ] |> checkExitCodeZero
 
-            let loader = WorkspaceLoader.Create(toolsPath)
+            let loader = workspaceFactory toolsPath
 
             let watcher = watchNotifications logger loader
 
             let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
 
-            [ loading "c1.fsproj"
-              loading "l1.csproj"
-              loaded "l1.csproj"
-              loading "l2.fsproj"
-              loaded "l2.fsproj"
-              loaded "c1.fsproj" ]
-            |> expectNotifications (watcher.Notifications)
+            expected |> expectNotifications (watcher.Notifications)
 
 
             let [ _; _; WorkspaceProjectState.Loaded (l1Loaded, _, _); _; WorkspaceProjectState.Loaded (l2Loaded, _, _); WorkspaceProjectState.Loaded (c1Loaded, _, _) ] = watcher.Notifications
@@ -248,10 +246,10 @@ let testSample3 toolsPath =
             Expect.equal l2Parsed l2Loaded "l2 notificaton and parsed should be the same"
             Expect.equal c1Parsed c1Loaded "c1 notificaton and parsed should be the same")
 
-let testSample4 toolsPath =
+let testSample4 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog
-        "can load sample4"
+        (sprintf "can load sample4 - %s" workspaceLoader)
         (fun logger fs ->
             let testDir = inDir fs "load_sample4"
             copyDirFromAssets fs ``sample4 NetSdk multi tfm``.ProjDir testDir
@@ -261,7 +259,7 @@ let testSample4 toolsPath =
 
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
-            let loader = WorkspaceLoader.Create(toolsPath)
+            let loader = workspaceFactory toolsPath
 
             let watcher = watchNotifications logger loader
 
@@ -286,10 +284,10 @@ let testSample4 toolsPath =
             Expect.equal m1Parsed.SourceFiles m1ExpectedSources "check sources"
             Expect.equal m1Parsed m1Loaded "m1 notificaton and parsed should be the same")
 
-let testSample5 toolsPath =
+let testSample5 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog
-        "can load sample5"
+        (sprintf "can load sample5 - %s" workspaceLoader)
         (fun logger fs ->
             let testDir = inDir fs "load_sample5"
             copyDirFromAssets fs ``sample5 NetSdk CSharp library``.ProjDir testDir
@@ -299,7 +297,7 @@ let testSample5 toolsPath =
 
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
-            let loader = WorkspaceLoader.Create(toolsPath)
+            let loader = workspaceFactory toolsPath
 
             let watcher = watchNotifications logger loader
 
@@ -327,10 +325,10 @@ let testSample5 toolsPath =
 
             Expect.equal l2Parsed l2Loaded "l2 notificaton and parsed should be the same")
 
-let testLoadSln toolsPath =
+let testLoadSln toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) expected =
     testCase
     |> withLog
-        "can load sln"
+        (sprintf "can load sln - %s" workspaceLoader)
         (fun logger fs ->
             let testDir = inDir fs "load_sln"
             copyDirFromAssets fs ``sample6 Netsdk Sparse/sln``.ProjDir testDir
@@ -339,20 +337,14 @@ let testLoadSln toolsPath =
 
             dotnet fs [ "restore"; slnPath ] |> checkExitCodeZero
 
-            let loader = WorkspaceLoader.Create(toolsPath)
+            let loader = workspaceFactory toolsPath
 
             let watcher = watchNotifications logger loader
 
             let parsed = loader.LoadSln(slnPath) |> Seq.toList
 
-            [ loading "c1.fsproj"
-              loading "l2.fsproj"
-              loaded "l2.fsproj"
-              loaded "c1.fsproj"
-              loading "l1.fsproj"
-              loaded "l1.fsproj"
-              loaded "l2.fsproj" ]
-            |> expectNotifications (watcher.Notifications)
+
+            expected |> expectNotifications (watcher.Notifications)
 
 
             Expect.equal parsed.Length 3 "c1, l1, l2"
@@ -436,10 +428,10 @@ let testParseSln toolsPath =
 
             )
 
-let testSample9 toolsPath =
+let testSample9 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog
-        "can load sample9"
+        (sprintf "can load sample9 - %s" workspaceLoader)
         (fun logger fs ->
             let testDir = inDir fs "load_sample9"
             copyDirFromAssets fs ``sample9 NetSdk library``.ProjDir testDir
@@ -450,7 +442,7 @@ let testSample9 toolsPath =
 
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
-            let loader = WorkspaceLoader.Create(toolsPath)
+            let loader = workspaceFactory toolsPath
 
             let watcher = watchNotifications logger loader
 
@@ -476,10 +468,10 @@ let testSample9 toolsPath =
 
             Expect.equal n1Parsed n1Loaded "notificaton and parsed should be the same")
 
-let testRender2 toolsPath =
+let testRender2 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog
-        "can render sample2"
+        (sprintf "can render sample2 - %s" workspaceLoader)
         (fun logger fs ->
             let testDir = inDir fs "render_sample2"
             let sampleProj = ``sample2 NetSdk library``
@@ -490,7 +482,7 @@ let testRender2 toolsPath =
 
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
-            let loader = WorkspaceLoader.Create(toolsPath)
+            let loader = workspaceFactory toolsPath
 
             let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
 
@@ -503,10 +495,10 @@ let testRender2 toolsPath =
 
             Expect.equal rendered (renderOf sampleProj expectedSources) "check rendered project")
 
-let testRender3 toolsPath =
+let testRender3 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog
-        "can render sample3"
+        (sprintf "can render sample3 - %s" workspaceLoader)
         (fun logger fs ->
             let testDir = inDir fs "render_sample3"
             let c1Proj = ``sample3 Netsdk projs``
@@ -522,7 +514,7 @@ let testRender3 toolsPath =
 
             dotnet fs [ "build"; projPath ] |> checkExitCodeZero
 
-            let loader = WorkspaceLoader.Create(toolsPath)
+            let loader = workspaceFactory toolsPath
 
             let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
 
@@ -549,10 +541,10 @@ let testRender3 toolsPath =
 
             Expect.equal (ProjectViewer.render c1Parsed) (renderOf c1Proj c1ExpectedSources) "check rendered c1")
 
-let testRender4 toolsPath =
+let testRender4 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog
-        "can render sample4"
+        (sprintf "can render sample4 - %s" workspaceLoader)
         (fun logger fs ->
             let testDir = inDir fs "render_sample4"
             let m1Proj = ``sample4 NetSdk multi tfm``
@@ -563,7 +555,7 @@ let testRender4 toolsPath =
 
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
-            let loader = WorkspaceLoader.Create(toolsPath)
+            let loader = workspaceFactory toolsPath
             let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
 
             let m1Parsed = parsed |> expectFind projPath "the F# console"
@@ -572,10 +564,10 @@ let testRender4 toolsPath =
 
             Expect.equal (ProjectViewer.render m1Parsed) (renderOf m1Proj m1ExpectedSources) "check rendered m1")
 
-let testRender5 toolsPath =
+let testRender5 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog
-        "can render sample5"
+        (sprintf "can render sample5 - %s" workspaceLoader)
         (fun logger fs ->
             let testDir = inDir fs "render_sample5"
             let l2Proj = ``sample5 NetSdk CSharp library``
@@ -586,7 +578,7 @@ let testRender5 toolsPath =
 
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
-            let loader = WorkspaceLoader.Create(toolsPath)
+            let loader = workspaceFactory toolsPath
 
             let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
 
@@ -601,10 +593,10 @@ let testRender5 toolsPath =
             // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
             Expect.equal (ProjectViewer.render l2Parsed) (renderOf l2Proj l2ExpectedSources) "check rendered l2")
 
-let testRender8 toolsPath =
+let testRender8 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog
-        "can render sample8"
+        (sprintf "can render sample8 - %s" workspaceLoader)
         (fun logger fs ->
             let testDir = inDir fs "render_sample8"
             let sampleProj = ``sample8 NetSdk Explorer``
@@ -615,7 +607,7 @@ let testRender8 toolsPath =
 
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
-            let loader = WorkspaceLoader.Create(toolsPath)
+            let loader = workspaceFactory toolsPath
 
             let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
 
@@ -632,10 +624,10 @@ let testRender8 toolsPath =
 
             Expect.equal rendered (renderOf sampleProj expectedSources) "check rendered project")
 
-let testProjectNotFound toolsPath =
+let testProjectNotFound toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog
-        "project not found"
+        (sprintf "project not found - %s" workspaceLoader)
         (fun logger fs ->
             let testDir = inDir fs "proj_not_found"
             copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
@@ -644,7 +636,7 @@ let testProjectNotFound toolsPath =
 
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
-            let loader = WorkspaceLoader.Create(toolsPath)
+            let loader = workspaceFactory toolsPath
 
             let watcher = watchNotifications logger loader
 
@@ -654,8 +646,9 @@ let testProjectNotFound toolsPath =
 
             let parsed = loader.LoadProjects [ wrongPath ] |> Seq.toList
 
-            [ loading "n1aa.fsproj"
-              failed "n1aa.fsproj" ]
+
+            [ ExpectNotification.loading "n1aa.fsproj"
+              ExpectNotification.failed "n1aa.fsproj" ]
             |> expectNotifications (watcher.Notifications)
 
 
@@ -663,10 +656,10 @@ let testProjectNotFound toolsPath =
 
             Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(wrongPath, (GetProjectOptionsErrors.ProjectNotFound(wrongPath)))) "check error type")
 
-let testFCSmap toolsPath =
+let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog
-        "can load sample2 with FCS"
+        (sprintf "can load sample2 with FCS - %s" workspaceLoader)
         (fun logger fs ->
             let rec allFCSProjects (po: FSharpProjectOptions) =
                 [ yield po
@@ -701,7 +694,7 @@ let testFCSmap toolsPath =
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
 
-            let loader = WorkspaceLoader.Create(toolsPath)
+            let loader = workspaceFactory toolsPath
 
             let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
 
@@ -732,10 +725,10 @@ let testFCSmap toolsPath =
 
             )
 
-let testSample2WithBinLog toolsPath =
+let testSample2WithBinLog toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog
-        "can load sample2 with bin log"
+        (sprintf "can load sample2 with bin log - %s" workspaceLoader)
         (fun logger fs ->
             let testDir = inDir fs "load_sample2_bin_log"
             copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
@@ -745,7 +738,7 @@ let testSample2WithBinLog toolsPath =
 
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
-            let loader = WorkspaceLoader.Create(toolsPath)
+            let loader = workspaceFactory toolsPath
 
             let watcher = watchNotifications logger loader
 
@@ -818,7 +811,15 @@ module ExpectProjectSystemNotification =
         sprintf "changed %s" name, isFailed
 
     let expectNotifications actual expected =
-        Expect.equal (List.length actual) (List.length expected) (sprintf "notifications: %A" (expected |> List.map fst))
+        let getMessage =
+            function
+            | ProjectResponse.ProjectLoading (path) -> sprintf "loading %s" path
+            | ProjectResponse.Project (po, _) -> sprintf "loaded %s" po.ProjectFileName
+            | ProjectResponse.ProjectError (path, _) -> sprintf "failed %s" path
+            | ProjectResponse.WorkspaceLoad (finished) -> sprintf "workspace %b" finished
+            | ProjectResponse.ProjectChanged (projectFileName) -> sprintf "changed %s" projectFileName
+
+        Expect.equal (List.length actual) (List.length expected) (sprintf "expected notifications: %A\n actual notifications %A" (expected |> List.map fst) (actual |> List.map getMessage))
 
         expected
         |> List.zip actual
@@ -826,13 +827,8 @@ module ExpectProjectSystemNotification =
             (fun (n, check) ->
                 let name, f = check
 
-                let minimal_info =
-                    match n with
-                    | ProjectResponse.ProjectLoading (path) -> sprintf "loading %s" path
-                    | ProjectResponse.Project (po, _) -> sprintf "loaded %s" po.ProjectFileName
-                    | ProjectResponse.ProjectError (path, _) -> sprintf "failed %s" path
-                    | ProjectResponse.WorkspaceLoad (finished) -> sprintf "workspace %b" finished
-                    | ProjectResponse.ProjectChanged (projectFileName) -> sprintf "changed %s" projectFileName
+                let minimal_info = getMessage n
+
 
                 Expect.isTrue (f n) (sprintf "expected %s but was %s" name minimal_info))
 
@@ -853,10 +849,10 @@ module ExpectProjectSystemNotification =
     let watchNotifications logger controller =
         NotificationWatcher(controller, logNotification logger)
 
-let testProjectSystem toolsPath =
+let testProjectSystem toolsPath workspaceLoader workspaceFactory =
     testCase
     |> withLog
-        "can load sample2 with Project System"
+        (sprintf "can load sample2 with Project System - %s" workspaceLoader)
         (fun logger fs ->
             let testDir = inDir fs "load_sample2_projectSystem"
             copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
@@ -866,7 +862,7 @@ let testProjectSystem toolsPath =
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
 
-            let controller = ProjectSystem.ProjectController(toolsPath)
+            use controller = new ProjectSystem.ProjectController(toolsPath, workspaceFactory)
             let watcher = watchNotifications logger controller
             controller.LoadProject(projPath)
 
@@ -896,10 +892,10 @@ let testProjectSystem toolsPath =
 
             )
 
-let testProjectSystemOnChange toolsPath =
+let testProjectSystemOnChange toolsPath workspaceLoader workspaceFactory =
     testCase
     |> withLog
-        "can load sample2 with Project System, detect change on fsproj"
+        (sprintf "can load sample2 with Project System, detect change on fsproj - %s" workspaceLoader)
         (fun logger fs ->
             let testDir = inDir fs "load_sample2_projectSystem_onChange"
             copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
@@ -908,7 +904,7 @@ let testProjectSystemOnChange toolsPath =
 
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
-            let controller = ProjectSystem.ProjectController(toolsPath)
+            use controller = new ProjectSystem.ProjectController(toolsPath, workspaceFactory)
             let watcher = watchNotifications logger controller
             controller.LoadProject(projPath)
 
@@ -938,15 +934,15 @@ let testProjectSystemOnChange toolsPath =
 
             )
 
-let debugTets toolsPath =
+let debugTets toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     ptestCase
     |> withLog
-        "debug"
+        (sprintf "debug - %s" workspaceLoader)
         (fun logger fs ->
 
             let projPath = @"D:\Programowanie\Projekty\Ionide\dotnet-proj-info\src\Ionide.ProjInfo.Sln\Ionide.ProjInfo.Sln.csproj"
 
-            let loader = WorkspaceLoader.Create(toolsPath)
+            let loader = workspaceFactory toolsPath
 
             let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
 
@@ -955,30 +951,77 @@ let debugTets toolsPath =
             )
 
 let tests toolsPath =
+    let testSample3WorkspaceLoaderExpected =
+        [ ExpectNotification.loading "c1.fsproj"
+          ExpectNotification.loading "l1.csproj"
+          ExpectNotification.loaded "l1.csproj"
+          ExpectNotification.loading "l2.fsproj"
+          ExpectNotification.loaded "l2.fsproj"
+          ExpectNotification.loaded "c1.fsproj" ]
+
+    let testSample3GraphExpected =
+        [ ExpectNotification.loading "c1.fsproj"
+          ExpectNotification.loaded "c1.fsproj" ]
+
+    let testSlnExpected =
+        [ ExpectNotification.loading "c1.fsproj"
+          ExpectNotification.loading "l2.fsproj"
+          ExpectNotification.loaded "l2.fsproj"
+          ExpectNotification.loaded "c1.fsproj"
+          ExpectNotification.loading "l1.fsproj"
+          ExpectNotification.loaded "l1.fsproj"
+          ExpectNotification.loaded "l2.fsproj" ]
+
+    let testSlnGraphExpected =
+        [ ExpectNotification.loading "l2.fsproj"
+          ExpectNotification.loading "l1.fsproj"
+          ExpectNotification.loading "c1.fsproj"
+          ExpectNotification.loaded "l2.fsproj"
+          ExpectNotification.loaded "c1.fsproj"
+          ExpectNotification.loaded "l1.fsproj" ]
+
+
     testSequenced
     <| testList
         "Main tests"
-        [ testSample2 toolsPath
-          testSample3 toolsPath //- Sample 3 having issues, was also marked pending on old test suite
-          testSample4 toolsPath
-          testSample5 toolsPath
-          testSample9 toolsPath
+        [ testSample2 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+          testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
+          testSample3 toolsPath "WorkspaceLoader" WorkspaceLoader.Create testSample3WorkspaceLoaderExpected //- Sample 3 having issues, was also marked pending on old test suite
+          //   testSample3 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create testSample3GraphExpected //- Sample 3 having issues, was also marked pending on old test suite
+          testSample4 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+          testSample4 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
+          testSample5 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+          testSample5 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
+          testSample9 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+          testSample9 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           //Sln tests
-          testLoadSln toolsPath
+          testLoadSln toolsPath "WorkspaceLoader" WorkspaceLoader.Create testSlnExpected
+          testLoadSln toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create testSlnGraphExpected
           testParseSln toolsPath
           //Render tests
-          testRender2 toolsPath
-          testRender3 toolsPath //- Sample 3 having issues, was also marked pending on old test suite
-          testRender4 toolsPath
-          testRender5 toolsPath
-          testRender8 toolsPath
+          testRender2 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+          testRender2 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
+          testRender3 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+          //   testRender3 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create //- Sample 3 having issues, was also marked pending on old test suite
+          testRender4 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+          testRender4 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
+          testRender5 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+          testRender5 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
+          testRender8 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+          testRender8 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           //Invalid tests
-          testProjectNotFound toolsPath
+          testProjectNotFound toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+          testProjectNotFound toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           //FCS tests
-          testFCSmap toolsPath
+          testFCSmap toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+          testFCSmap toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           //ProjectSystem tests
-          testProjectSystem toolsPath
-          testProjectSystemOnChange toolsPath
-          debugTets toolsPath
+          testProjectSystem toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+          testProjectSystem toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
+          testProjectSystemOnChange toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+          testProjectSystemOnChange toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
+          debugTets toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+          debugTets toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           //Binlog test
-          testSample2WithBinLog toolsPath ]
+          testSample2WithBinLog toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+          testSample2WithBinLog toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create ]
