@@ -78,25 +78,32 @@ module ProjectLoader =
         else
             [ logger ]
 
+    let getGlobalProps (path: string) (tfm: string option) =
+        dict [ "ProvideCommandLineArgs", "true"
+               "DesignTimeBuild", "true"
+               "SkipCompilerExecution", "true"
+               "GeneratePackageOnBuild", "false"
+               "Configuration", "Debug"
+               "DefineExplicitDefaults", "true"
+               "BuildProjectReferences", "false"
+               "UseCommonOutputDirectory", "false"
+               if tfm.IsSome then
+                   "TargetFramework", tfm.Value
+               if path.EndsWith ".csproj" then
+                   "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__")
+               "DotnetProjInfo", "true" ]
+
+
+    let buildArgs =
+        [| "ResolvePackageDependenciesDesignTime"
+           "_GenerateCompileDependencyCache"
+           "CoreCompile" |]
+
     let loadProject (path: string) (generateBinlog: bool) (ToolsPath toolsPath) =
         try
             let tfm = getTfm path
 
-
-            let globalProperties =
-                dict [ "ProvideCommandLineArgs", "true"
-                       "DesignTimeBuild", "true"
-                       "SkipCompilerExecution", "true"
-                       "GeneratePackageOnBuild", "false"
-                       "Configuration", "Debug"
-                       "DefineExplicitDefaults", "true"
-                       "BuildProjectReferences", "false"
-                       "UseCommonOutputDirectory", "false"
-                       "DotnetProjInfo", "true"
-                       if tfm.IsSome then
-                           "TargetFramework", tfm.Value
-                       if path.EndsWith ".csproj" then
-                           "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__") ]
+            let globalProperties = getGlobalProps path tfm
 
             match System.Environment.GetEnvironmentVariable "DOTNET_HOST_PATH" with
             | null
@@ -114,14 +121,7 @@ module ProjectLoader =
             let pi = pi.CreateProjectInstance()
 
 
-            let build =
-                pi.Build(
-                    [| "ResolvePackageDependenciesDesignTime"
-                       "_GenerateCompileDependencyCache"
-                       "CoreCompile" |],
-                    loggers
-
-                )
+            let build = pi.Build(buildArgs, loggers)
 
             let t = sw.ToString()
 
@@ -373,20 +373,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
     let logger = LogProvider.getLoggerFor<WorkspaceLoaderViaProjectGraph> ()
     let loadingNotification = new Event<Types.WorkspaceProjectState>()
 
-    let getGlobalProps (path: string) (tfm: string option) =
-        dict [ "ProvideCommandLineArgs", "true"
-               "DesignTimeBuild", "true"
-               "SkipCompilerExecution", "true"
-               "GeneratePackageOnBuild", "false"
-               "Configuration", "Debug"
-               "DefineExplicitDefaults", "true"
-               "BuildProjectReferences", "false"
-               "UseCommonOutputDirectory", "false"
-               if tfm.IsSome then
-                   "TargetFramework", tfm.Value
-               if path.EndsWith ".csproj" then
-                   "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__")
-               "DotnetProjInfo", "true" ]
+
 
     let handleProjectGraphFailures f =
         try
@@ -398,7 +385,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
 
     let projectInstanceFactory projectPath globalProperties (projectCollection: ProjectCollection) =
         let tfm = ProjectLoader.getTfm projectPath
-        ProjectInstance(projectPath, getGlobalProps projectPath tfm, null, projectCollection)
+        ProjectInstance(projectPath, ProjectLoader.getGlobalProps projectPath tfm, null, projectCollection)
 
     let projectGraphProjs (paths: string seq) =
 
@@ -422,10 +409,6 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
 
 
 
-    let buildArgs =
-        [| "ResolvePackageDependenciesDesignTime"
-           "_GenerateCompileDependencyCache"
-           "CoreCompile" |]
 
 
 
@@ -445,7 +428,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
 
 
 
-                let gbr = GraphBuildRequestData(projects, buildArgs, null, BuildRequestDataFlags.ReplaceExistingProjectInstance)
+                let gbr = GraphBuildRequestData(projects, ProjectLoader.buildArgs, null, BuildRequestDataFlags.ReplaceExistingProjectInstance)
                 let bm = BuildManager.DefaultBuildManager
                 use sw = new StringWriter()
                 let loggers = ProjectLoader.createLoggers allKnownNames generateBinlog sw
@@ -491,9 +474,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
                 |> Seq.iter
                     (fun po ->
                         logger.info (Log.setMessage "Project loaded {project}" >> Log.addContextDestructured "project" po.ProjectFileName)
-                        loadingNotification.Trigger(WorkspaceProjectState.Loaded(po, allProjectOptions |> Seq.toList, false))
-                        // Async.Sleep 150 |> Async.RunSynchronously
-                        )
+                        loadingNotification.Trigger(WorkspaceProjectState.Loaded(po, allProjectOptions |> Seq.toList, false)))
 
                 allProjectOptions :> seq<_>
         with e ->

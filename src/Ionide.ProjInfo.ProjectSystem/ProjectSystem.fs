@@ -165,8 +165,6 @@ type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -
                 | delay when delay > TimeSpan.Zero -> do! Async.Sleep(Environment.workspaceLoadDelay().TotalMilliseconds |> int)
                 | _ -> ()
 
-                // let loader = WorkspaceLoader.Create(toolsPath)
-                // let loader = WorkspaceLoaderViaProjectGraph.Create(toolsPath)
                 let loader = workspaceLoaderFactory toolsPath
 
                 let bindNewOnloaded (n: WorkspaceProjectState) : ProjectSystemState option =
