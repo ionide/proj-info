@@ -20,6 +20,8 @@ nuget Microsoft.Build.Locator
 nuget Newtonsoft.Json
 nuget Fsharp.Control.Reactive
 
+github TheAngryByrd/FsLibLog src/FsLibLog/FsLibLog.fs
+
 // [ FAKE GROUP ]
 group Build
   source https://api.nuget.org/v3/index.json

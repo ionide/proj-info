@@ -36,7 +36,7 @@ type ProjectResponse =
 /// Public API for any operations related to workspace and projects.
 /// Internally keeps all the information related to project files in current workspace.
 /// It's responsible for refreshing and caching - should be used only as source of information and public API
-type ProjectController(toolsPath: ToolsPath) as x =
+type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -> IWorkspaceLoader) as x =
     let fileCheckOptions = ConcurrentDictionary<string, FSharpProjectOptions>()
     let projects = ConcurrentDictionary<string, Project>()
     let mutable isWorkspaceReady = false
@@ -165,7 +165,7 @@ type ProjectController(toolsPath: ToolsPath) as x =
                 | delay when delay > TimeSpan.Zero -> do! Async.Sleep(Environment.workspaceLoadDelay().TotalMilliseconds |> int)
                 | _ -> ()
 
-                let loader = WorkspaceLoader.Create(toolsPath)
+                let loader = workspaceLoaderFactory toolsPath
 
                 let bindNewOnloaded (n: WorkspaceProjectState) : ProjectSystemState option =
                     match n with
@@ -177,7 +177,8 @@ type ProjectController(toolsPath: ToolsPath) as x =
                         | Ok optsDPW ->
                             let view = ProjectViewer.render optsDPW
                             Some(ProjectSystemState.Loaded(fcsOpts, optsDPW, view.Items, isFromCache))
-                        | Error _ -> None //TODO not ignore the error
+                        | Error e -> Some(ProjectSystemState.Failed(e.ProjFile, e))
+
                     | WorkspaceProjectState.Failed (path, e) ->
                         let error = e
                         Some(ProjectSystemState.Failed(path, error))
