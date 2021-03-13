@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.50.0] - 2021-03-13
+
+* Introduce a pluggable abstraction for creating workspaces to allow for independent experimentation
+* Introduce a workspace implementation for MsBuild Graph Build mode, which should be a large performance boost for consumers
+* introduce debouncing to prevent rebuilds when invoked multiple times in a short timeframe
+
 ## [0.49.0] - 2021-03-03
 
 ### Changed
