@@ -434,7 +434,6 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
                 let loggers = ProjectLoader.createLoggers allKnownNames generateBinlog sw
                 bm.BeginBuild(new BuildParameters(Loggers = loggers))
                 let result = bm.BuildRequest gbr
-                let foo = bm.PendBuildRequest(gbr)
 
                 bm.EndBuild()
 
@@ -453,9 +452,8 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
                     resultsByNode
                     |> Seq.map
                         (fun p ->
-                            let foo = ProjectLoader.LoadedProject p.ProjectInstance
 
-                            p.ProjectInstance.FullPath, ProjectLoader.getLoadedProjectInfo p.ProjectInstance.FullPath customProperties foo)
+                            p.ProjectInstance.FullPath, ProjectLoader.getLoadedProjectInfo p.ProjectInstance.FullPath customProperties (ProjectLoader.LoadedProject p.ProjectInstance))
 
                     |> Seq.choose
                         (fun (projectPath, projectOptionResult) ->
