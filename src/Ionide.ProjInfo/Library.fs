@@ -99,11 +99,16 @@ module ProjectLoader =
            "_GenerateCompileDependencyCache"
            "CoreCompile" |]
 
-    let loadProject (path: string) (generateBinlog: bool) (ToolsPath toolsPath) =
+    let loadProject (path: string) (generateBinlog: bool) (ToolsPath toolsPath) globalProperties toolsVersion =
         try
             let tfm = getTfm path
 
-            let globalProperties = getGlobalProps path tfm
+            let defaultGlobalProperties = getGlobalProps path tfm
+            let globalProperties = 
+                dict [ for (KeyValue(k,v)) in defaultGlobalProperties -> (k,v)
+                       yield! globalProperties ]
+
+            let toolsVersion = toolsVersion |> Option.defaultValue null
 
             match System.Environment.GetEnvironmentVariable "DOTNET_HOST_PATH" with
             | null
@@ -112,7 +117,7 @@ module ProjectLoader =
 
             use pc = new ProjectCollection(globalProperties)
 
-            let pi = pc.LoadProject(path)
+            let pi = pc.LoadProject(path, globalProperties, toolsVersion)
 
             use sw = new StringWriter()
 
@@ -343,10 +348,12 @@ module ProjectLoader =
     /// <param name="path">Full path to the `.fsproj` file</param>
     /// <param name="toolsPath">Path to MsBuild obtained from `ProjectLoader.init ()`</param>
     /// <param name="generateBinlog">Enable Binary Log generation</param>
+    /// <param name="globalProperties">The global properties to use (e.g. Configuration=Release). Some additional global properties are pre-set by the tool</param>
+    /// <param name="toolsVersion">The tools version to use, if any.</param>
     /// <param name="customProperties">List of additional MsBuild properties that you want to obtain.</param>
     /// <returns>Returns the record instance representing the loaded project or string containing error message</returns>
-    let getProjectInfo (path: string) (toolsPath: ToolsPath) (generateBinlog: bool) (customProperties: string list) : Result<Types.ProjectOptions, string> =
-        let loadedProject = loadProject path generateBinlog toolsPath
+    let getProjectInfo (path: string) (toolsPath: ToolsPath) (globalProperties: (string*string) list) (toolsVersion: string option) (generateBinlog: bool) (customProperties: string list) : Result<Types.ProjectOptions, string> =
+        let loadedProject = loadProject path generateBinlog toolsPath globalProperties toolsVersion 
 
         match loadedProject with
         | Success project -> getLoadedProjectInfo path customProperties project
@@ -561,7 +568,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
                 cache |> Seq.map (fun n -> n.Value) |> Seq.toList
 
             let rec loadProject p =
-                let res = ProjectLoader.getProjectInfo p toolsPath generateBinlog customProperties
+                let res = ProjectLoader.getProjectInfo p toolsPath [] None generateBinlog customProperties
 
                 match res with
                 | Ok project ->
