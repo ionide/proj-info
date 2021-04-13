@@ -13,6 +13,8 @@ open Ionide.ProjInfo
 open Expecto.Logging.Message
 open FSharp.Compiler.SourceCodeServices
 
+#nowarn "25"
+
 let RepoDir = (__SOURCE_DIRECTORY__ / ".." / "..") |> Path.GetFullPath
 let ExamplesDir = RepoDir / "test" / "examples"
 let TestRunDir = RepoDir / "test" / "testrun_ws"
@@ -140,10 +142,10 @@ module ExpectNotification =
     let watchNotifications logger loader =
         NotificationWatcher(loader, logNotification logger)
 
-let testSample2 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
+let testSample2 toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPath * (string * string) list -> IWorkspaceLoader) =
     testCase
     |> withLog
-        (sprintf "can load sample2 - %s" workspaceLoader)
+        (sprintf "can load sample2 - %s - isRelease is %b" workspaceLoader isRelease)
         (fun logger fs ->
             let testDir = inDir fs "load_sample2"
             copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
@@ -153,7 +155,9 @@ let testSample2 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
 
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
-            let loader = workspaceFactory toolsPath
+            let config = if isRelease then "Release" else "Debug"
+            let props = [("Configuration", config)]
+            let loader = workspaceFactory (toolsPath, props)
 
             let watcher = watchNotifications logger loader
 
@@ -168,8 +172,10 @@ let testSample2 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
             let n1Parsed = parsed |> expectFind projPath "first is a lib"
 
             let expectedSources =
-                [ projDir / "obj/Debug/netstandard2.0/n1.AssemblyInfo.fs"
-                  projDir / "Library.fs" ]
+                [ projDir / ("obj/" + config + "/netstandard2.0/n1.AssemblyInfo.fs")
+                  projDir / "Library.fs" 
+                  if isRelease then 
+                      projDir / "Other.fs" ]
                 |> List.map Path.GetFullPath
 
             Expect.equal parsed.Length 1 "console and lib"
@@ -981,8 +987,10 @@ let tests toolsPath =
     testSequenced
     <| testList
         "Main tests"
-        [ testSample2 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
-          testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
+        [ testSample2 toolsPath "WorkspaceLoader" false (fun (tools,props) -> WorkspaceLoader.Create(tools, globalProperties=props))
+          testSample2 toolsPath "WorkspaceLoader" true (fun (tools,props) -> WorkspaceLoader.Create(tools, globalProperties=props))
+          testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" false (fun (tools,props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties=props))
+          testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" true (fun (tools,props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties=props))
           testSample3 toolsPath "WorkspaceLoader" WorkspaceLoader.Create testSample3WorkspaceLoaderExpected //- Sample 3 having issues, was also marked pending on old test suite
           //   testSample3 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create testSample3GraphExpected //- Sample 3 having issues, was also marked pending on old test suite
           testSample4 toolsPath "WorkspaceLoader" WorkspaceLoader.Create

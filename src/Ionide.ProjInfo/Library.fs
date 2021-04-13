@@ -78,7 +78,7 @@ module ProjectLoader =
         else
             [ logger ]
 
-    let getGlobalProps (path: string) (tfm: string option) =
+    let getGlobalProps (path: string) (tfm: string option) (globalProperties: (string * string) list)=
         dict [ "ProvideCommandLineArgs", "true"
                "DesignTimeBuild", "true"
                "SkipCompilerExecution", "true"
@@ -91,7 +91,8 @@ module ProjectLoader =
                    "TargetFramework", tfm.Value
                if path.EndsWith ".csproj" then
                    "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__")
-               "DotnetProjInfo", "true" ]
+               "DotnetProjInfo", "true" 
+               yield! globalProperties ]
 
 
     let buildArgs =
@@ -99,16 +100,11 @@ module ProjectLoader =
            "_GenerateCompileDependencyCache"
            "CoreCompile" |]
 
-    let loadProject (path: string) (generateBinlog: bool) (ToolsPath toolsPath) globalProperties toolsVersion =
+    let loadProject (path: string) (generateBinlog: bool) (ToolsPath toolsPath) globalProperties =
         try
             let tfm = getTfm path
 
-            let defaultGlobalProperties = getGlobalProps path tfm
-            let globalProperties = 
-                dict [ for (KeyValue(k,v)) in defaultGlobalProperties -> (k,v)
-                       yield! globalProperties ]
-
-            let toolsVersion = toolsVersion |> Option.defaultValue null
+            let globalProperties = getGlobalProps path tfm globalProperties
 
             match System.Environment.GetEnvironmentVariable "DOTNET_HOST_PATH" with
             | null
@@ -117,7 +113,7 @@ module ProjectLoader =
 
             use pc = new ProjectCollection(globalProperties)
 
-            let pi = pc.LoadProject(path, globalProperties, toolsVersion)
+            let pi = pc.LoadProject(path, globalProperties, toolsVersion=null)
 
             use sw = new StringWriter()
 
@@ -349,11 +345,10 @@ module ProjectLoader =
     /// <param name="toolsPath">Path to MsBuild obtained from `ProjectLoader.init ()`</param>
     /// <param name="generateBinlog">Enable Binary Log generation</param>
     /// <param name="globalProperties">The global properties to use (e.g. Configuration=Release). Some additional global properties are pre-set by the tool</param>
-    /// <param name="toolsVersion">The tools version to use, if any.</param>
     /// <param name="customProperties">List of additional MsBuild properties that you want to obtain.</param>
     /// <returns>Returns the record instance representing the loaded project or string containing error message</returns>
-    let getProjectInfo (path: string) (toolsPath: ToolsPath) (globalProperties: (string*string) list) (toolsVersion: string option) (generateBinlog: bool) (customProperties: string list) : Result<Types.ProjectOptions, string> =
-        let loadedProject = loadProject path generateBinlog toolsPath globalProperties toolsVersion 
+    let getProjectInfo (path: string) (toolsPath: ToolsPath) (globalProperties: (string*string) list) (generateBinlog: bool) (customProperties: string list) : Result<Types.ProjectOptions, string> =
+        let loadedProject = loadProject path generateBinlog toolsPath globalProperties 
 
         match loadedProject with
         | Success project -> getLoadedProjectInfo path customProperties project
@@ -376,7 +371,8 @@ type IWorkspaceLoader =
     [<CLIEvent>]
     abstract Notifications : IEvent<WorkspaceProjectState>
 
-type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
+type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath, ?globalProperties: (string*string) list) =
+    let globalProperties = defaultArg globalProperties []
     let logger = LogProvider.getLoggerFor<WorkspaceLoaderViaProjectGraph> ()
     let loadingNotification = new Event<Types.WorkspaceProjectState>()
 
@@ -390,9 +386,11 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
             loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
             None
 
-    let projectInstanceFactory projectPath globalProperties (projectCollection: ProjectCollection) =
+    let projectInstanceFactory projectPath (_globalProperties: IDictionary<string,string>) (projectCollection: ProjectCollection) =
         let tfm = ProjectLoader.getTfm projectPath
-        ProjectInstance(projectPath, ProjectLoader.getGlobalProps projectPath tfm, null, projectCollection)
+        //let globalProperties = globalProperties |> Seq.toList |> List.map (fun (KeyValue(k,v)) -> (k,v))
+        let globalProperties = ProjectLoader.getGlobalProps projectPath tfm globalProperties
+        ProjectInstance(projectPath, globalProperties, toolsVersion=null, projectCollection=projectCollection)
 
     let projectGraphProjs (paths: string seq) =
 
@@ -400,7 +398,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
         <| fun () ->
             paths |> Seq.iter (fun p -> loadingNotification.Trigger(WorkspaceProjectState.Loading p))
             let entryPoints = paths |> Seq.map ProjectGraphEntryPoint
-            ProjectGraph(entryPoints, ProjectCollection.GlobalProjectCollection, projectInstanceFactory)
+            ProjectGraph(entryPoints, projectCollection=ProjectCollection.GlobalProjectCollection, projectInstanceFactory=projectInstanceFactory)
 
     let projectGraphSln (path: string) =
         handleProjectGraphFailures
@@ -548,10 +546,11 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath) =
         this.LoadSln(sln, customProperties, false)
 
 
-    static member Create(toolsPath: ToolsPath) =
-        WorkspaceLoaderViaProjectGraph(toolsPath) :> IWorkspaceLoader
+    static member Create(toolsPath: ToolsPath, ?globalProperties) =
+        WorkspaceLoaderViaProjectGraph(toolsPath, ?globalProperties=globalProperties) :> IWorkspaceLoader
 
-type WorkspaceLoader private (toolsPath: ToolsPath) =
+type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string * string) list) =
+    let globalProperties = defaultArg globalProperties []
     let loadingNotification = new Event<Types.WorkspaceProjectState>()
 
 
@@ -568,7 +567,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
                 cache |> Seq.map (fun n -> n.Value) |> Seq.toList
 
             let rec loadProject p =
-                let res = ProjectLoader.getProjectInfo p toolsPath [] None generateBinlog customProperties
+                let res = ProjectLoader.getProjectInfo p toolsPath globalProperties generateBinlog customProperties
 
                 match res with
                 | Ok project ->
@@ -651,8 +650,8 @@ type WorkspaceLoader private (toolsPath: ToolsPath) =
 
 
 
-    static member Create(toolsPath: ToolsPath) =
-        WorkspaceLoader(toolsPath) :> IWorkspaceLoader
+    static member Create(toolsPath: ToolsPath, ?globalProperties) =
+        WorkspaceLoader(toolsPath, ?globalProperties=globalProperties) :> IWorkspaceLoader
 
 type ProjectViewerTree =
     { Name: string
