@@ -2,7 +2,7 @@
 
 open System
 open System.IO
-open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.CodeAnalysis
 open Newtonsoft.Json
 open Ionide.ProjInfo
 
@@ -21,9 +21,10 @@ module internal ProjectCrackerCache =
         let fullPathNormalized = Path.GetFullPath >> Utils.normalizePath
 
         let projViewerItemsNormalized =
-            if obj.ReferenceEquals(null, projViewerItems)
-            then []
-            else projViewerItems
+            if obj.ReferenceEquals(null, projViewerItems) then
+                []
+            else
+                projViewerItems
 
         let projViewerItemsNormalized =
             projViewerItemsNormalized
@@ -142,14 +143,16 @@ type internal Project(projectFile, onChange: string -> unit) =
                 }
 
             let projectTime =
-                if File.Exists projectFile
-                then File.GetLastWriteTimeUtc projectFile
-                else DateTime.MinValue
+                if File.Exists projectFile then
+                    File.GetLastWriteTimeUtc projectFile
+                else
+                    DateTime.MinValue
 
             let projectAssetsTime =
-                if File.Exists projectAssetsFile
-                then File.GetLastWriteTimeUtc projectAssetsFile
-                else DateTime.MinValue
+                if File.Exists projectAssetsFile then
+                    File.GetLastWriteTimeUtc projectAssetsFile
+                else
+                    DateTime.MinValue
 
             let projectPropsTime =
                 if Directory.Exists objFolder then
@@ -175,8 +178,8 @@ type internal Project(projectFile, onChange: string -> unit) =
     do fsw.EnableRaisingEvents <- true
 
     do
-        if projectAssetsFile |> Path.GetDirectoryName |> Directory.Exists |> not
-        then projectAssetsFile |> Path.GetDirectoryName |> Directory.CreateDirectory |> ignore
+        if projectAssetsFile |> Path.GetDirectoryName |> Directory.Exists |> not then
+            projectAssetsFile |> Path.GetDirectoryName |> Directory.CreateDirectory |> ignore
 
     ///File System Watcher for `obj` dir, at the moment only `project.assets.json` and `*.props`
     let afsw = new FileSystemWatcher(Path = Path.GetDirectoryName projectAssetsFile, Filter = Path.GetFileName projectAssetsFile)

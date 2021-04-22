@@ -1,5 +1,6 @@
-Microsoft.Build
-Microsoft.Build.Locator
+Microsoft.Build copy_local: false
+Microsoft.Build.Framework copy_local: false
+Microsoft.Build.Locator copy_local: false
 FSharp.Core
 Microsoft.SourceLink.GitHub
 File: FsLibLog.fs

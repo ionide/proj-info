@@ -9,32 +9,21 @@ type internal GetProjectOptionsErrors = Types.GetProjectOptionsErrors
 [<RequireQualifiedAccess>]
 type internal ProjectSystemState =
     | Loading of string
-    | Loaded of FSharp.Compiler.SourceCodeServices.FSharpProjectOptions * Types.ProjectOptions * ProjectViewerItem list * fromDpiCache: bool
+    | Loaded of FSharp.Compiler.CodeAnalysis.FSharpProjectOptions * Types.ProjectOptions * ProjectViewerItem list * fromDpiCache: bool
     | LoadedOther of Types.ProjectOptions * ProjectViewerItem list * fromDpiCache: bool
     | Failed of string * GetProjectOptionsErrors
 
 
-let internal extractOptionsDPW (opts: FSharp.Compiler.SourceCodeServices.FSharpProjectOptions) =
-    match opts.ExtraProjectInfo with
-    | None -> Error(GenericError(opts.ProjectFileName, "expected ExtraProjectInfo after project parsing, was None"))
-    | Some x ->
-        match x with
-        | :? ProjectOptions as poDPW -> Ok poDPW
-        | x -> Error(GenericError(opts.ProjectFileName, (sprintf "expected ExtraProjectInfo after project parsing, was %A" x)))
+let private getItems isFromCache fcsPo po =
+    let view = ProjectViewer.render po
 
-let private bindResults isFromCache res =
-    extractOptionsDPW res
-    |> Result.bind
-        (fun optsDPW ->
-            let view = ProjectViewer.render optsDPW
+    let items =
+        if obj.ReferenceEquals(view.Items, null) then
+            []
+        else
+            view.Items
 
-            let items =
-                if obj.ReferenceEquals(view.Items, null) then
-                    []
-                else
-                    view.Items
-
-            Result.Ok(res, optsDPW, items, isFromCache))
+    items
 
 let private getProjectOptions (loader: IWorkspaceLoader) (onEvent: ProjectSystemState -> unit) (generateBinlog: bool) (projectFileNames: string list) =
     let existing, notExisting = projectFileNames |> List.partition (File.Exists)
@@ -49,11 +38,8 @@ let private getProjectOptions (loader: IWorkspaceLoader) (onEvent: ProjectSystem
         | WorkspaceProjectState.Loading (p) -> onEvent (ProjectSystemState.Loading p)
         | WorkspaceProjectState.Loaded (po, allProjects, isFromCache) when po.ProjectFileName.EndsWith ".fsproj" ->
             let fpo = FCS.mapToFSharpProjectOptions po allProjects
-            let x = bindResults isFromCache fpo
-
-            match x with
-            | Ok (opts, optsDPW, projViewerItems, isFromCache) -> onEvent (ProjectSystemState.Loaded(opts, optsDPW, projViewerItems, isFromCache))
-            | Error error -> onEvent (ProjectSystemState.Failed(error.ProjFile, error))
+            let items = getItems isFromCache fpo po
+            onEvent (ProjectSystemState.Loaded(fpo, po, items, isFromCache))
         | WorkspaceProjectState.Loaded (po, allProjects, isFromCache) ->
             let view = ProjectViewer.render po
             let items = view.Items

@@ -5,3 +5,7 @@ Expecto.Diff
 MedallionShell
 Microsoft.NETFramework.ReferenceAssemblies
 FSharp.Compiler.Service
+Microsoft.Build.Locator
+Microsoft.Build.Framework
+Microsoft.Build.Utilities.Core
+Microsoft.Build.Tasks.Core

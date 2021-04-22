@@ -1,9 +1,12 @@
 source https://api.nuget.org/v3/index.json
+# this is the FCS nightly feed, re-enable at your own risk!
+source https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3/index.json
+
 storage: none
 framework: net5.0, netcoreapp3.1
 
-nuget FSharp.Core
-nuget FSharp.Compiler.Service ~> 39.0
+nuget FSharp.Core prerelease
+nuget FSharp.Compiler.Service prerelease
 nuget Argu ~> 5.1
 
 nuget Microsoft.NETFramework.ReferenceAssemblies # for net461 builds
@@ -16,6 +19,7 @@ nuget MedallionShell ~> 1.5.0
 
 
 nuget Microsoft.Build copy_local: false
+nuget Microsoft.Build.Framework copy_local: false
 nuget Microsoft.Build.Locator
 nuget Newtonsoft.Json
 nuget Fsharp.Control.Reactive
