@@ -9,7 +9,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         dotnet: [5.0.100]
+      fail-fast: false # we have timing issues on some OS, so we want them all to run
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
 
     steps:
     - uses: actions/checkout@v1
