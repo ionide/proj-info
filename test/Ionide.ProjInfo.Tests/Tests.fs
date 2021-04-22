@@ -826,11 +826,11 @@ module ExpectProjectSystemNotification =
     let expectNotifications actual expected =
         let getMessage =
             function
-            | ProjectResponse.ProjectLoading (path) -> sprintf "loading %s" path
-            | ProjectResponse.Project (po, _) -> sprintf "loaded %s" po.ProjectFileName
-            | ProjectResponse.ProjectError (path, _) -> sprintf "failed %s" path
+            | ProjectResponse.ProjectLoading (path) -> sprintf "loading %s" (System.IO.Path.GetFileName path)
+            | ProjectResponse.Project (po, _) -> sprintf "loaded %s" (System.IO.Path.GetFileName po.ProjectFileName)
+            | ProjectResponse.ProjectError (path, _) -> sprintf "failed %s" (System.IO.Path.GetFileName path)
             | ProjectResponse.WorkspaceLoad (finished) -> sprintf "workspace %b" finished
-            | ProjectResponse.ProjectChanged (projectFileName) -> sprintf "changed %s" projectFileName
+            | ProjectResponse.ProjectChanged (projectFileName) -> sprintf "changed %s" (System.IO.Path.GetFileName projectFileName)
 
         Expect.equal (List.length actual) (List.length expected) (sprintf "expected notifications: %A\n actual notifications %A" (expected |> List.map fst) (actual |> List.map getMessage))
 
