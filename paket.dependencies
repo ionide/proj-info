@@ -5,8 +5,8 @@ source https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3
 storage: none
 framework: net5.0, netcoreapp3.1
 
-nuget FSharp.Core prerelease
-nuget FSharp.Compiler.Service prerelease
+nuget FSharp.Core
+nuget FSharp.Compiler.Service
 nuget Argu ~> 5.1
 
 nuget Microsoft.NETFramework.ReferenceAssemblies # for net461 builds
