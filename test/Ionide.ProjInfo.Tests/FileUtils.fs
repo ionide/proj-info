@@ -12,10 +12,11 @@ let (/) a b = Path.Combine(a, b)
 let rm_rf (logger: Logger) path =
     logger.debug (eventX "rm -rf '{path}'" >> setField "path" path)
 
-    if Directory.Exists path
-    then Directory.Delete(path, true)
+    if Directory.Exists path then
+        Directory.Delete(path, true)
 
-    if File.Exists path then File.Delete(path)
+    if File.Exists path then
+        File.Delete(path)
 
 let mkdir_p (logger: Logger) dir =
     if not (Directory.Exists dir) then
@@ -26,9 +27,10 @@ let cp (logger: Logger) (from: string) (toPath: string) =
     logger.debug (eventX "cp '{from}' '{toPath}'" >> setField "from" from >> setField "toPath" toPath)
 
     let toFilePath =
-        if (Directory.Exists(toPath))
-        then toPath / Path.GetFileName(from)
-        else toPath
+        if (Directory.Exists(toPath)) then
+            toPath / Path.GetFileName(from)
+        else
+            toPath
 
     File.Copy(from, toFilePath, true)
 
@@ -46,36 +48,34 @@ let cp_r (logger: Logger) (from: string) (toPath: string) =
         File.Copy(newPath, toFilePath, true)
 
 let shellExecRun (logger: Logger) workDir cmd (args: string list) =
-    logger.debug
-        (eventX "executing: '{cmd}' '{args}'"
-         >> setField "cmd" cmd
-         >> setField "args" (args |> String.concat " ")
-         >> setField "workingDir" workDir)
+    logger.debug (
+        eventX "executing: '{cmd}' '{args}'"
+        >> setField "cmd" cmd
+        >> setField "args" (args |> String.concat " ")
+        >> setField "workingDir" workDir
+    )
 
     let cmd =
         Medallion.Shell.Command.Run(cmd, args |> Array.ofList |> Array.map box, options = (fun opt -> opt.WorkingDirectory(workDir) |> ignore))
 
     cmd.Wait()
 
-    if not (String.IsNullOrWhiteSpace(cmd.Result.StandardOutput))
-    then logger.debug (eventX "output: '{output}'" >> setField "output" cmd.Result.StandardOutput)
+    if not (String.IsNullOrWhiteSpace(cmd.Result.StandardOutput)) then
+        logger.debug (eventX "output: '{output}'" >> setField "output" cmd.Result.StandardOutput)
 
-    if not (String.IsNullOrWhiteSpace(cmd.Result.StandardError))
-    then logger.debug (eventX "error: '{error}'" >> setField "error" cmd.Result.StandardError)
+    if not (String.IsNullOrWhiteSpace(cmd.Result.StandardError)) then
+        logger.debug (eventX "error: '{error}'" >> setField "error" cmd.Result.StandardError)
 
     cmd
 
 let isWindows () =
-#if NET461
-    System.Environment.OSVersion.Platform = System.PlatformID.Win32NT
-#else
     RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-#endif
 
 let shellExecRunNET (logger: Logger) workDir cmd (args: string list) =
-    if (isWindows ())
-    then shellExecRun logger workDir cmd args
-    else shellExecRun logger workDir "mono" (cmd :: args)
+    if (isWindows ()) then
+        shellExecRun logger workDir cmd args
+    else
+        shellExecRun logger workDir "mono" (cmd :: args)
 
 
 let createFile (logger: Logger) path setContent =

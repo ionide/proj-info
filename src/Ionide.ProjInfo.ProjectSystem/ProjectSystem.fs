@@ -3,7 +3,7 @@ namespace Ionide.ProjInfo.ProjectSystem
 open System
 open System.IO
 open System.Collections.Concurrent
-open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.CodeAnalysis
 open Ionide.ProjInfo.Types
 open Ionide.ProjInfo
 open Workspace
@@ -167,27 +167,7 @@ type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -
             | _ -> ()
 
             let loader = workspaceLoaderFactory toolsPath
-
-            let bindNewOnloaded (n: WorkspaceProjectState) : ProjectSystemState option =
-                match n with
-                | WorkspaceProjectState.Loading (path) -> Some(ProjectSystemState.Loading path)
-                | WorkspaceProjectState.Loaded (opts, allKNownProjects, isFromCache) ->
-                    let fcsOpts = FCS.mapToFSharpProjectOptions opts allKNownProjects
-
-                    match Workspace.extractOptionsDPW fcsOpts with
-                    | Ok optsDPW ->
-                        let view = ProjectViewer.render optsDPW
-                        Some(ProjectSystemState.Loaded(fcsOpts, optsDPW, view.Items, isFromCache))
-                    | Error e -> Some(ProjectSystemState.Failed(e.ProjFile, e))
-
-                | WorkspaceProjectState.Failed (path, e) ->
-                    let error = e
-                    Some(ProjectSystemState.Failed(path, error))
-
-            // loader.Notifications.Add(fun arg -> arg |> bindNewOnloaded |> Option.iter onLoaded)
-
             Workspace.loadInBackground onLoaded loader (prjs |> List.map snd) generateBinlog
-
             ProjectResponse.WorkspaceLoad true |> notify.Trigger
 
             isWorkspaceReady <- true

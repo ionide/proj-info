@@ -4,25 +4,26 @@ on: [push, pull_request]
 
 jobs:
   build:
-
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         dotnet: [5.0.100]
+      fail-fast: false # we have timing issues on some OS, so we want them all to run
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
 
     steps:
-    - uses: actions/checkout@v1
-    - name: Setup .NET Core
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: ${{ matrix.dotnet }}
-    - name: Restore tools
-      run: dotnet tool restore
-    - name: Run build
-      run: dotnet fake build -t Pack
-    - name: Upload NuGet packages
-      uses: actions/upload-artifact@v2
-      with:
-        name: packages
-        path: out/
+      - uses: actions/checkout@v1
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: ${{ matrix.dotnet }}
+      - name: Restore tools
+        run: dotnet tool restore
+      - name: Run build
+        run: dotnet fake build -t Pack
+      - name: Upload NuGet packages
+        uses: actions/upload-artifact@v2
+        with:
+          name: packages
+          path: out/

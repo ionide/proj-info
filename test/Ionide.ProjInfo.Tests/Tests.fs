@@ -11,7 +11,7 @@ open System.Collections.Generic
 open Ionide.ProjInfo.Types
 open Ionide.ProjInfo
 open Expecto.Logging.Message
-open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.CodeAnalysis
 
 #nowarn "25"
 
@@ -32,8 +32,8 @@ let findByPath path parsed =
             else
                 None)
     |> function
-    | Some x -> x
-    | None -> failwithf "key '%s' not found in %A" path (parsed |> Array.map (fun kv -> kv.Key))
+        | Some x -> x
+        | None -> failwithf "key '%s' not found in %A" path (parsed |> Array.map (fun kv -> kv.Key))
 
 let expectFind projPath msg (parsed: ProjectOptions list) =
     let p = parsed |> List.tryFind (fun n -> n.ProjectFileName = projPath)
@@ -72,12 +72,8 @@ let renderOf sampleProj sources =
       Items = sources |> List.map (fun (path, link) -> ProjectViewerItem.Compile(path, { ProjectViewerItemConfig.Link = link })) }
 
 let createFCS () =
-
-    let checker =
-        FSharp.Compiler.SourceCodeServices.FSharpChecker.Create(projectCacheSize = 200, keepAllBackgroundResolutions = true, keepAssemblyContents = true)
-
+    let checker = FSharpChecker.Create(projectCacheSize = 200, keepAllBackgroundResolutions = true, keepAssemblyContents = true)
     checker.ImplicitlyStartBackgroundWork <- true
-
     checker
 
 [<AutoOpen>]
@@ -155,8 +151,13 @@ let testSample2 toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPath
 
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
-            let config = if isRelease then "Release" else "Debug"
-            let props = [("Configuration", config)]
+            let config =
+                if isRelease then
+                    "Release"
+                else
+                    "Debug"
+
+            let props = [ ("Configuration", config) ]
             let loader = workspaceFactory (toolsPath, props)
 
             let watcher = watchNotifications logger loader
@@ -173,8 +174,8 @@ let testSample2 toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPath
 
             let expectedSources =
                 [ projDir / ("obj/" + config + "/netstandard2.0/n1.AssemblyInfo.fs")
-                  projDir / "Library.fs" 
-                  if isRelease then 
+                  projDir / "Library.fs"
+                  if isRelease then
                       projDir / "Other.fs" ]
                 |> List.map Path.GetFullPath
 
@@ -659,35 +660,43 @@ let testProjectNotFound toolsPath workspaceLoader (workspaceFactory: ToolsPath -
 
             Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(wrongPath, (GetProjectOptionsErrors.ProjectNotFound(wrongPath)))) "check error type")
 
+let internalGetProjectOptions =
+    fun (r: FSharpReferencedProject) ->
+        let rCase, fields =
+            FSharp.Reflection.FSharpValue.GetUnionFields(r, typeof<FSharpReferencedProject>, System.Reflection.BindingFlags.NonPublic ||| System.Reflection.BindingFlags.Instance)
+
+        if rCase.Name = "FSharpReference" then
+            let projOptions : FSharpProjectOptions = rCase.GetFields().[1].GetValue(box r) :?> _
+            Some projOptions
+        else
+            None
+
 let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog
         (sprintf "can load sample2 with FCS - %s" workspaceLoader)
         (fun logger fs ->
+
             let rec allFCSProjects (po: FSharpProjectOptions) =
                 [ yield po
-                  for (_, p2p) in po.ReferencedProjects do
-                      yield! allFCSProjects p2p ]
+                  for reference in po.ReferencedProjects do
+                      match internalGetProjectOptions reference with
+                      | Some opts -> yield! allFCSProjects opts
+                      | None -> () ]
 
-            let findProjectExtraInfo (po: FSharpProjectOptions) =
-                match po.ExtraProjectInfo with
-                | None -> failwithf "expect ExtraProjectInfo but was None"
-                | Some extra ->
-                    match extra with
-                    | :? ProjectOptions as poDPW -> poDPW
-                    | ex -> failwithf "expected ProjectOptions but was '%A'" ex
 
             let rec allP2P (po: FSharpProjectOptions) =
-                [ for (key, p2p) in po.ReferencedProjects do
-                      let poDPW = findProjectExtraInfo p2p
-                      yield (key, p2p, poDPW)
-                      yield! allP2P p2p ]
+                [ for reference in po.ReferencedProjects do
+                      yield reference.FileName, internalGetProjectOptions reference |> Option.get
 
-            let expectP2PKeyIsTargetPath po =
-                for (tar, fcsPO, poDPW) in allP2P po do
-                    Expect.equal tar poDPW.TargetPath (sprintf "p2p key is TargetPath, fsc projet options was '%A'" fcsPO)
+                      match internalGetProjectOptions reference with
+                      | Some opts -> yield! allP2P opts
+                      | None -> () ]
 
-
+            let expectP2PKeyIsTargetPath (pos: Map<string, ProjectOptions>) fcsPo =
+                for (tar, fcsPO) in allP2P fcsPo do
+                    let dpoPo = pos |> Map.find fcsPo.ProjectFileName
+                    Expect.equal tar dpoPo.TargetPath (sprintf "p2p key is TargetPath, fsc projet options was '%A'" fcsPO)
 
             let testDir = inDir fs "load_sample_fsc"
             copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
@@ -696,10 +705,14 @@ let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
 
             dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
-
             let loader = workspaceFactory toolsPath
 
             let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+            let mutable pos = Map.empty
+
+            loader.Notifications.Add
+                (function
+                | WorkspaceProjectState.Loaded (po, knownProjects, _) -> pos <- Map.add po.ProjectFileName po pos)
 
             let fcsPo = FCS.mapToFSharpProjectOptions parsed.Head parsed
 
@@ -709,18 +722,15 @@ let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
 
             Expect.equal fcsPo.ReferencedProjects.Length ``sample2 NetSdk library``.ProjectReferences.Length "refs"
 
-            Expect.equal fcsPo.ExtraProjectInfo (Some(box po)) "extra info"
-
             //TODO check fullpaths
             Expect.equal fcsPo.SourceFiles (po.SourceFiles |> Array.ofList) "check sources"
 
-
-            expectP2PKeyIsTargetPath fcsPo
+            expectP2PKeyIsTargetPath pos fcsPo
 
             let fcs = createFCS ()
             let result = fcs.ParseAndCheckProject(fcsPo) |> Async.RunSynchronously
 
-            Expect.isEmpty result.Errors (sprintf "no errors but was: %A" result.Errors)
+            Expect.isEmpty result.Diagnostics (sprintf "no errors but was: %A" result.Diagnostics)
 
             let uses = result.GetAllUsesOfAllSymbols()
 
@@ -816,11 +826,11 @@ module ExpectProjectSystemNotification =
     let expectNotifications actual expected =
         let getMessage =
             function
-            | ProjectResponse.ProjectLoading (path) -> sprintf "loading %s" path
-            | ProjectResponse.Project (po, _) -> sprintf "loaded %s" po.ProjectFileName
-            | ProjectResponse.ProjectError (path, _) -> sprintf "failed %s" path
+            | ProjectResponse.ProjectLoading (path) -> sprintf "loading %s" (System.IO.Path.GetFileName path)
+            | ProjectResponse.Project (po, _) -> sprintf "loaded %s" (System.IO.Path.GetFileName po.ProjectFileName)
+            | ProjectResponse.ProjectError (path, _) -> sprintf "failed %s" (System.IO.Path.GetFileName path)
             | ProjectResponse.WorkspaceLoad (finished) -> sprintf "workspace %b" finished
-            | ProjectResponse.ProjectChanged (projectFileName) -> sprintf "changed %s" projectFileName
+            | ProjectResponse.ProjectChanged (projectFileName) -> sprintf "changed %s" (System.IO.Path.GetFileName projectFileName)
 
         Expect.equal (List.length actual) (List.length expected) (sprintf "expected notifications: %A\n actual notifications %A" (expected |> List.map fst) (actual |> List.map getMessage))
 
@@ -887,7 +897,7 @@ let testProjectSystem toolsPath workspaceLoader workspaceFactory =
             let fcs = createFCS ()
             let result = fcs.ParseAndCheckProject(fcsPo) |> Async.RunSynchronously
 
-            Expect.isEmpty result.Errors (sprintf "no errors but was: %A" result.Errors)
+            Expect.isEmpty result.Diagnostics (sprintf "no errors but was: %A" result.Diagnostics)
 
             let uses = result.GetAllUsesOfAllSymbols()
 
@@ -987,10 +997,10 @@ let tests toolsPath =
     testSequenced
     <| testList
         "Main tests"
-        [ testSample2 toolsPath "WorkspaceLoader" false (fun (tools,props) -> WorkspaceLoader.Create(tools, globalProperties=props))
-          testSample2 toolsPath "WorkspaceLoader" true (fun (tools,props) -> WorkspaceLoader.Create(tools, globalProperties=props))
-          testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" false (fun (tools,props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties=props))
-          testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" true (fun (tools,props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties=props))
+        [ testSample2 toolsPath "WorkspaceLoader" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
+          testSample2 toolsPath "WorkspaceLoader" true (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
+          testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" false (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))
+          testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" true (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))
           testSample3 toolsPath "WorkspaceLoader" WorkspaceLoader.Create testSample3WorkspaceLoaderExpected //- Sample 3 having issues, was also marked pending on old test suite
           //   testSample3 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create testSample3GraphExpected //- Sample 3 having issues, was also marked pending on old test suite
           testSample4 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
