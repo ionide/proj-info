@@ -10,7 +10,7 @@ nuget FSharp.Compiler.Service
 nuget Argu ~> 5.1
 
 nuget Microsoft.NETFramework.ReferenceAssemblies # for net461 builds
-nuget Microsoft.SourceLink.GitHub copy_local: true
+nuget Microsoft.SourceLink.GitHub copy_local: false
 
 nuget Expecto ~> 8.4
 nuget Expecto.Diff
