@@ -10,11 +10,12 @@ open System.Runtime.InteropServices
 
 let defaultDotNetSDKRoot =
     let path =
-        if RuntimeInformation.IsOSPlatform OSPlatform.OSX
-        then "/usr/local/share/dotnet"
-        else if RuntimeInformation.IsOSPlatform OSPlatform.Linux
-        then "/usr/share/dotnet"
-        else @"C:\Program Files\dotnet"
+        if RuntimeInformation.IsOSPlatform OSPlatform.OSX then
+            "/usr/local/share/dotnet"
+        else if RuntimeInformation.IsOSPlatform OSPlatform.Linux then
+            "/usr/share/dotnet"
+        else
+            @"C:\Program Files\dotnet"
 
     DirectoryInfo path
 
@@ -50,19 +51,21 @@ let compareNugetVersion (NugetVersion (lM, lm, lb, ls)) (NugetVersion (rM, rm, r
 /// Parse nuget version strings into numeric and suffix parts
 ///
 /// Format: `$(Major).$(Minor).$(Build) [-SomeSuffix]`
-let deconstructVersion (version: string): NugetVersion =
+let deconstructVersion (version: string) : NugetVersion =
     let version, suffix =
         let pos = version.IndexOf("-")
 
-        if pos >= 0
-        then version.Substring(0, pos), version.Substring(pos + 1)
-        else version, ""
+        if pos >= 0 then
+            version.Substring(0, pos), version.Substring(pos + 1)
+        else
+            version, ""
 
     let elements = version.Split('.')
 
-    if elements.Length < 3
-    then NugetVersion(0, 0, 0, suffix)
-    else NugetVersion(Int32.Parse(elements.[0]), Int32.Parse(elements.[1]), Int32.Parse(elements.[2]), suffix)
+    if elements.Length < 3 then
+        NugetVersion(0, 0, 0, suffix)
+    else
+        NugetVersion(Int32.Parse(elements.[0]), Int32.Parse(elements.[1]), Int32.Parse(elements.[2]), suffix)
 
 let versionDirectoriesIn (baseDir: DirectoryInfo) =
     baseDir.EnumerateDirectories()
@@ -78,9 +81,10 @@ let sdkDir (dotnetRoot: DirectoryInfo) =
 let sdkVersions dotnetRoot =
     let sdkDir = sdkDir dotnetRoot
 
-    if sdkDir.Exists
-    then Some(versionDirectoriesIn sdkDir)
-    else None
+    if sdkDir.Exists then
+        Some(versionDirectoriesIn sdkDir)
+    else
+        None
 
 /// path to the .netcoreapp reference assembly storage location
 let netcoreAppPacksDir (dotnetRoot: DirectoryInfo) =
@@ -97,32 +101,36 @@ let runtimeVersions (dotnetRoot: DirectoryInfo) =
     let runtimesDir = netcoreAppDir dotnetRoot
     let packsDir = netcoreAppPacksDir dotnetRoot
 
-    if packsDir.Exists
-    then Some(versionDirectoriesIn packsDir)
-    else if runtimesDir.Exists
-    then Some(versionDirectoriesIn runtimesDir)
-    else None
+    if packsDir.Exists then
+        Some(versionDirectoriesIn packsDir)
+    else if runtimesDir.Exists then
+        Some(versionDirectoriesIn runtimesDir)
+    else
+        None
 
 let appPackDir dotnetRoot runtimeVersion tfm =
     let packDir = Path.Combine((netcoreAppPacksDir dotnetRoot).FullName, runtimeVersion, "ref", tfm)
 
-    if Directory.Exists packDir
-    then Some(DirectoryInfo packDir)
-    else None
+    if Directory.Exists packDir then
+        Some(DirectoryInfo packDir)
+    else
+        None
 
 let compilerDir dotnetRoot sdkVersion =
     let compilerDir = Path.Combine((sdkDir dotnetRoot).FullName, sdkVersion, "FSharp")
 
-    if Directory.Exists compilerDir
-    then Some(DirectoryInfo compilerDir)
-    else None
+    if Directory.Exists compilerDir then
+        Some(DirectoryInfo compilerDir)
+    else
+        None
 
 let runtimeDir dotnetRoot runtimeVersion =
     let runtimeDir = Path.Combine((netcoreAppDir dotnetRoot).FullName, runtimeVersion)
 
-    if Directory.Exists runtimeDir
-    then Some(DirectoryInfo runtimeDir)
-    else None
+    if Directory.Exists runtimeDir then
+        Some(DirectoryInfo runtimeDir)
+    else
+        None
 
 /// given the pack directory and the runtime directory, we prefer the pack directory (because these are ref dlls)
 /// but will accept the runtime dir if no pack exists.
@@ -136,9 +144,10 @@ let findRuntimeRefs packDir runtimeDir =
         // of netcore.
         |> Seq.choose
             (fun r ->
-                if r.Extension.EndsWith "dll" && not (Path.GetFileNameWithoutExtension(r.Name) = "mscorlib")
-                then Some r.FullName
-                else None)
+                if r.Extension.EndsWith "dll" && not (Path.GetFileNameWithoutExtension(r.Name) = "mscorlib") then
+                    Some r.FullName
+                else
+                    None)
         |> Seq.toArray
     | None, None -> [||]
 
@@ -147,8 +156,8 @@ let compilerAndInteractiveRefs compilerDir useFsiAuxLib =
     match compilerDir with
     | Some (dir: DirectoryInfo) ->
         [ yield Path.Combine(dir.FullName, "FSharp.Core.dll")
-          if useFsiAuxLib
-          then yield Path.Combine(dir.FullName, "FSharp.Compiler.Interactive.Settings.dll") ]
+          if useFsiAuxLib then
+              yield Path.Combine(dir.FullName, "FSharp.Compiler.Interactive.Settings.dll") ]
     | None -> []
 
 /// refs for .net core include:
@@ -163,19 +172,24 @@ let tfmForRuntime =
     let netcore3 = NugetVersion(3, 0, 100, "")
     let netcore31 = NugetVersion(3, 1, 100, "")
     let netcore5 = NugetVersion(5, 0, 100, "")
+    let netcore6 = NugetVersion(6, 0, 100, "")
 
     fun (sdkVersion: NugetVersion) ->
         let compare = compareNugetVersion sdkVersion
 
-        match compare netcore5 with
+        match compare netcore6 with
         | 1
-        | 0 -> "net5.0"
+        | 0 -> "net6.0"
         | _ ->
-            match compare netcore31 with
+            match compare netcore5 with
             | 1
-            | 0 -> "netcoreapp3.1"
+            | 0 -> "net5.0"
             | _ ->
-                match compare netcore3 with
+                match compare netcore31 with
                 | 1
-                | 0 -> "netcoreapp3.0"
-                | _ -> "netcoreapp2.2"
+                | 0 -> "netcoreapp3.1"
+                | _ ->
+                    match compare netcore3 with
+                    | 1
+                    | 0 -> "netcoreapp3.0"
+                    | _ -> "netcoreapp2.2"

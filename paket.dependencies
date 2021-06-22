@@ -3,13 +3,12 @@ source https://api.nuget.org/v3/index.json
 source https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3/index.json
 
 storage: none
-framework: net5.0, netcoreapp3.1
+framework: net5.0
 
 nuget FSharp.Core
 nuget FSharp.Compiler.Service
 nuget Argu ~> 5.1
 
-nuget Microsoft.NETFramework.ReferenceAssemblies # for net461 builds
 nuget Microsoft.SourceLink.GitHub copy_local: false
 
 nuget Expecto ~> 8.4
@@ -20,6 +19,8 @@ nuget MedallionShell ~> 1.5.0
 
 nuget Microsoft.Build copy_local: false
 nuget Microsoft.Build.Framework copy_local: false
+nuget Microsoft.Build.Utilities.Core copy_local: false
+nuget Microsoft.Build.Tasks.Core copy_local: false
 nuget Microsoft.Build.Locator
 nuget Newtonsoft.Json
 nuget Fsharp.Control.Reactive
