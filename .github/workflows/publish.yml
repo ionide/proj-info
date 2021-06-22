@@ -53,4 +53,4 @@ jobs:
       - name: Publish to NuGet
         run: dotnet fake build -t Push
         env:
-          nuget-key: ${{ secrets.NUGET_TOKEN }}
+          nuget-key: ${{ secrets.PROJ_INFO_NUGET_TOKEN }}
