@@ -32,8 +32,8 @@ let findByPath path parsed =
             else
                 None)
     |> function
-    | Some x -> x
-    | None -> failwithf "key '%s' not found in %A" path (parsed |> Array.map (fun kv -> kv.Key))
+        | Some x -> x
+        | None -> failwithf "key '%s' not found in %A" path (parsed |> Array.map (fun kv -> kv.Key))
 
 let expectFind projPath msg (parsed: ProjectOptions list) =
     let p = parsed |> List.tryFind (fun n -> n.ProjectFileName = projPath)
