@@ -9,14 +9,15 @@ nuget FSharp.Core
 nuget FSharp.Compiler.Service
 nuget Argu ~> 5.1
 
-nuget Microsoft.SourceLink.GitHub copy_local: false
+# copy_local: true doesn't expose sourcelink as a package dependency
+nuget Microsoft.SourceLink.GitHub copy_local: true
 
 nuget Expecto ~> 8.4
 nuget Expecto.Diff
 nuget Expecto.TestResults ~> 8.4
 nuget MedallionShell ~> 1.5.0
 
-
+# copy_local: false exculdes runtime assets (desired for msbuild)
 nuget Microsoft.Build copy_local: false
 nuget Microsoft.Build.Framework copy_local: false
 nuget Microsoft.Build.Utilities.Core copy_local: false

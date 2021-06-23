@@ -76,7 +76,7 @@ NUGET
       System.Security.Cryptography.Xml (>= 4.7)
       System.Security.Permissions (>= 4.7)
       System.Threading.Tasks.Dataflow (>= 4.9)
-    Microsoft.Build.Tasks.Git (1.0) - copy_local: false
+    Microsoft.Build.Tasks.Git (1.0) - copy_local: true
     Microsoft.Build.Utilities.Core (16.10) - copy_local: false
       Microsoft.Build.Framework (>= 16.10)
       Microsoft.NET.StringTools (>= 1.0)
@@ -90,8 +90,8 @@ NUGET
       System.Runtime.CompilerServices.Unsafe (>= 5.0)
     Microsoft.NETCore.Platforms (5.0.2) - copy_local: false
     Microsoft.NETCore.Targets (5.0)
-    Microsoft.SourceLink.Common (1.0) - copy_local: false
-    Microsoft.SourceLink.GitHub (1.0) - copy_local: false
+    Microsoft.SourceLink.Common (1.0) - copy_local: true
+    Microsoft.SourceLink.GitHub (1.0) - copy_local: true
       Microsoft.Build.Tasks.Git (>= 1.0)
       Microsoft.SourceLink.Common (>= 1.0)
     Microsoft.Win32.Primitives (4.3)
