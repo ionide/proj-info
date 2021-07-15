@@ -11,6 +11,9 @@ module internal Paths =
             .MainModule
             .FileName
 
+    let sdksPath (dotnetRoot: string) =
+        System.IO.Path.Combine(dotnetRoot, "Sdks")
+
 module internal CommonHelpers =
 
     let chooseByPrefix (prefix: string) (s: string) =
@@ -81,7 +84,7 @@ module internal FscArguments =
         // TODO put in FCS
         (n = "--times") || (n = "--no-jit-optimize")
 
-    let isSourceFile (file: string): (string -> bool) =
+    let isSourceFile (file: string) : (string -> bool) =
         if System.IO.Path.GetExtension(file) = ".fsproj" then
             isCompileFile
         else
@@ -110,7 +113,7 @@ module internal CscArguments =
         else
             s
 
-    let isSourceFile (file: string): (string -> bool) =
+    let isSourceFile (file: string) : (string -> bool) =
         if System.IO.Path.GetExtension(file) = ".csproj" then
             isCompileFile
         else

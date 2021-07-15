@@ -5,6 +5,21 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch Tool",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net5.0/Ionide.ProjInfo.Tool.dll",
+            "args": [
+                "--project",
+                "/Users/chethusk/work/server/src/BDS.Endpoint.Server/BDS.Endpoint.Server.fsproj",
+                "--graph"
+            ],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "justMyCode": true,
+        },
+        {
             "name": "Ionide.ProjInfo.Tests",
             "type": "coreclr",
             "request": "launch",

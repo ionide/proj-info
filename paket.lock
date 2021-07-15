@@ -1,5 +1,5 @@
 STORAGE: NONE
-RESTRICTION: == net50
+RESTRICTION: || (== net5.0) (== net6.0)
 NUGET
   remote: https://api.nuget.org/v3/index.json
     Argu (5.5)
@@ -62,7 +62,6 @@ NUGET
       System.Threading.Tasks.Dataflow (>= 4.9)
     Microsoft.Build.Framework (16.10) - copy_local: false
       System.Security.Permissions (>= 4.7)
-    Microsoft.Build.Locator (1.4.1)
     Microsoft.Build.Tasks.Core (16.10) - copy_local: false
       Microsoft.Build.Framework (>= 16.10)
       Microsoft.Build.Utilities.Core (>= 16.10)
@@ -103,7 +102,7 @@ NUGET
       System.Security.Principal.Windows (>= 5.0)
     Microsoft.Win32.SystemEvents (5.0) - copy_local: false
       Microsoft.NETCore.Platforms (>= 5.0)
-    Mono.Cecil (0.11.3)
+    Mono.Cecil (0.11.4)
     NETStandard.Library (2.0.3)
       Microsoft.NETCore.Platforms (>= 1.1)
     Newtonsoft.Json (13.0.1)
@@ -150,6 +149,7 @@ NUGET
     runtime.ubuntu.16.04-x64.runtime.native.System.Security.Cryptography.OpenSsl (4.3.3)
     runtime.ubuntu.16.10-x64.runtime.native.System.Security.Cryptography.OpenSsl (4.3.3)
     runtime.ubuntu.18.04-x64.runtime.native.System.Security.Cryptography.OpenSsl (4.3.3)
+    SemanticVersioning (2.0)
     System.Buffers (4.5.1)
     System.CodeDom (5.0) - copy_local: false
     System.Collections (4.3)

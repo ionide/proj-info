@@ -9,26 +9,87 @@ open System.IO
 open Microsoft.Build.Execution
 open Types
 open Microsoft.Build.Graph
+open System.Diagnostics
+
+module SdkDiscovery =
+    let msbuildForSdk (sdkPath: string) = Path.Combine(sdkPath, "MSBuild.dll")
+
+    let private versionedPaths (root: string) =
+        System.IO.Directory.EnumerateDirectories root
+        |> Seq.map (Path.GetFileName >> SemanticVersioning.Version)
+        |> Seq.sortDescending
+        |> Seq.map (fun v -> v, Path.Combine(root, string v))
+
+    let sdks (dotnetRoot: string) =
+        let basePath = Path.GetDirectoryName dotnetRoot
+        let sdksPath = Path.Combine(basePath, "sdk")
+        versionedPaths sdksPath
+
+    let runtimes (dotnetRoot: string) =
+        let basePath = Path.GetDirectoryName dotnetRoot
+        let netcoreAppPath = Path.Combine(basePath, "shared", "Microsoft.NETCore.App")
+        versionedPaths netcoreAppPath
+
+    let versionAt (cwd: string) =
+        let exe = Paths.dotnetRoot
+        let info = ProcessStartInfo()
+        info.WorkingDirectory <- cwd
+        info.FileName <- exe
+        info.ArgumentList.Add("--version")
+        info.RedirectStandardOutput <- true
+        let p = System.Diagnostics.Process.Start(info)
+        p.WaitForExit()
+        p.StandardOutput.ReadToEnd() |> SemanticVersioning.Version
 
 [<RequireQualifiedAccess>]
 module Init =
-    ///Initialize the MsBuild integration. Returns path to MsBuild tool that was detected by Locator. Needs to be called before doing anything else
-    let init () =
-        let instance = Microsoft.Build.Locator.MSBuildLocator.RegisterDefaults()
-        //Workaround from https://github.com/microsoft/MSBuildLocator/issues/86#issuecomment-640275377
-        AssemblyLoadContext.Default.add_Resolving
+
+    let private ensureTrailer (path: string) =
+        if path.EndsWith(Path.DirectorySeparatorChar) || path.EndsWith(Path.AltDirectorySeparatorChar) then
+            path
+        else
+            path + string Path.DirectorySeparatorChar
+
+    let mutable private resolveHandler : Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly> = null
+
+    let resolveFromSdkRoot (root: string) : Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly> =
+        Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly>
             (fun assemblyLoadContext assemblyName ->
-                let path = Path.Combine(instance.MSBuildPath, assemblyName.Name + ".dll")
+                let paths = [ Path.Combine(root, assemblyName.Name + ".dll") ]
 
-                if File.Exists path then
-                    assemblyLoadContext.LoadFromAssemblyPath path
-                else
-                    null)
+                match paths |> List.tryFind File.Exists with
+                | Some path -> assemblyLoadContext.LoadFromAssemblyPath path
+                | None -> null)
 
-        ToolsPath instance.MSBuildPath
+    let setupForSdkVersion (sdkRoot: string) =
+        let msbuild = SdkDiscovery.msbuildForSdk sdkRoot
+
+        // gotta set some env variables so msbuild interop works, see the locator for details: https://github.com/microsoft/MSBuildLocator/blob/d83904bff187ce8245f430b93e8b5fbfefb6beef/src/MSBuildLocator/MSBuildLocator.cs#L289
+        Environment.SetEnvironmentVariable("MSBUILD_EXE_PATH", msbuild)
+        Environment.SetEnvironmentVariable("MSBuildExtensionsPath", ensureTrailer sdkRoot)
+        Environment.SetEnvironmentVariable("MSBuildSDKsPath", Path.Combine(sdkRoot, "Sdks"))
+
+        match System.Environment.GetEnvironmentVariable "DOTNET_HOST_PATH" with
+        | null
+        | "" -> Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", Paths.dotnetRoot)
+        | alreadySet -> ()
+
+        if resolveHandler <> null then
+            AssemblyLoadContext.Default.remove_Resolving resolveHandler
+
+        resolveHandler <- resolveFromSdkRoot sdkRoot
+        AssemblyLoadContext.Default.add_Resolving resolveHandler
+
+    ///Initialize the MsBuild integration. Returns path to MsBuild tool that was detected by Locator. Needs to be called before doing anything else
+    let init (workingDirectory: string) =
+        let dotnetSdkVersionAtPath = SdkDiscovery.versionAt workingDirectory
+        let sdkVersion, sdkPath = SdkDiscovery.sdks Paths.dotnetRoot |> Seq.skipWhile (fun (v, path) -> v > dotnetSdkVersionAtPath) |> Seq.head
+        let msbuild = SdkDiscovery.msbuildForSdk sdkPath
+        setupForSdkVersion sdkPath
+        ToolsPath msbuild
 
 ///Low level APIs for single project loading. Doesn't provide caching, and doesn't follow p2p references.
-/// In most cases you want to use `Ionide.ProjInf.WorkspaceLoader` type instead
+/// In most cases you want to use `Ionide.ProjInfo.WorkspaceLoader` type instead
 module ProjectLoader =
 
     type LoadedProject = internal LoadedProject of ProjectInstance
@@ -55,16 +116,21 @@ module ProjectLoader =
             member this.Verbosity
                 with set (v: LoggerVerbosity): unit = () }
 
-    let getTfm (path: string) =
-        let pi = ProjectInstance(path)
+    let getTfm (path: string) readingProps =
+        let pi = ProjectInstance(path, globalProperties = readingProps, toolsVersion = null)
         let tfm = pi.GetPropertyValue "TargetFramework"
 
         if String.IsNullOrWhiteSpace tfm then
             let tfms = pi.GetPropertyValue "TargetFrameworks"
-            let actualTFM = tfms.Split(';').[0]
-            Some actualTFM
+
+            match tfms with
+            | null -> None
+            | tfms ->
+                match tfms.Split(';') with
+                | [||] -> None
+                | tfms -> Some tfms.[0]
         else
-            None
+            Some tfm
 
     let createLoggers (paths: string seq) (generateBinlog: bool) (sw: StringWriter) =
         let logger = logger (sw)
@@ -78,7 +144,7 @@ module ProjectLoader =
         else
             [ logger ]
 
-    let getGlobalProps (path: string) (tfm: string option) (globalProperties: (string * string) list)=
+    let getGlobalProps (path: string) (tfm: string option) (toolsPath: string) (globalProperties: (string * string) list) =
         dict [ "ProvideCommandLineArgs", "true"
                "DesignTimeBuild", "true"
                "SkipCompilerExecution", "true"
@@ -91,29 +157,28 @@ module ProjectLoader =
                    "TargetFramework", tfm.Value
                if path.EndsWith ".csproj" then
                    "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__")
-               "DotnetProjInfo", "true" 
+               "DotnetProjInfo", "true"
+               "MSBuildEnableWorkloadResolver", "false" // we don't care about workloads
                yield! globalProperties ]
 
 
     let buildArgs =
-        [| "ResolvePackageDependenciesDesignTime"
+        [| "ResolveAssemblyReferencesDesignTime"
+           "ResolveProjectReferencesDesignTime"
+           "ResolvePackageDependenciesDesignTime"
            "_GenerateCompileDependencyCache"
            "CoreCompile" |]
 
     let loadProject (path: string) (generateBinlog: bool) (ToolsPath toolsPath) globalProperties =
         try
-            let tfm = getTfm path
+            let readingProps = getGlobalProps path None toolsPath globalProperties
+            let tfm = getTfm path readingProps
 
-            let globalProperties = getGlobalProps path tfm globalProperties
-
-            match System.Environment.GetEnvironmentVariable "DOTNET_HOST_PATH" with
-            | null
-            | "" -> System.Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", Ionide.ProjInfo.Paths.dotnetRoot)
-            | _alreadySet -> ()
+            let globalProperties = getGlobalProps path tfm toolsPath globalProperties
 
             use pc = new ProjectCollection(globalProperties)
 
-            let pi = pc.LoadProject(path, globalProperties, toolsVersion=null)
+            let pi = pc.LoadProject(path, globalProperties, toolsVersion = null)
 
             use sw = new StringWriter()
 
@@ -130,7 +195,8 @@ module ProjectLoader =
                 Success(LoadedProject pi)
             else
                 Error(sw.ToString())
-        with exc -> Error(exc.Message)
+        with
+        | exc -> Error(exc.Message)
 
     let getFscArgs (LoadedProject project) =
         project.Items |> Seq.filter (fun p -> p.ItemType = "FscCommandLineArgs") |> Seq.map (fun p -> p.EvaluatedInclude)
@@ -342,20 +408,17 @@ module ProjectLoader =
     /// Main entry point for project loading.
     /// </summary>
     /// <param name="path">Full path to the `.fsproj` file</param>
-    /// <param name="toolsPath">Path to MsBuild obtained from `ProjectLoader.init ()`</param>
+    /// <param name="toolsPath">Path to MsBuild obtained from `ProjectLoader.init cwd`</param>
     /// <param name="generateBinlog">Enable Binary Log generation</param>
     /// <param name="globalProperties">The global properties to use (e.g. Configuration=Release). Some additional global properties are pre-set by the tool</param>
     /// <param name="customProperties">List of additional MsBuild properties that you want to obtain.</param>
     /// <returns>Returns the record instance representing the loaded project or string containing error message</returns>
-    let getProjectInfo (path: string) (toolsPath: ToolsPath) (globalProperties: (string*string) list) (generateBinlog: bool) (customProperties: string list) : Result<Types.ProjectOptions, string> =
-        let loadedProject = loadProject path generateBinlog toolsPath globalProperties 
+    let getProjectInfo (path: string) (toolsPath: ToolsPath) (globalProperties: (string * string) list) (generateBinlog: bool) (customProperties: string list) : Result<Types.ProjectOptions, string> =
+        let loadedProject = loadProject path generateBinlog toolsPath globalProperties
 
         match loadedProject with
         | Success project -> getLoadedProjectInfo path customProperties project
         | Error e -> Result.Error e
-
-
-
 
 open Ionide.ProjInfo.Logging
 
@@ -371,34 +434,44 @@ type IWorkspaceLoader =
     [<CLIEvent>]
     abstract Notifications : IEvent<WorkspaceProjectState>
 
-type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath, ?globalProperties: (string*string) list) =
+type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (string * string) list) =
+    let (ToolsPath toolsPath) = toolsPath
     let globalProperties = defaultArg globalProperties []
     let logger = LogProvider.getLoggerFor<WorkspaceLoaderViaProjectGraph> ()
     let loadingNotification = new Event<Types.WorkspaceProjectState>()
 
-
-
     let handleProjectGraphFailures f =
         try
             f () |> Some
-        with :? Microsoft.Build.Exceptions.InvalidProjectFileException as e ->
+        with
+        | :? Microsoft.Build.Exceptions.InvalidProjectFileException as e ->
             let p = e.ProjectFile
             loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
             None
+        | ex ->
+            logger.error (Log.setMessage "oops" >> Log.addExn ex)
+            None
 
-    let projectInstanceFactory projectPath (_globalProperties: IDictionary<string,string>) (projectCollection: ProjectCollection) =
-        let tfm = ProjectLoader.getTfm projectPath
+    let projectInstanceFactory projectPath (_globalProperties: IDictionary<string, string>) (projectCollection: ProjectCollection) =
+        let tfm = ProjectLoader.getTfm projectPath (dict globalProperties)
         //let globalProperties = globalProperties |> Seq.toList |> List.map (fun (KeyValue(k,v)) -> (k,v))
-        let globalProperties = ProjectLoader.getGlobalProps projectPath tfm globalProperties
-        ProjectInstance(projectPath, globalProperties, toolsVersion=null, projectCollection=projectCollection)
+        let globalProperties = ProjectLoader.getGlobalProps projectPath tfm toolsPath globalProperties
+        ProjectInstance(projectPath, globalProperties, toolsVersion = null, projectCollection = projectCollection)
 
     let projectGraphProjs (paths: string seq) =
 
         handleProjectGraphFailures
         <| fun () ->
             paths |> Seq.iter (fun p -> loadingNotification.Trigger(WorkspaceProjectState.Loading p))
-            let entryPoints = paths |> Seq.map ProjectGraphEntryPoint
-            ProjectGraph(entryPoints, projectCollection=ProjectCollection.GlobalProjectCollection, projectInstanceFactory=projectInstanceFactory)
+
+            let graph =
+                match paths |> List.ofSeq with
+                | [ x ] -> ProjectGraph(x, projectCollection = ProjectCollection.GlobalProjectCollection, projectInstanceFactory = projectInstanceFactory)
+                | xs ->
+                    let entryPoints = paths |> Seq.map ProjectGraphEntryPoint |> List.ofSeq
+                    ProjectGraph(entryPoints, projectCollection = ProjectCollection.GlobalProjectCollection, projectInstanceFactory = projectInstanceFactory)
+
+            graph
 
     let projectGraphSln (path: string) =
         handleProjectGraphFailures
@@ -411,11 +484,6 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath, ?globalProper
             |> Seq.iter (fun p -> loadingNotification.Trigger(WorkspaceProjectState.Loading p))
 
             pg
-
-
-
-
-
 
     let loadProjects (projects: ProjectGraph, customProperties: string list, generateBinlog: bool) =
         try
@@ -431,18 +499,31 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath, ?globalProper
                     >> Log.addContextDestructured "projects" (allKnownNames)
                 )
 
-
-
                 let gbr = GraphBuildRequestData(projects, ProjectLoader.buildArgs, null, BuildRequestDataFlags.ReplaceExistingProjectInstance)
                 let bm = BuildManager.DefaultBuildManager
                 use sw = new StringWriter()
                 let loggers = ProjectLoader.createLoggers allKnownNames generateBinlog sw
-                bm.BeginBuild(new BuildParameters(Loggers = loggers))
+                let buildParameters = BuildParameters(Loggers = loggers)
+                buildParameters.ProjectLoadSettings <- ProjectLoadSettings.RecordEvaluatedItemElements ||| ProjectLoadSettings.ProfileEvaluation
+                buildParameters.LogInitialPropertiesAndItems <- true
+                bm.BeginBuild(buildParameters)
+
                 let result = bm.BuildRequest gbr
 
                 bm.EndBuild()
 
-                let resultsByNode = result.ResultsByNode |> Seq.map (fun kvp -> kvp.Key) |> Seq.cache
+                let rec walkResults (known: String Set) (results: ProjectGraphNode seq) =
+                    seq {
+                        for nodeKey in results do
+                            if known |> Set.contains nodeKey.ProjectInstance.FullPath |> not then
+                                yield nodeKey
+                                let cache = Set.add nodeKey.ProjectInstance.FullPath known
+                                yield! walkResults cache nodeKey.ProjectReferences
+                            else
+                                yield! walkResults known nodeKey.ProjectReferences
+                    }
+
+                let resultsByNode = walkResults Set.empty (result.ResultsByNode |> Seq.map (fun kvp -> kvp.Key)) |> Seq.cache
                 let buildProjs = resultsByNode |> Seq.map (fun p -> p.ProjectInstance.FullPath) |> Seq.toList
 
                 logger.info (
@@ -480,7 +561,8 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath, ?globalProper
                         loadingNotification.Trigger(WorkspaceProjectState.Loaded(po, allProjectOptions |> Seq.toList, false)))
 
                 allProjectOptions :> seq<_>
-        with e ->
+        with
+        | e ->
             let msg = e.Message
 
             logger.error (Log.setMessage "Failed loading" >> Log.addExn e)
@@ -500,8 +582,6 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath, ?globalProper
                         loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg))))
 
             Seq.empty
-
-
 
     interface IWorkspaceLoader with
         override this.LoadProjects(projects: string list, customProperties, generateBinlog: bool) =
@@ -547,7 +627,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath: ToolsPath, ?globalProper
 
 
     static member Create(toolsPath: ToolsPath, ?globalProperties) =
-        WorkspaceLoaderViaProjectGraph(toolsPath, ?globalProperties=globalProperties) :> IWorkspaceLoader
+        WorkspaceLoaderViaProjectGraph(toolsPath, ?globalProperties = globalProperties) :> IWorkspaceLoader
 
 type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string * string) list) =
     let globalProperties = defaultArg globalProperties []
@@ -576,7 +656,8 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
                         let lst = project.ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
                         let info = Some project
                         lst, info
-                    with exc ->
+                    with
+                    | exc ->
                         loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, exc.Message)))
                         [], None
                 | Error msg when msg.Contains "The project file could not be loaded." ->
@@ -651,7 +732,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
 
 
     static member Create(toolsPath: ToolsPath, ?globalProperties) =
-        WorkspaceLoader(toolsPath, ?globalProperties=globalProperties) :> IWorkspaceLoader
+        WorkspaceLoader(toolsPath, ?globalProperties = globalProperties) :> IWorkspaceLoader
 
 type ProjectViewerTree =
     { Name: string
