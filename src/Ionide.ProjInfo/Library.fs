@@ -12,7 +12,7 @@ open Microsoft.Build.Graph
 open System.Diagnostics
 
 /// functions for .net sdk probing
-module SdkDiscovery =
+module internal SdkDiscovery =
 
     let msbuildForSdk (sdkPath: string) = Path.Combine(sdkPath, "MSBuild.dll")
 
@@ -32,6 +32,8 @@ module SdkDiscovery =
         let netcoreAppPath = Path.Combine(basePath, "shared", "Microsoft.NETCore.App")
         versionedPaths netcoreAppPath
 
+    /// performs a `dotnet --version` command at the given directory to get the version of the
+    /// SDK active at that location.
     let versionAt (cwd: string) =
         let exe = Paths.dotnetRoot
         let info = ProcessStartInfo()
@@ -54,7 +56,7 @@ module Init =
 
     let mutable private resolveHandler : Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly> = null
 
-    let resolveFromSdkRoot (root: string) : Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly> =
+    let private resolveFromSdkRoot (root: string) : Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly> =
         Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly>
             (fun assemblyLoadContext assemblyName ->
                 let paths = [ Path.Combine(root, assemblyName.Name + ".dll") ]
@@ -454,9 +456,28 @@ module WorkspaceLoaderViaProjectGraph =
     let locker = obj ()
 
 
+/// A type that turns project files or solution files into deconstructed options.
+/// Use this in conjunction with the other ProjInfo libraries to turn these options into
+/// ones compatible for use with FCS directly.
 type IWorkspaceLoader =
+
+    /// <summary>
+    /// Load a list of projects, extracting a set of custom build properties from the build results
+    /// in addition to the properties used to power the ProjectOption creation.
+    /// </summary>
+    /// <returns></returns>
     abstract member LoadProjects : string list * list<string> * bool -> seq<ProjectOptions>
+
+    /// <summary>
+    /// Load a list of projects
+    /// </summary>
+    /// <returns></returns>
     abstract member LoadProjects : string list -> seq<ProjectOptions>
+
+    /// <summary>
+    /// Load every project contained in the solution file
+    /// </summary>
+    /// <returns></returns>
     abstract member LoadSln : string -> seq<ProjectOptions>
 
     [<CLIEvent>]
@@ -666,7 +687,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
         [<CLIEvent>]
         override __.Notifications = loadingNotification.Publish
 
-        override __.LoadProjects(projects: string list, customProperties: string list, generateBinlog: bool) =
+        override __.LoadProjects(projects: string list, customProperties, generateBinlog: bool) =
             let cache = Dictionary<string, ProjectOptions>()
 
             let getAllKnonw () =
@@ -725,6 +746,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
 
         override this.LoadSln(sln) = this.LoadSln(sln, [], false)
 
+    /// <inheritdoc />
     member this.LoadProjects(projects: string list, customProperties: string list, generateBinlog: bool) =
         (this :> IWorkspaceLoader)
             .LoadProjects(projects, customProperties, generateBinlog)
