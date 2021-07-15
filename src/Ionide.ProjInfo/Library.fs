@@ -11,7 +11,9 @@ open Types
 open Microsoft.Build.Graph
 open System.Diagnostics
 
+/// functions for .net sdk probing
 module SdkDiscovery =
+
     let msbuildForSdk (sdkPath: string) = Path.Combine(sdkPath, "MSBuild.dll")
 
     let private versionedPaths (root: string) =
@@ -61,6 +63,29 @@ module Init =
                 | Some path -> assemblyLoadContext.LoadFromAssemblyPath path
                 | None -> null)
 
+
+    /// <summary>
+    /// Given the versioned path to an SDK root, sets up a few required environment variables
+    /// that make the SDK and MSBuild behave the same as they do when invoked from the dotnet cli directly.
+    /// </summary>
+    /// <remarks>
+    /// Specifically, this sets the following environment variables:
+    /// <list type="bullet">
+    /// <item><term>MSBUILD_EXE_PATH</term><description>the path to MSBuild.dll in the SDK</description></item>
+    /// <item><term>MSBuildExtensionsPath</term><description>the slash-terminated root path for this SDK version</description></item>
+    /// <item><term>MSBuildSDKsPath</term><description>the path to the Sdks folder inside this SDK version</description></item>
+    /// <item><term>DOTNET_HOST_PATH</term><description>the path to the 'dotnet' binary</description></item>
+    /// </list>
+    ///
+    /// It also hooks up assembly resolution to execute from the sdk's base path, per the suggestions in the MSBuildLocator project.
+    ///
+    /// See <see href="https://github.com/microsoft/MSBuildLocator/blob/d83904bff187ce8245f430b93e8b5fbfefb6beef/src/MSBuildLocator/MSBuildLocator.cs#L289">MSBuildLocator</see>,
+    /// the <see href="https://github.com/dotnet/sdk/blob/a30e465a2e2ea4e2550f319a2dc088daaafe5649/src/Cli/dotnet/CommandFactory/CommandResolution/MSBuildProject.cs#L120">dotnet cli</see>, and
+    /// the <see href="https://github.com/dotnet/sdk/blob/2c011f2aa7a91a386430233d5797452ca0821ed3/src/Cli/Microsoft.DotNet.Cli.Utils/MSBuildForwardingAppWithoutLogging.cs#L42-L44">dotnet msbuild command</see>
+    /// for more examples of this.
+    /// </remarks>
+    /// <param name="sdkRoot">the versioned root path of a given SDK version, for example '/usr/local/share/dotnet/sdk/5.0.300'</param>
+    /// <returns></returns>
     let setupForSdkVersion (sdkRoot: string) =
         let msbuild = SdkDiscovery.msbuildForSdk sdkRoot
 
@@ -80,7 +105,8 @@ module Init =
         resolveHandler <- resolveFromSdkRoot sdkRoot
         AssemblyLoadContext.Default.add_Resolving resolveHandler
 
-    ///Initialize the MsBuild integration. Returns path to MsBuild tool that was detected by Locator. Needs to be called before doing anything else
+    /// Initialize the MsBuild integration. Returns path to MsBuild tool that was detected by Locator. Needs to be called before doing anything else.
+    /// Call it again when the working directory changes.
     let init (workingDirectory: string) =
         let dotnetSdkVersionAtPath = SdkDiscovery.versionAt workingDirectory
         let sdkVersion, sdkPath = SdkDiscovery.sdks Paths.dotnetRoot |> Seq.skipWhile (fun (v, path) -> v > dotnetSdkVersionAtPath) |> Seq.head
@@ -88,8 +114,10 @@ module Init =
         setupForSdkVersion sdkPath
         ToolsPath msbuild
 
-///Low level APIs for single project loading. Doesn't provide caching, and doesn't follow p2p references.
-/// In most cases you want to use `Ionide.ProjInfo.WorkspaceLoader` type instead
+/// <summary>
+/// Low level APIs for single project loading. Doesn't provide caching, and doesn't follow p2p references.
+/// In most cases you want to use an <see cref="Ionide.ProjInfo.IWorkspaceLoader"/> type instead
+/// </summary>
 module ProjectLoader =
 
     type LoadedProject = internal LoadedProject of ProjectInstance
@@ -632,8 +660,6 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string * string) list) =
     let globalProperties = defaultArg globalProperties []
     let loadingNotification = new Event<Types.WorkspaceProjectState>()
-
-
 
     interface IWorkspaceLoader with
 
