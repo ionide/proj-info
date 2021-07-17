@@ -124,6 +124,7 @@ module ProjectLoader =
 
     type LoadedProject = internal LoadedProject of ProjectInstance
 
+    [<RequireQualifiedAccess>]
     type ProjectLoadingStatus =
         private
         | Success of LoadedProject
@@ -197,6 +198,7 @@ module ProjectLoader =
            "ResolveProjectReferencesDesignTime"
            "ResolvePackageDependenciesDesignTime"
            "_GenerateCompileDependencyCache"
+           "_ComputeNonExistentFileProperty"
            "CoreCompile" |]
 
     let loadProject (path: string) (generateBinlog: bool) (ToolsPath toolsPath) globalProperties =
@@ -222,11 +224,11 @@ module ProjectLoader =
             let t = sw.ToString()
 
             if build then
-                Success(LoadedProject pi)
+                ProjectLoadingStatus.Success(LoadedProject pi)
             else
-                Error(sw.ToString())
+                ProjectLoadingStatus.Error(sw.ToString())
         with
-        | exc -> Error(exc.Message)
+        | exc -> ProjectLoadingStatus.Error(exc.Message)
 
     let getFscArgs (LoadedProject project) =
         project.Items |> Seq.filter (fun p -> p.ItemType = "FscCommandLineArgs") |> Seq.map (fun p -> p.EvaluatedInclude)
@@ -292,15 +294,16 @@ module ProjectLoader =
                 { Name = p.Name
                   Value = p.EvaluatedValue })
 
-    let getSdkInfo (props: Property seq) =
-        let (|ConditionEquals|_|) (str: string) (arg: string) =
-            if System.String.Compare(str, arg, System.StringComparison.OrdinalIgnoreCase) = 0 then
-                Some()
-            else
-                None
+    let (|ConditionEquals|_|) (str: string) (arg: string) =
+        if System.String.Compare(str, arg, System.StringComparison.OrdinalIgnoreCase) = 0 then
+            Some()
+        else
+            None
 
-        let (|StringList|_|) (str: string) =
-            str.Split([| ';' |], System.StringSplitOptions.RemoveEmptyEntries) |> List.ofArray |> Some
+    let (|StringList|_|) (str: string) =
+        str.Split([| ';' |], System.StringSplitOptions.RemoveEmptyEntries) |> List.ofArray |> Some
+
+    let getSdkInfo (props: Property seq) =
 
         let msbuildPropBool (s: Property) =
             match s.Value.Trim() with
@@ -447,8 +450,8 @@ module ProjectLoader =
         let loadedProject = loadProject path generateBinlog toolsPath globalProperties
 
         match loadedProject with
-        | Success project -> getLoadedProjectInfo path customProperties project
-        | Error e -> Result.Error e
+        | ProjectLoadingStatus.Success project -> getLoadedProjectInfo path customProperties project
+        | ProjectLoadingStatus.Error e -> Result.Error e
 
 open Ionide.ProjInfo.Logging
 

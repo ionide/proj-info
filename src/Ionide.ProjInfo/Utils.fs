@@ -1,6 +1,6 @@
 namespace Ionide.ProjInfo
 
-module internal Paths =
+module Paths =
     /// provides the path to the `dotnet` binary running this library, duplicated from
     /// https://github.com/dotnet/sdk/blob/b91b88aec2684e3d2988df8d838d3aa3c6240a35/src/Cli/Microsoft.DotNet.Cli.Utils/Muxer.cs#L39
     let dotnetRoot =
@@ -34,7 +34,7 @@ module internal CommonHelpers =
     let splitByPrefix2 prefixes (s: string) =
         prefixes |> List.tryPick (fun prefix -> splitByPrefix prefix s)
 
-module internal FscArguments =
+module FscArguments =
 
     open CommonHelpers
     open Types
@@ -90,7 +90,7 @@ module internal FscArguments =
         else
             (fun n -> n.EndsWith ".cs")
 
-module internal CscArguments =
+module CscArguments =
     open CommonHelpers
     open System.IO
     open Types
