@@ -133,8 +133,8 @@ module Environment =
         |> Array.tryLast
 
     /// because 3.x is the minimum SDK that we support for FSI, we want to float to the latest
-    /// 3.x sdk that the user has installed, to prevent hard-coding.
-    let latest3xSdkVersion (dotnetRoot: DirectoryInfo) =
+    /// sdk that the user has installed, to prevent hard-coding.
+    let latest5xSdkVersion (dotnetRoot: DirectoryInfo) =
         let minSDKVersion = FSIRefs.NugetVersion(3, 0, 100, "")
 
         lazy
