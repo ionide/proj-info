@@ -26,7 +26,8 @@ module Environment =
     let runningOnMono =
         try
             not << isNull <| Type.GetType "Mono.Runtime"
-        with _ -> false
+        with
+        | _ -> false
 
     let private environVar v = Environment.GetEnvironmentVariable v
 
@@ -40,9 +41,10 @@ module Environment =
         | "x86", "AMD64" -> environVar "ProgramFiles(x86)"
         | _ -> environVar "ProgramFiles"
         |> fun detected ->
-            if detected = null
-            then @"C:\Program Files (x86)\"
-            else detected
+            if detected = null then
+                @"C:\Program Files (x86)\"
+            else
+                detected
 
     // Below code slightly modified from FAKE MSBuildHelper.fs
 
@@ -56,8 +58,8 @@ module Environment =
 
     let private cartesian a b =
         [ for a' in a do
-            for b' in b do
-                yield a', b' ]
+              for b' in b do
+                  yield a', b' ]
 
     let private vsRoots =
         cartesian vsVersions vsSkus
@@ -113,7 +115,6 @@ module Environment =
         | _ -> TimeSpan.Zero
 
     /// The sdk root that we assume for FSI-ref-location purposes.
-    /// TODO: make this settable via ENV variable or explicit LSP config
     let dotnetSDKRoot =
         lazy
             (let fromEnv =
@@ -122,32 +123,34 @@ module Environment =
                 |> Option.bind
                     (fun d ->
                         let di = DirectoryInfo d
-                        if di.Exists then Some di else None)
+
+                        if di.Exists then
+                            Some di
+                        else
+                            None)
 
              defaultArg fromEnv FSIRefs.defaultDotNetSDKRoot)
 
-    let private maxVersionWithThreshold (minVersion: FSIRefs.NugetVersion) (versions: FSIRefs.NugetVersion []) =
+    /// <summary>
+    /// Gets the highest-version of a set of versions based on an optional upper an lower bound
+    /// </summary>
+    /// <param name="minVersion">optional lower bound</param>
+    /// <param name="maxVersion">optional upper bound</param>
+    /// <param name="versions">the set of versions to compare</param>
+    /// <returns>the max value found in that range, if any</returns>
+    let maxVersionWithThreshold (minVersion: FSIRefs.NugetVersion option) (maxVersion: FSIRefs.NugetVersion option) (versions: FSIRefs.NugetVersion []) =
+        let minChooser =
+            match minVersion with
+            | None -> fun _ -> true
+            | Some minVersion -> fun v -> FSIRefs.compareNugetVersion v minVersion >= 0
+
+        let maxChooser =
+            match maxVersion with
+            | None -> fun _ -> true
+            | Some maxVersion -> fun v -> FSIRefs.compareNugetVersion v maxVersion <= 0
+
         versions
-        |> Array.filter (fun v -> FSIRefs.compareNugetVersion v minVersion >= 0) // get all versions that compare as greater than the minVersion
+        |> Array.filter minChooser // get all versions that compare as greater than the minVersion
+        |> Array.filter maxChooser // get all versions that compare as less than the maxVersion
         |> Array.sortWith FSIRefs.compareNugetVersion
         |> Array.tryLast
-
-    /// because 3.x is the minimum SDK that we support for FSI, we want to float to the latest
-    /// sdk that the user has installed, to prevent hard-coding.
-    let latest5xSdkVersion (dotnetRoot: DirectoryInfo) =
-        let minSDKVersion = FSIRefs.NugetVersion(3, 0, 100, "")
-
-        lazy
-            (match FSIRefs.sdkVersions dotnetRoot with
-             | None -> None
-             | Some sortedSdkVersions -> maxVersionWithThreshold minSDKVersion sortedSdkVersions)
-
-    /// because 3.x is the minimum runtime that we support for FSI, we want to float to the latest
-    /// 3.x runtime that the user has installed, to prevent hard-coding.
-    let latest3xRuntimeVersion (dotnetRoot: DirectoryInfo) =
-        let minRuntimeVersion = FSIRefs.NugetVersion(3, 0, 0, "")
-
-        lazy
-            (match FSIRefs.runtimeVersions dotnetRoot with
-             | None -> None
-             | Some sortedRuntimeVersions -> maxVersionWithThreshold minRuntimeVersion sortedRuntimeVersions)
