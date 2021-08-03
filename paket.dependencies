@@ -25,7 +25,6 @@ nuget Microsoft.Build.Tasks.Core copy_local: false
 nuget Newtonsoft.Json
 nuget Fsharp.Control.Reactive
 nuget SemanticVersioning
-nuget Buildalyzer
 
 github TheAngryByrd/FsLibLog src/FsLibLog/FsLibLog.fs
 
