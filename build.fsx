@@ -132,7 +132,7 @@ Target.create
               ("PackageTags", tags)
               ("RepositoryType", "git")
               ("RepositoryUrl", gitUrl)
-              ("PackageLicenseUrl", gitUrl + "/LICENSE")
+              ("PackageLicenseExpression", "MIT")
               ("PackageReleaseNotes", packageReleaseNotes)
               ("PackageDescription", summary)
               ("EnableSourceLink", "true") ]
