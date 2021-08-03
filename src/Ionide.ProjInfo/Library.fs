@@ -53,7 +53,7 @@ module internal SdkDiscovery =
 
         match SemanticVersioning.Version.TryParse stdout with
         | true, v -> Ok v
-        | false, _ -> Error stdout
+        | false, _ -> Error(exe, info.ArgumentList, cwd, stdout)
 
 [<RequireQualifiedAccess>]
 module Init =
@@ -126,7 +126,7 @@ module Init =
             let msbuild = SdkDiscovery.msbuildForSdk sdkPath
             setupForSdkVersion sdkPath
             ToolsPath msbuild
-        | Error erroringVersionString -> failwithf $"Unable to parse sdk version from the string '{erroringVersionString}'. This value came from running `dotnet --version` at path ${workingDirectory}"
+        | Error (dotnetExe, args, cwd, erroringVersionString) -> failwithf $"Unable to parse sdk version from the string '{erroringVersionString}'. This value came from running `{dotnetExe} {args}` at path {cwd}"
 
 /// <summary>
 /// Low level APIs for single project loading. Doesn't provide caching, and doesn't follow p2p references.
