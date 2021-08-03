@@ -512,7 +512,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
             loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
             None
         | ex ->
-            logger.error (Log.setMessage "oops" >> Log.addExn ex)
+            logger.error (Log.setMessage "error while building projects via graph build" >> Log.addExn ex)
             None
 
     let projectInstanceFactory projectPath (_globalProperties: IDictionary<string, string>) (projectCollection: ProjectCollection) =
