@@ -3,6 +3,7 @@ namespace Ionide.ProjInfo.ProjectSystem
 open System
 open System.IO
 open System.Runtime.InteropServices
+open SemanticVersioning
 
 [<RequireQualifiedAccess>]
 module Environment =
@@ -134,23 +135,14 @@ module Environment =
     /// <summary>
     /// Gets the highest-version of a set of versions based on an optional upper an lower bound
     /// </summary>
-    /// <param name="minVersion">optional lower bound</param>
-    /// <param name="maxVersion">optional upper bound</param>
+    /// <param name="range">optional bounds</param>
     /// <param name="versions">the set of versions to compare</param>
+    /// <param name="includePrereleases">if true, prerelease versions will be considered</param>
     /// <returns>the max value found in that range, if any</returns>
-    let maxVersionWithThreshold (minVersion: FSIRefs.NugetVersion option) (maxVersion: FSIRefs.NugetVersion option) (versions: FSIRefs.NugetVersion []) =
-        let minChooser =
-            match minVersion with
+    let maxVersionWithThreshold (range: Range option) (includePrereleases: bool) (versions: Version []) =
+        let filterer =
+            match range with
+            | Some r -> (fun v -> r.IsSatisfied(v, includePrerelease = includePrereleases))
             | None -> fun _ -> true
-            | Some minVersion -> fun v -> FSIRefs.compareNugetVersion v minVersion >= 0
 
-        let maxChooser =
-            match maxVersion with
-            | None -> fun _ -> true
-            | Some maxVersion -> fun v -> FSIRefs.compareNugetVersion v maxVersion <= 0
-
-        versions
-        |> Array.filter minChooser // get all versions that compare as greater than the minVersion
-        |> Array.filter maxChooser // get all versions that compare as less than the maxVersion
-        |> Array.sortWith FSIRefs.compareNugetVersion
-        |> Array.tryLast
+        versions |> Array.filter filterer |> Array.sort |> Array.tryLast

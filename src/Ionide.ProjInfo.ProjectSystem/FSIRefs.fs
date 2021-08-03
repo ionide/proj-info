@@ -7,6 +7,7 @@ module Ionide.ProjInfo.ProjectSystem.FSIRefs
 open System
 open System.IO
 open System.Runtime.InteropServices
+open SemanticVersioning
 
 let defaultDotNetSDKRoot =
     let path =
@@ -23,55 +24,15 @@ type TFM =
     | NetFx
     | NetCore
 
-[<NoComparison>]
-type NugetVersion =
-    | NugetVersion of major: int * minor: int * build: int * suffix: string
-    override x.ToString() =
-        match x with
-        | NugetVersion (major, minor, build, suffix) when String.IsNullOrWhiteSpace suffix -> sprintf "%d.%d.%d" major minor build
-        | NugetVersion (major, minor, build, suffix) -> sprintf "%d.%d.%d-%s" major minor build suffix
-
-/// custom comparison for these versions means that you compare major/minor/build,
-/// but an empty preview string marks a stable version, which is greater
-let compareNugetVersion (NugetVersion (lM, lm, lb, ls)) (NugetVersion (rM, rm, rb, rs)) =
-    match compare lM rM with
-    | 0 ->
-        match compare lm rm with
-        | 0 ->
-            match compare lb rb with
-            | 0 ->
-                match ls, rs with
-                | "", s -> 1 // no preview string means left is a stable release and so is greater than right
-                | s, "" -> -1 // no preview string means right is a stable release and so is greater than left
-                | ls, rs -> compare ls rs // no shortcut means compare lexigrapically
-            | n -> n
-        | n -> n
-    | n -> n
-
-/// Parse nuget version strings into numeric and suffix parts
-///
-/// Format: `$(Major).$(Minor).$(Build) [-SomeSuffix]`
-let deconstructVersion (version: string) : NugetVersion =
-    let version, suffix =
-        let pos = version.IndexOf("-")
-
-        if pos >= 0 then
-            version.Substring(0, pos), version.Substring(pos + 1)
-        else
-            version, ""
-
-    let elements = version.Split('.')
-
-    if elements.Length < 3 then
-        NugetVersion(0, 0, 0, suffix)
-    else
-        NugetVersion(Int32.Parse(elements.[0]), Int32.Parse(elements.[1]), Int32.Parse(elements.[2]), suffix)
-
 let versionDirectoriesIn (baseDir: DirectoryInfo) =
     baseDir.EnumerateDirectories()
     |> Array.ofSeq // have to convert to array to get a sortWith that takes our custom comparison function
-    |> Array.map (fun dir -> deconstructVersion dir.Name)
-    |> Array.sortWith compareNugetVersion
+    |> Array.choose
+        (fun dir ->
+            match Version.TryParse dir.Name with
+            | true, v -> Some v
+            | false, _ -> None)
+    |> Array.sort
 
 /// path to the directory where .Net SDK versions are stored
 let sdkDir (dotnetRoot: DirectoryInfo) =
@@ -169,27 +130,20 @@ let netCoreRefs dotnetRoot sdkVersion runtimeVersion tfm useFsiAuxLib =
 
 /// <summary>picks a TFM for F# scripts based on the provided SDK version.</summary>
 let tfmForRuntime =
-    let netcore3 = NugetVersion(3, 0, 100, "")
-    let netcore31 = NugetVersion(3, 1, 100, "")
-    let netcore5 = NugetVersion(5, 0, 100, "")
-    let netcore6 = NugetVersion(6, 0, 100, "")
+    let netcore3 = Version(3, 0, 100, "")
+    let netcore31 = Version(3, 1, 100, "")
+    let netcore5 = Version(5, 0, 100, "")
+    let netcore6 = Version(6, 0, 100, "")
 
-    fun (sdkVersion: NugetVersion) ->
-        let compare = compareNugetVersion sdkVersion
+    fun (sdkVersion: Version) ->
 
-        match compare netcore6 with
-        | 1
-        | 0 -> "net6.0"
-        | _ ->
-            match compare netcore5 with
-            | 1
-            | 0 -> "net5.0"
-            | _ ->
-                match compare netcore31 with
-                | 1
-                | 0 -> "netcoreapp3.1"
-                | _ ->
-                    match compare netcore3 with
-                    | 1
-                    | 0 -> "netcoreapp3.0"
-                    | _ -> "netcoreapp2.2"
+        if netcore6 <= sdkVersion then
+            "net6.0"
+        else if netcore5 <= sdkVersion then
+            "net5.0"
+        else if netcore31 <= sdkVersion then
+            "netcoreapp3.1"
+        else if netcore3 <= sdkVersion then
+            "netcoreapp3.0"
+        else
+            "netcoreapp2.2"
