@@ -4,12 +4,16 @@ module Paths =
     /// provides the path to the `dotnet` binary running this library, duplicated from
     /// https://github.com/dotnet/sdk/blob/b91b88aec2684e3d2988df8d838d3aa3c6240a35/src/Cli/Microsoft.DotNet.Cli.Utils/Muxer.cs#L39
     let dotnetRoot =
-        System
-            .Diagnostics
-            .Process
-            .GetCurrentProcess()
-            .MainModule
-            .FileName
+        match System.Environment.GetEnvironmentVariable "DOTNET_HOST_PATH" with
+        | null
+        | "" ->
+            System
+                .Diagnostics
+                .Process
+                .GetCurrentProcess()
+                .MainModule
+                .FileName
+        | alreadySet -> alreadySet
 
     let sdksPath (dotnetRoot: string) =
         System.IO.Path.Combine(dotnetRoot, "Sdks")
