@@ -49,7 +49,11 @@ module internal SdkDiscovery =
         info.RedirectStandardOutput <- true
         let p = System.Diagnostics.Process.Start(info)
         p.WaitForExit()
-        p.StandardOutput.ReadToEnd() |> SemanticVersioning.Version
+        let stdout = p.StandardOutput.ReadToEnd()
+
+        match SemanticVersioning.Version.TryParse stdout with
+        | true, v -> Ok v
+        | false, _ -> Error stdout
 
 [<RequireQualifiedAccess>]
 module Init =
@@ -116,11 +120,13 @@ module Init =
     /// Initialize the MsBuild integration. Returns path to MsBuild tool that was detected by Locator. Needs to be called before doing anything else.
     /// Call it again when the working directory changes.
     let init (workingDirectory: string) =
-        let dotnetSdkVersionAtPath = SdkDiscovery.versionAt workingDirectory
-        let sdkVersion, sdkPath = SdkDiscovery.sdks Paths.dotnetRoot |> Seq.skipWhile (fun (v, path) -> v > dotnetSdkVersionAtPath) |> Seq.head
-        let msbuild = SdkDiscovery.msbuildForSdk sdkPath
-        setupForSdkVersion sdkPath
-        ToolsPath msbuild
+        match SdkDiscovery.versionAt workingDirectory with
+        | Ok dotnetSdkVersionAtPath ->
+            let sdkVersion, sdkPath = SdkDiscovery.sdks Paths.dotnetRoot |> Seq.skipWhile (fun (v, path) -> v > dotnetSdkVersionAtPath) |> Seq.head
+            let msbuild = SdkDiscovery.msbuildForSdk sdkPath
+            setupForSdkVersion sdkPath
+            ToolsPath msbuild
+        | Error erroringVersionString -> failwithf $"Unable to parse sdk version from the string '{erroringVersionString}'. This value came from running `dotnet --version` at path ${workingDirectory}"
 
 /// <summary>
 /// Low level APIs for single project loading. Doesn't provide caching, and doesn't follow p2p references.
