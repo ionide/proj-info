@@ -187,7 +187,7 @@ module ProjectLoader =
         else
             [ logger ]
 
-    let getGlobalProps (path: string) (tfm: string option) (toolsPath: string) (globalProperties: (string * string) list) =
+    let getGlobalProps (path: string) (tfm: string option) (globalProperties: (string * string) list) =
         dict [ "ProvideCommandLineArgs", "true"
                "DesignTimeBuild", "true"
                "SkipCompilerExecution", "true"
@@ -213,12 +213,12 @@ module ProjectLoader =
            "_ComputeNonExistentFileProperty"
            "CoreCompile" |]
 
-    let loadProject (path: string) (generateBinlog: bool) (ToolsPath toolsPath) globalProperties =
+    let loadProject (path: string) (generateBinlog: bool) globalProperties =
         try
-            let readingProps = getGlobalProps path None toolsPath globalProperties
+            let readingProps = getGlobalProps path None globalProperties
             let tfm = getTfm path readingProps
 
-            let globalProperties = getGlobalProps path tfm toolsPath globalProperties
+            let globalProperties = getGlobalProps path tfm globalProperties
 
             use pc = new ProjectCollection(globalProperties)
 
@@ -453,13 +453,12 @@ module ProjectLoader =
     /// Main entry point for project loading.
     /// </summary>
     /// <param name="path">Full path to the `.fsproj` file</param>
-    /// <param name="toolsPath">Path to MsBuild obtained from `ProjectLoader.init cwd`</param>
     /// <param name="generateBinlog">Enable Binary Log generation</param>
     /// <param name="globalProperties">The global properties to use (e.g. Configuration=Release). Some additional global properties are pre-set by the tool</param>
     /// <param name="customProperties">List of additional MsBuild properties that you want to obtain.</param>
     /// <returns>Returns the record instance representing the loaded project or string containing error message</returns>
-    let getProjectInfo (path: string) (toolsPath: ToolsPath) (globalProperties: (string * string) list) (generateBinlog: bool) (customProperties: string list) : Result<Types.ProjectOptions, string> =
-        let loadedProject = loadProject path generateBinlog toolsPath globalProperties
+    let getProjectInfo (path: string) (globalProperties: (string * string) list) (generateBinlog: bool) (customProperties: string list) : Result<Types.ProjectOptions, string> =
+        let loadedProject = loadProject path generateBinlog globalProperties
 
         match loadedProject with
         | ProjectLoadingStatus.Success project -> getLoadedProjectInfo path customProperties project
@@ -519,7 +518,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
     let projectInstanceFactory projectPath (_globalProperties: IDictionary<string, string>) (projectCollection: ProjectCollection) =
         let tfm = ProjectLoader.getTfm projectPath (dict globalProperties)
         //let globalProperties = globalProperties |> Seq.toList |> List.map (fun (KeyValue(k,v)) -> (k,v))
-        let globalProperties = ProjectLoader.getGlobalProps projectPath tfm toolsPath globalProperties
+        let globalProperties = ProjectLoader.getGlobalProps projectPath tfm globalProperties
         ProjectInstance(projectPath, globalProperties, toolsVersion = null, projectCollection = projectCollection)
 
     let projectGraphProjs (paths: string seq) =
@@ -710,7 +709,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
                 cache |> Seq.map (fun n -> n.Value) |> Seq.toList
 
             let rec loadProject p =
-                let res = ProjectLoader.getProjectInfo p toolsPath globalProperties generateBinlog customProperties
+                let res = ProjectLoader.getProjectInfo p globalProperties generateBinlog customProperties
 
                 match res with
                 | Ok project ->
