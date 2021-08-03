@@ -18,7 +18,13 @@ module internal SdkDiscovery =
 
     let private versionedPaths (root: string) =
         System.IO.Directory.EnumerateDirectories root
-        |> Seq.map (Path.GetFileName >> SemanticVersioning.Version)
+        |> Seq.choose
+            (fun dir ->
+                let dirName = Path.GetFileName dir
+
+                match SemanticVersioning.Version.TryParse dirName with
+                | true, v -> Some v
+                | false, _ -> None)
         |> Seq.sortDescending
         |> Seq.map (fun v -> v, Path.Combine(root, string v))
 
@@ -54,7 +60,7 @@ module Init =
         else
             path + string Path.DirectorySeparatorChar
 
-    let mutable private resolveHandler : Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly> = null
+    let mutable private resolveHandler: Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly> = null
 
     let private resolveFromSdkRoot (root: string) : Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly> =
         Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly>
@@ -136,13 +142,13 @@ module ProjectLoader =
                 // eventSource.ErrorRaised.Add(fun t -> writer.WriteLine t.Message) //Only log errors
                 eventSource.AnyEventRaised.Add(fun t -> writer.WriteLine t.Message)
 
-            member this.Parameters : string = ""
+            member this.Parameters: string = ""
 
             member this.Parameters
                 with set (v: string): unit = printfn "v"
 
             member this.Shutdown() : unit = ()
-            member this.Verbosity : LoggerVerbosity = LoggerVerbosity.Detailed
+            member this.Verbosity: LoggerVerbosity = LoggerVerbosity.Detailed
 
             member this.Verbosity
                 with set (v: LoggerVerbosity): unit = () }
@@ -588,6 +594,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
                 let projects =
                     resultsByNode
+                    |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
                     |> Seq.map
                         (fun p ->
 

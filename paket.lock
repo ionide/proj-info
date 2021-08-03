@@ -1,5 +1,5 @@
 STORAGE: NONE
-RESTRICTION: || (== net5.0) (== net6.0)
+RESTRICTION: == net5.0
 NUGET
   remote: https://api.nuget.org/v3/index.json
     Argu (5.5)

@@ -10,5 +10,10 @@ open Expecto.Logging
 
 [<EntryPoint>]
 let main argv =
-    let toolsPath = Init.init ()
-    Tests.runTests {defaultConfig with printer = TestPrinters.summaryPrinter defaultConfig.printer; verbosity = LogLevel.Info } (Tests.tests toolsPath)
+    let toolsPath = Init.init Environment.CurrentDirectory
+
+    Tests.runTests
+        { defaultConfig with
+              printer = TestPrinters.summaryPrinter defaultConfig.printer
+              verbosity = LogLevel.Info }
+        (Tests.tests toolsPath)

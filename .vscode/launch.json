@@ -5,13 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch Tool 5.0 inprocess graph",
+            "name": "Launch Tool 5.0 graph resolver",
             "type": "coreclr",
             "request": "launch",
             "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net5.0/Ionide.ProjInfo.Tool.dll",
             "args": [
                 "--project",
-                "/Users/chethusk/work/server/src/BDS.Endpoint.Server/BDS.Endpoint.Server.fsproj",
+                "<your project>",
                 "--graph"
             ],
             "cwd": "${workspaceFolder}/src/Ionide.ProjInfo.Tool",
@@ -20,90 +20,13 @@
             "justMyCode": true,
         },
         {
-            "name": "Launch Tool 5.0 inprocess 5.0 target",
+            "name": "Launch Tool 5.0 normal resolver",
             "type": "coreclr",
             "request": "launch",
             "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net5.0/Ionide.ProjInfo.Tool.dll",
             "args": [
                 "--project",
-                "/Users/chethusk/work/server/src/BDS.Endpoint.Server/BDS.Endpoint.Server.fsproj",
-            ],
-            "cwd": "${workspaceFolder}/src/Ionide.ProjInfo.Tool",
-            "stopAtEntry": false,
-            "console": "internalConsole",
-            "justMyCode": true,
-        },
-        {
-            "name": "Launch Tool 5.0 inprocess 6.0 target",
-            "type": "coreclr",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net5.0/Ionide.ProjInfo.Tool.dll",
-            "args": [
-                "--project",
-                "/Users/chethusk/oss/Giraffe/src/Giraffe/Giraffe.fsproj",
-            ],
-            "cwd": "${workspaceFolder}/src/Ionide.ProjInfo.Tool",
-            "stopAtEntry": false,
-            "console": "internalConsole",
-            "justMyCode": true,
-        },
-        {
-            "name": "Launch Tool 6.0 inprocess 6.0 target",
-            "type": "coreclr",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net6.0/Ionide.ProjInfo.Tool.dll",
-            "args": [
-                "--project",
-                "/Users/chethusk/oss/Giraffe/src/Giraffe/Giraffe.fsproj",
-            ],
-            "cwd": "${workspaceFolder}/src/Ionide.ProjInfo.Tool",
-            "stopAtEntry": false,
-            "console": "internalConsole",
-            "justMyCode": true,
-        },
-        {
-            "name": "Launch Tool 6.0 inprocess 5.0 target",
-            "type": "coreclr",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net6.0/Ionide.ProjInfo.Tool.dll",
-            "args": [
-                "--project",
-                "/Users/chethusk/work/server/src/BDS.Endpoint.Server/BDS.Endpoint.Server.fsproj",
-            ],
-            "cwd": "${workspaceFolder}/src/Ionide.ProjInfo.Tool",
-            "stopAtEntry": false,
-            "console": "internalConsole",
-            "justMyCode": true,
-        },
-        {
-            "name": "Launch Tool 5.0 outofprocess",
-            "type": "coreclr",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net5.0/Ionide.ProjInfo.Tool.dll",
-            "args": [
-                "--project",
-                "/Users/chethusk/work/server/src/BDS.Endpoint.Server/BDS.Endpoint.Server.fsproj",
-                "--outofprocess",
-            ],
-            "cwd": "${workspaceFolder}/src/Ionide.ProjInfo.Tool",
-            "stopAtEntry": false,
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "symbolOptions": {
-                "searchPaths": [],
-                "searchMicrosoftSymbolServer": false,
-                "searchNuGetOrgSymbolServer": true
-            }
-        },
-        {
-            "name": "Launch Tool 6.0 outofprocess",
-            "type": "coreclr",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net6.0/Ionide.ProjInfo.Tool.dll",
-            "args": [
-                "--project",
-                "/Users/chethusk/work/server/src/BDS.Endpoint.Server/BDS.Endpoint.Server.fsproj",
-                "--outofprocess",
+                "<your project>",
             ],
             "cwd": "${workspaceFolder}/src/Ionide.ProjInfo.Tool",
             "stopAtEntry": false,
