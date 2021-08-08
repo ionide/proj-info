@@ -666,7 +666,7 @@ let internalGetProjectOptions =
             FSharp.Reflection.FSharpValue.GetUnionFields(r, typeof<FSharpReferencedProject>, System.Reflection.BindingFlags.NonPublic ||| System.Reflection.BindingFlags.Instance)
 
         if rCase.Name = "FSharpReference" then
-            let projOptions : FSharpProjectOptions = rCase.GetFields().[1].GetValue(box r) :?> _
+            let projOptions: FSharpProjectOptions = rCase.GetFields().[1].GetValue(box r) :?> _
             Some projOptions
         else
             None
@@ -755,7 +755,7 @@ let testSample2WithBinLog toolsPath workspaceLoader (workspaceFactory: ToolsPath
 
             let watcher = watchNotifications logger loader
 
-            let parsed = loader.LoadProjects([ projPath ], [], true) |> Seq.toList
+            let parsed = loader.LoadProjects([ projPath ], [], BinaryLogGeneration.Within projDir) |> Seq.toList
 
             [ loading "n1.fsproj"
               loaded "n1.fsproj" ]

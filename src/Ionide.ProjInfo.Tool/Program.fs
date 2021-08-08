@@ -26,13 +26,13 @@ let parseProject (loaderFunc: LoaderFunc) (path: string) =
     let cwd = System.IO.Path.GetDirectoryName path
     let toolsPath = Ionide.ProjInfo.Init.init cwd
     let loader = loaderFunc (toolsPath, [])
-    loader.LoadProjects([ path ], [], true)
+    loader.LoadProjects([ path ], [], BinaryLogGeneration.Within cwd)
 
 let parseSolution (loaderFunc: LoaderFunc) (path: string) =
     let cwd = System.IO.Path.GetDirectoryName path
     let toolsPath = Ionide.ProjInfo.Init.init cwd
     let loader = loaderFunc (toolsPath, [])
-    loader.LoadSln path
+    loader.LoadSln(path, [], BinaryLogGeneration.Within cwd)
 
 [<EntryPoint>]
 let main argv =

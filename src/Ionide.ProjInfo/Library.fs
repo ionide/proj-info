@@ -128,6 +128,14 @@ module Init =
             ToolsPath msbuild
         | Error (dotnetExe, args, cwd, erroringVersionString) -> failwithf $"Unable to parse sdk version from the string '{erroringVersionString}'. This value came from running `{dotnetExe} {args}` at path {cwd}"
 
+[<RequireQualifiedAccess>]
+type BinaryLogGeneration =
+    /// No binary logs will be generated for this build
+    | Off
+    /// Binary logs will be generated and placed in the directory specified. They will have names of the form `{directory}/{project_name}.binlog`
+    | Within of directory: string
+
+
 /// <summary>
 /// Low level APIs for single project loading. Doesn't provide caching, and doesn't follow p2p references.
 /// In most cases you want to use an <see cref="Ionide.ProjInfo.IWorkspaceLoader"/> type instead
@@ -175,17 +183,25 @@ module ProjectLoader =
         else
             Some tfm
 
-    let createLoggers (paths: string seq) (generateBinlog: bool) (sw: StringWriter) =
+    let createLoggers (paths: string seq) (binaryLogs: BinaryLogGeneration) (sw: StringWriter) =
         let logger = logger (sw)
 
-        if generateBinlog then
+        let logFilePath (dir, projectPath: string) =
+            let projectFileName = Path.GetFileName projectPath
+            let logFileName = Path.ChangeExtension(projectFileName, ".binlog")
+            Path.Combine(dir, logFileName)
+
+        match binaryLogs with
+        | BinaryLogGeneration.Off -> [ logger ]
+        | BinaryLogGeneration.Within dir ->
             let loggers =
                 paths
-                |> Seq.map (fun path -> Microsoft.Build.Logging.BinaryLogger(Parameters = Path.Combine(Path.GetDirectoryName(path), "msbuild.binlog")) :> ILogger)
+                |> Seq.map
+                    (fun path ->
+                        let logPath = logFilePath (dir, path)
+                        Microsoft.Build.Logging.BinaryLogger(Parameters = logPath) :> ILogger)
 
             [ logger; yield! loggers ]
-        else
-            [ logger ]
 
     let getGlobalProps (path: string) (tfm: string option) (globalProperties: (string * string) list) =
         dict [ "ProvideCommandLineArgs", "true"
@@ -205,7 +221,23 @@ module ProjectLoader =
                yield! globalProperties ]
 
 
-    let buildArgs =
+    ///<summary>
+    /// These are a list of build targets that are run during a design-time build (mostly).
+    /// The list comes partially from <see href="https://github.com/dotnet/project-system/blob/main/docs/design-time-builds.md#targets-that-run-during-design-time-builds">the msbuild docs</see>
+    /// and partly from experience.
+    ///
+    /// <remarks>
+    /// <list type="bullet">
+    /// <item><term>ResolveAssemblyReferencesDesignTime</term><description>resolves Reference items</description></item>
+    /// <item><term>ResolveProjectReferencesDesignTime</term><description>resolve ProjectReference items</description></item>
+    /// <item><term>ResolvePackageDependenciesDesignTime</term><description>resolve PackageReference items</description></item>
+    /// <item><term>_GenerateCompileDependencyCache</term><description>defined in the F# targets to populate any required dependencies</description></item>
+    /// <item><term>_ComputeNonExistentFileProperty</term><description>when built forces a re-compile (which we want to ensure we get fresh results each time we crack a project)</description></item>
+    /// <item><term>CoreCompile</term><description>actually generates the FSC command line arguments</description></item>
+    /// </list>
+    /// </remarks>
+    /// </summary>
+    let designTimeBuildTargets =
         [| "ResolveAssemblyReferencesDesignTime"
            "ResolveProjectReferencesDesignTime"
            "ResolvePackageDependenciesDesignTime"
@@ -213,7 +245,7 @@ module ProjectLoader =
            "_ComputeNonExistentFileProperty"
            "CoreCompile" |]
 
-    let loadProject (path: string) (generateBinlog: bool) globalProperties =
+    let loadProject (path: string) (binaryLogs: BinaryLogGeneration) globalProperties =
         try
             let readingProps = getGlobalProps path None globalProperties
             let tfm = getTfm path readingProps
@@ -226,12 +258,12 @@ module ProjectLoader =
 
             use sw = new StringWriter()
 
-            let loggers = createLoggers [ path ] generateBinlog sw
+            let loggers = createLoggers [ path ] binaryLogs sw
 
             let pi = pi.CreateProjectInstance()
 
 
-            let build = pi.Build(buildArgs, loggers)
+            let build = pi.Build(designTimeBuildTargets, loggers)
 
             let t = sw.ToString()
 
@@ -453,22 +485,16 @@ module ProjectLoader =
     /// Main entry point for project loading.
     /// </summary>
     /// <param name="path">Full path to the `.fsproj` file</param>
-    /// <param name="generateBinlog">Enable Binary Log generation</param>
+    /// <param name="binaryLogs">describes if and how to generate MsBuild binary logs</param>
     /// <param name="globalProperties">The global properties to use (e.g. Configuration=Release). Some additional global properties are pre-set by the tool</param>
     /// <param name="customProperties">List of additional MsBuild properties that you want to obtain.</param>
     /// <returns>Returns the record instance representing the loaded project or string containing error message</returns>
-    let getProjectInfo (path: string) (globalProperties: (string * string) list) (generateBinlog: bool) (customProperties: string list) : Result<Types.ProjectOptions, string> =
-        let loadedProject = loadProject path generateBinlog globalProperties
+    let getProjectInfo (path: string) (globalProperties: (string * string) list) (binaryLogs: BinaryLogGeneration) (customProperties: string list) : Result<Types.ProjectOptions, string> =
+        let loadedProject = loadProject path binaryLogs globalProperties
 
         match loadedProject with
         | ProjectLoadingStatus.Success project -> getLoadedProjectInfo path customProperties project
         | ProjectLoadingStatus.Error e -> Result.Error e
-
-open Ionide.ProjInfo.Logging
-
-module WorkspaceLoaderViaProjectGraph =
-    let locker = obj ()
-
 
 /// A type that turns project files or solution files into deconstructed options.
 /// Use this in conjunction with the other ProjInfo libraries to turn these options into
@@ -479,23 +505,43 @@ type IWorkspaceLoader =
     /// Load a list of projects, extracting a set of custom build properties from the build results
     /// in addition to the properties used to power the ProjectOption creation.
     /// </summary>
-    /// <returns></returns>
-    abstract member LoadProjects : string list * list<string> * bool -> seq<ProjectOptions>
+    /// <param name="projectPaths">the projects to load</param>
+    /// <param name="customProperties">any custom msbuild properties that should be extracted from the build results. these will be available under the CustomProperties property of the returned ProjectOptions</param>
+    /// <param name="binaryLog">determines if and where to write msbuild binary logs</param>
+    /// <returns>the loaded project structures</returns>
+    abstract member LoadProjects : projectPaths: string list * customProperties: list<string> * binaryLog: BinaryLogGeneration -> seq<ProjectOptions>
 
     /// <summary>
-    /// Load a list of projects
+    /// Load a list of projects with no additional custom properties, without generating binary logs
     /// </summary>
-    /// <returns></returns>
-    abstract member LoadProjects : string list -> seq<ProjectOptions>
+    /// <returns>the loaded project structures</returns>
+    abstract member LoadProjects : projectPaths: string list -> seq<ProjectOptions>
 
     /// <summary>
-    /// Load every project contained in the solution file
+    /// Load every project contained in the solution file, extra
     /// </summary>
-    /// <returns></returns>
-    abstract member LoadSln : string -> seq<ProjectOptions>
+    /// <returns>the loaded project structures</returns>
+    /// <param name="solutionPath">path to the solution to be loaded</param>
+    /// <param name="customProperties">any custom msbuild properties that should be extracted from the build results. these will be available under the CustomProperties property of the returned ProjectOptions</param>
+    /// <param name="binaryLog">determines if and where to write msbuild binary logs</param>
+    abstract member LoadSln : solutionPath: string * customProperties: list<string> * binaryLog: BinaryLogGeneration -> seq<ProjectOptions>
+
+    /// <summary>
+    /// Load every project contained in the solution file with no additional custom properties, without generating binary logs
+    /// </summary>
+    /// <param name="solutionPath">path to the solution to be loaded</param>
+    /// <returns>the loaded project structures</returns>
+    abstract member LoadSln : solutionPath: string -> seq<ProjectOptions>
 
     [<CLIEvent>]
     abstract Notifications : IEvent<WorkspaceProjectState>
+
+open Ionide.ProjInfo.Logging
+
+module WorkspaceLoaderViaProjectGraph =
+    let locker = obj ()
+
+
 
 type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (string * string) list) =
     let (ToolsPath toolsPath) = toolsPath
@@ -548,7 +594,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
             pg
 
-    let loadProjects (projects: ProjectGraph, customProperties: string list, generateBinlog: bool) =
+    let loadProjects (projects: ProjectGraph, customProperties: string list, binaryLogs: BinaryLogGeneration) =
         try
             lock WorkspaceLoaderViaProjectGraph.locker
             <| fun () ->
@@ -562,10 +608,12 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                     >> Log.addContextDestructured "projects" (allKnownNames)
                 )
 
-                let gbr = GraphBuildRequestData(projects, ProjectLoader.buildArgs, null, BuildRequestDataFlags.ReplaceExistingProjectInstance)
+                let gbr =
+                    GraphBuildRequestData(projects, ProjectLoader.designTimeBuildTargets, null, BuildRequestDataFlags.ReplaceExistingProjectInstance)
+
                 let bm = BuildManager.DefaultBuildManager
                 use sw = new StringWriter()
-                let loggers = ProjectLoader.createLoggers allKnownNames generateBinlog sw
+                let loggers = ProjectLoader.createLoggers allKnownNames binaryLogs sw
                 let buildParameters = BuildParameters(Loggers = loggers)
                 buildParameters.ProjectLoadSettings <- ProjectLoadSettings.RecordEvaluatedItemElements ||| ProjectLoadSettings.ProfileEvaluation
                 buildParameters.LogInitialPropertiesAndItems <- true
@@ -648,30 +696,33 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
             Seq.empty
 
     interface IWorkspaceLoader with
-        override this.LoadProjects(projects: string list, customProperties, generateBinlog: bool) =
+        override this.LoadProjects(projects: string list, customProperties, binaryLogs) =
             projectGraphProjs projects
-            |> Option.map (fun pg -> loadProjects (pg, customProperties, generateBinlog))
+            |> Option.map (fun pg -> loadProjects (pg, customProperties, binaryLogs))
             |> Option.defaultValue Seq.empty
 
-        override this.LoadProjects(projects: string list) = this.LoadProjects(projects, [], false)
+        override this.LoadProjects(projects: string list) =
+            this.LoadProjects(projects, [], BinaryLogGeneration.Off)
 
-        override this.LoadSln(sln) = this.LoadSln(sln, [], false)
+        override this.LoadSln(sln) =
+            this.LoadSln(sln, [], BinaryLogGeneration.Off)
+
+        override this.LoadSln(solutionPath: string, customProperties: string list, binaryLog: BinaryLogGeneration) =
+            this.LoadSln(solutionPath, customProperties, binaryLog)
 
         [<CLIEvent>]
         override this.Notifications = loadingNotification.Publish
 
-    member this.LoadProjects(projects: string list, customProperties: string list, generateBinlog: bool) =
+    member this.LoadProjects(projects: string list, customProperties: string list, binaryLogs) =
         (this :> IWorkspaceLoader)
-            .LoadProjects(projects, customProperties, generateBinlog)
+            .LoadProjects(projects, customProperties, binaryLogs)
 
     member this.LoadProjects(projects: string list, customProperties) =
-        this.LoadProjects(projects, customProperties, false)
+        this.LoadProjects(projects, customProperties, BinaryLogGeneration.Off)
 
 
-
-
-    member this.LoadProject(project: string, customProperties: string list, generateBinlog: bool) =
-        this.LoadProjects([ project ], customProperties, generateBinlog)
+    member this.LoadProject(project: string, customProperties: string list, binaryLogs) =
+        this.LoadProjects([ project ], customProperties, binaryLogs)
 
     member this.LoadProject(project: string, customProperties: string list) =
         this.LoadProjects([ project ], customProperties)
@@ -681,13 +732,13 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
             .LoadProjects([ project ])
 
 
-    member this.LoadSln(sln: string, customProperties: string list, generateBinlog: bool) =
+    member this.LoadSln(sln: string, customProperties: string list, binaryLogs) =
         projectGraphSln sln
-        |> Option.map (fun pg -> loadProjects (pg, customProperties, generateBinlog))
+        |> Option.map (fun pg -> loadProjects (pg, customProperties, binaryLogs))
         |> Option.defaultValue Seq.empty
 
     member this.LoadSln(sln, customProperties) =
-        this.LoadSln(sln, customProperties, false)
+        this.LoadSln(sln, customProperties, BinaryLogGeneration.Off)
 
 
     static member Create(toolsPath: ToolsPath, ?globalProperties) =
@@ -702,14 +753,14 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
         [<CLIEvent>]
         override __.Notifications = loadingNotification.Publish
 
-        override __.LoadProjects(projects: string list, customProperties, generateBinlog: bool) =
+        override __.LoadProjects(projects: string list, customProperties, binaryLogs) =
             let cache = Dictionary<string, ProjectOptions>()
 
-            let getAllKnonw () =
+            let getAllKnown () =
                 cache |> Seq.map (fun n -> n.Value) |> Seq.toList
 
             let rec loadProject p =
-                let res = ProjectLoader.getProjectInfo p globalProperties generateBinlog customProperties
+                let res = ProjectLoader.getProjectInfo p globalProperties binaryLogs customProperties
 
                 match res with
                 | Ok project ->
@@ -741,7 +792,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
                     let newList, toTrigger =
                         if cache.ContainsKey p then
                             let project = cache.[p]
-                            loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, getAllKnonw (), true)) //TODO: Should it even notify here?
+                            loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, getAllKnown (), true)) //TODO: Should it even notify here?
                             let lst = project.ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
                             lst, None
                         else
@@ -752,27 +803,32 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
                     loadProjectList newList
 
                     toTrigger
-                    |> Option.iter (fun project -> loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, getAllKnonw (), false)))
+                    |> Option.iter (fun project -> loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, getAllKnown (), false)))
 
             loadProjectList projects
             cache |> Seq.map (fun n -> n.Value)
 
-        override this.LoadProjects(projects) = this.LoadProjects(projects, [], false)
+        override this.LoadProjects(projects) =
+            this.LoadProjects(projects, [], BinaryLogGeneration.Off)
 
-        override this.LoadSln(sln) = this.LoadSln(sln, [], false)
+        override this.LoadSln(sln) =
+            this.LoadSln(sln, [], BinaryLogGeneration.Off)
+
+        override this.LoadSln(solutionPath: string, customProperties: string list, binaryLog: BinaryLogGeneration) =
+            this.LoadSln(solutionPath, customProperties, binaryLog)
 
     /// <inheritdoc />
-    member this.LoadProjects(projects: string list, customProperties: string list, generateBinlog: bool) =
+    member this.LoadProjects(projects: string list, customProperties: string list, binaryLogs) =
         (this :> IWorkspaceLoader)
-            .LoadProjects(projects, customProperties, generateBinlog)
+            .LoadProjects(projects, customProperties, binaryLogs)
 
     member this.LoadProjects(projects, customProperties) =
-        this.LoadProjects(projects, customProperties, false)
+        this.LoadProjects(projects, customProperties, BinaryLogGeneration.Off)
 
 
 
-    member this.LoadProject(project, customProperties: string list, generateBinlog: bool) =
-        this.LoadProjects([ project ], customProperties, generateBinlog)
+    member this.LoadProject(project, customProperties: string list, binaryLogs) =
+        this.LoadProjects([ project ], customProperties, binaryLogs)
 
     member this.LoadProject(project, customProperties: string list) =
         this.LoadProjects([ project ], customProperties)
@@ -782,15 +838,15 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
             .LoadProjects([ project ])
 
 
-    member this.LoadSln(sln, customProperties: string list, generateBinlog: bool) =
+    member this.LoadSln(sln, customProperties: string list, binaryLogs) =
         match InspectSln.tryParseSln sln with
         | Ok (_, slnData) ->
             let projs = InspectSln.loadingBuildOrder slnData
-            this.LoadProjects(projs, customProperties, generateBinlog)
+            this.LoadProjects(projs, customProperties, binaryLogs)
         | Error d -> failwithf "Cannot load the sln: %A" d
 
     member this.LoadSln(sln, customProperties) =
-        this.LoadSln(sln, customProperties, false)
+        this.LoadSln(sln, customProperties, BinaryLogGeneration.Off)
 
 
 
