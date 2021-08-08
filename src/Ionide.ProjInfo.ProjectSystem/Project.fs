@@ -2,7 +2,7 @@
 
 open System
 open System.IO
-open FSharp.Compiler.CodeAnalysis
+open FSharp.Compiler.SourceCodeServices
 open Newtonsoft.Json
 open Ionide.ProjInfo
 
@@ -63,7 +63,8 @@ type internal ProjectPersistentCache(projectFile: string) =
                             let resp' = defaultArg r ""
                             let ctn = [| lwt.ToString(); resp' |]
                             File.WriteAllLines(cachePath, ctn)
-                        with _ex ->
+                        with
+                        | _ex ->
                             //TODO add trace
                             ()
 
@@ -85,14 +86,16 @@ type internal ProjectPersistentCache(projectFile: string) =
                                                 None
                                             else
                                                 Some x
-                                        with _ ->
+                                        with
+                                        | _ ->
                                             File.Delete cachePath
                                             None
                                     else
                                         None
                                 else
                                     None
-                            with _ex ->
+                            with
+                            | _ex ->
                                 //TODO add trace
                                 None
 

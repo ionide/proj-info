@@ -11,7 +11,7 @@ open System.Collections.Generic
 open Ionide.ProjInfo.Types
 open Ionide.ProjInfo
 open Expecto.Logging.Message
-open FSharp.Compiler.CodeAnalysis
+open FSharp.Compiler.SourceCodeServices
 
 #nowarn "25"
 
@@ -660,16 +660,16 @@ let testProjectNotFound toolsPath workspaceLoader (workspaceFactory: ToolsPath -
 
             Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(wrongPath, (GetProjectOptionsErrors.ProjectNotFound(wrongPath)))) "check error type")
 
-let internalGetProjectOptions =
-    fun (r: FSharpReferencedProject) ->
-        let rCase, fields =
-            FSharp.Reflection.FSharpValue.GetUnionFields(r, typeof<FSharpReferencedProject>, System.Reflection.BindingFlags.NonPublic ||| System.Reflection.BindingFlags.Instance)
+// let internalGetProjectOptions =
+// fun (r: FSharpReferencedProject) ->
+//     let rCase, fields =
+//         FSharp.Reflection.FSharpValue.GetUnionFields(r, typeof<FSharpReferencedProject>, System.Reflection.BindingFlags.NonPublic ||| System.Reflection.BindingFlags.Instance)
 
-        if rCase.Name = "FSharpReference" then
-            let projOptions: FSharpProjectOptions = rCase.GetFields().[1].GetValue(box r) :?> _
-            Some projOptions
-        else
-            None
+//     if rCase.Name = "FSharpReference" then
+//         let projOptions: FSharpProjectOptions = rCase.GetFields().[1].GetValue(box r) :?> _
+//         Some projOptions
+//     else
+//         None
 
 let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
@@ -679,19 +679,14 @@ let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
 
             let rec allFCSProjects (po: FSharpProjectOptions) =
                 [ yield po
-                  for reference in po.ReferencedProjects do
-                      match internalGetProjectOptions reference with
-                      | Some opts -> yield! allFCSProjects opts
-                      | None -> () ]
+                  for (projectPath, opts) in po.ReferencedProjects do
+                      yield! allFCSProjects opts ]
 
 
             let rec allP2P (po: FSharpProjectOptions) =
-                [ for reference in po.ReferencedProjects do
-                      yield reference.FileName, internalGetProjectOptions reference |> Option.get
-
-                      match internalGetProjectOptions reference with
-                      | Some opts -> yield! allP2P opts
-                      | None -> () ]
+                [ for (fileName, projectRef) in po.ReferencedProjects do
+                      yield fileName, projectRef
+                      yield! allP2P projectRef ]
 
             let expectP2PKeyIsTargetPath (pos: Map<string, ProjectOptions>) fcsPo =
                 for (tar, fcsPO) in allP2P fcsPo do
@@ -730,7 +725,7 @@ let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
             let fcs = createFCS ()
             let result = fcs.ParseAndCheckProject(fcsPo) |> Async.RunSynchronously
 
-            Expect.isEmpty result.Diagnostics (sprintf "no errors but was: %A" result.Diagnostics)
+            Expect.isEmpty result.Errors (sprintf "no errors but was: %A" result.Errors)
 
             let uses = result.GetAllUsesOfAllSymbols()
 
@@ -897,7 +892,7 @@ let testProjectSystem toolsPath workspaceLoader workspaceFactory =
             let fcs = createFCS ()
             let result = fcs.ParseAndCheckProject(fcsPo) |> Async.RunSynchronously
 
-            Expect.isEmpty result.Diagnostics (sprintf "no errors but was: %A" result.Diagnostics)
+            Expect.isEmpty result.Errors (sprintf "no errors but was: %A" result.Errors)
 
             let uses = result.GetAllUsesOfAllSymbols()
 

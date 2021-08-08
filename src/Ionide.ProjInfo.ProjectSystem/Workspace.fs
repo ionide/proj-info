@@ -9,7 +9,7 @@ type internal GetProjectOptionsErrors = Types.GetProjectOptionsErrors
 [<RequireQualifiedAccess>]
 type internal ProjectSystemState =
     | Loading of string
-    | Loaded of FSharp.Compiler.CodeAnalysis.FSharpProjectOptions * Types.ProjectOptions * ProjectViewerItem list * fromDpiCache: bool
+    | Loaded of FSharp.Compiler.SourceCodeServices.FSharpProjectOptions * Types.ProjectOptions * ProjectViewerItem list * fromDpiCache: bool
     | LoadedOther of Types.ProjectOptions * ProjectViewerItem list * fromDpiCache: bool
     | Failed of string * GetProjectOptionsErrors
 
