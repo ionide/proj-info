@@ -770,7 +770,7 @@ let testSample2WithBinLog toolsPath workspaceLoader (workspaceFactory: ToolsPath
                   projDir / "Library.fs" ]
                 |> List.map Path.GetFullPath
 
-            let blPath = projDir / "msbuild.binlog"
+            let blPath = projDir / "n1.binlog"
             let blExists = File.Exists blPath
 
             Expect.isTrue blExists "binlog file should exist"
