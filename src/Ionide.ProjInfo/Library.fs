@@ -12,9 +12,10 @@ open Microsoft.Build.Graph
 open System.Diagnostics
 
 /// functions for .net sdk probing
-module internal SdkDiscovery =
+module SdkDiscovery =
 
-    let msbuildForSdk (sdkPath: string) = Path.Combine(sdkPath, "MSBuild.dll")
+    let internal msbuildForSdk (sdkPath: DirectoryInfo) =
+        Path.Combine(sdkPath.FullName, "MSBuild.dll")
 
     let private versionedPaths (root: string) =
         System.IO.Directory.EnumerateDirectories root
@@ -26,24 +27,26 @@ module internal SdkDiscovery =
                 | true, v -> Some v
                 | false, _ -> None)
         |> Seq.sortDescending
-        |> Seq.map (fun v -> v, Path.Combine(root, string v))
+        |> Seq.map (fun v -> v, Path.Combine(root, string v) |> DirectoryInfo)
 
-    let sdks (dotnetRoot: string) =
-        let basePath = Path.GetDirectoryName dotnetRoot
-        let sdksPath = Path.Combine(basePath, "sdk")
+    /// Given the DOTNET_ROOT, that is the directory where the `dotnet` binary is present and the sdk/runtimes/etc are,
+    /// enumerates the available SDKs in descending version order
+    let sdks (dotnetDirectory: DirectoryInfo) =
+        let sdksPath = Path.Combine(dotnetDirectory.FullName, "sdk")
         versionedPaths sdksPath
 
-    let runtimes (dotnetRoot: string) =
-        let basePath = Path.GetDirectoryName dotnetRoot
-        let netcoreAppPath = Path.Combine(basePath, "shared", "Microsoft.NETCore.App")
+    /// Given the DOTNET_ROOT, that is the directory where the `dotnet` binary is present and the sdk/runtimes/etc are,
+    /// enumerates the available runtimes in descending version order
+    let runtimes (dotnetDirectory: DirectoryInfo) =
+        let netcoreAppPath = Path.Combine(dotnetDirectory.FullName, "shared", "Microsoft.NETCore.App")
         versionedPaths netcoreAppPath
 
     /// performs a `dotnet --version` command at the given directory to get the version of the
     /// SDK active at that location.
-    let versionAt (cwd: string) =
+    let versionAt (cwd: DirectoryInfo) =
         let exe = Paths.dotnetRoot
         let info = ProcessStartInfo()
-        info.WorkingDirectory <- cwd
+        info.WorkingDirectory <- cwd.FullName
         info.FileName <- exe
         info.ArgumentList.Add("--version")
         info.RedirectStandardOutput <- true
@@ -66,10 +69,10 @@ module Init =
 
     let mutable private resolveHandler: Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly> = null
 
-    let private resolveFromSdkRoot (root: string) : Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly> =
+    let private resolveFromSdkRoot (sdkRoot: DirectoryInfo) : Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly> =
         Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly>
             (fun assemblyLoadContext assemblyName ->
-                let paths = [ Path.Combine(root, assemblyName.Name + ".dll") ]
+                let paths = [ Path.Combine(sdkRoot.FullName, assemblyName.Name + ".dll") ]
 
                 match paths |> List.tryFind File.Exists with
                 | Some path -> assemblyLoadContext.LoadFromAssemblyPath path
@@ -98,13 +101,13 @@ module Init =
     /// </remarks>
     /// <param name="sdkRoot">the versioned root path of a given SDK version, for example '/usr/local/share/dotnet/sdk/5.0.300'</param>
     /// <returns></returns>
-    let setupForSdkVersion (sdkRoot: string) =
+    let setupForSdkVersion (sdkRoot: DirectoryInfo) =
         let msbuild = SdkDiscovery.msbuildForSdk sdkRoot
 
         // gotta set some env variables so msbuild interop works, see the locator for details: https://github.com/microsoft/MSBuildLocator/blob/d83904bff187ce8245f430b93e8b5fbfefb6beef/src/MSBuildLocator/MSBuildLocator.cs#L289
         Environment.SetEnvironmentVariable("MSBUILD_EXE_PATH", msbuild)
-        Environment.SetEnvironmentVariable("MSBuildExtensionsPath", ensureTrailer sdkRoot)
-        Environment.SetEnvironmentVariable("MSBuildSDKsPath", Path.Combine(sdkRoot, "Sdks"))
+        Environment.SetEnvironmentVariable("MSBuildExtensionsPath", ensureTrailer sdkRoot.FullName)
+        Environment.SetEnvironmentVariable("MSBuildSDKsPath", Path.Combine(sdkRoot.FullName, "Sdks"))
 
         match System.Environment.GetEnvironmentVariable "DOTNET_HOST_PATH" with
         | null
@@ -119,10 +122,14 @@ module Init =
 
     /// Initialize the MsBuild integration. Returns path to MsBuild tool that was detected by Locator. Needs to be called before doing anything else.
     /// Call it again when the working directory changes.
-    let init (workingDirectory: string) =
+    let init (workingDirectory: DirectoryInfo) =
         match SdkDiscovery.versionAt workingDirectory with
         | Ok dotnetSdkVersionAtPath ->
-            let sdkVersion, sdkPath = SdkDiscovery.sdks Paths.dotnetRoot |> Seq.skipWhile (fun (v, path) -> v > dotnetSdkVersionAtPath) |> Seq.head
+            let sdkVersion, sdkPath =
+                SdkDiscovery.sdks (Path.GetDirectoryName Paths.dotnetRoot |> DirectoryInfo)
+                |> Seq.skipWhile (fun (v, path) -> v > dotnetSdkVersionAtPath)
+                |> Seq.head
+
             let msbuild = SdkDiscovery.msbuildForSdk sdkPath
             setupForSdkVersion sdkPath
             ToolsPath msbuild
