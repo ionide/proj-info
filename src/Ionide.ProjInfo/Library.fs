@@ -142,7 +142,7 @@ type BinaryLogGeneration =
     /// No binary logs will be generated for this build
     | Off
     /// Binary logs will be generated and placed in the directory specified. They will have names of the form `{directory}/{project_name}.binlog`
-    | Within of directory: string
+    | Within of directory: DirectoryInfo
 
 
 /// <summary>
@@ -195,10 +195,10 @@ module ProjectLoader =
     let createLoggers (paths: string seq) (binaryLogs: BinaryLogGeneration) (sw: StringWriter) =
         let logger = logger (sw)
 
-        let logFilePath (dir, projectPath: string) =
+        let logFilePath (dir: DirectoryInfo, projectPath: string) =
             let projectFileName = Path.GetFileName projectPath
             let logFileName = Path.ChangeExtension(projectFileName, ".binlog")
-            Path.Combine(dir, logFileName)
+            Path.Combine(dir.FullName, logFileName)
 
         match binaryLogs with
         | BinaryLogGeneration.Off -> [ logger ]

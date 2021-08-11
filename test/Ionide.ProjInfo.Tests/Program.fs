@@ -20,7 +20,7 @@ let main argv =
             "dotnet.exe"
 
     Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", IO.Path.Combine(baseDir, dotnetExe))
-    let toolsPath = Init.init Environment.CurrentDirectory
+    let toolsPath = Init.init (IO.DirectoryInfo Environment.CurrentDirectory)
 
     Tests.runTests
         { defaultConfig with

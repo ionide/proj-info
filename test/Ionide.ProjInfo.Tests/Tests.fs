@@ -750,7 +750,7 @@ let testSample2WithBinLog toolsPath workspaceLoader (workspaceFactory: ToolsPath
 
             let watcher = watchNotifications logger loader
 
-            let parsed = loader.LoadProjects([ projPath ], [], BinaryLogGeneration.Within projDir) |> Seq.toList
+            let parsed = loader.LoadProjects([ projPath ], [], BinaryLogGeneration.Within(DirectoryInfo projDir)) |> Seq.toList
 
             [ loading "n1.fsproj"
               loaded "n1.fsproj" ]
