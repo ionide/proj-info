@@ -7,6 +7,7 @@ Parsing and evaluating of `.fsproj` files. This repository contains several pack
 * `Ionide.ProjInfo.Sln` - library for parsing `.sln` files
 * `Ionide.ProjInfo.FCS` - library providing utility for mapping project data types used by `Ionide.ProjInfo` into `FSharpProjectOptions` type used by `FSharp.Compiler.Service`
 * `Ionide.ProjInfo.ProjectSystem` - library providing high level project system component that can be used by editor tooling. It supports features like tracking changes, event-driven notifications about project loading status, and persistent caching of the data for fast initial load.
+* `Ionide.ProjInfo.Tool` - a CLI tool intended to help with debugging the cracking of various projects easily
 
 ---
 You can support Ionide development on [Open Collective](https://opencollective.com/ionide).
