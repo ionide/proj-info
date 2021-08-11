@@ -108,6 +108,8 @@ module Init =
         Environment.SetEnvironmentVariable("MSBUILD_EXE_PATH", msbuild)
         Environment.SetEnvironmentVariable("MSBuildExtensionsPath", ensureTrailer sdkRoot.FullName)
         Environment.SetEnvironmentVariable("MSBuildSDKsPath", Path.Combine(sdkRoot.FullName, "Sdks"))
+        // .net 6 sdk includes workload stuff and this breaks for some reason
+        Environment.SetEnvironmentVariable("MSBuildEnableWorkloadResolver", "false")
 
         match System.Environment.GetEnvironmentVariable "DOTNET_HOST_PATH" with
         | null
@@ -224,7 +226,6 @@ module ProjectLoader =
                if path.EndsWith ".csproj" then
                    "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__")
                "DotnetProjInfo", "true"
-               "MSBuildEnableWorkloadResolver", "false" // we don't care about workloads
                yield! globalProperties ]
 
 
