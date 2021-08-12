@@ -9,7 +9,7 @@ type internal GetProjectOptionsErrors = Types.GetProjectOptionsErrors
 [<RequireQualifiedAccess>]
 type internal ProjectSystemState =
     | Loading of string
-    | Loaded of FSharp.Compiler.CodeAnalysis.FSharpProjectOptions * Types.ProjectOptions * ProjectViewerItem list * fromDpiCache: bool
+    | Loaded of FSharp.Compiler.SourceCodeServices.FSharpProjectOptions * Types.ProjectOptions * ProjectViewerItem list * fromDpiCache: bool
     | LoadedOther of Types.ProjectOptions * ProjectViewerItem list * fromDpiCache: bool
     | Failed of string * GetProjectOptionsErrors
 
@@ -25,7 +25,7 @@ let private getItems isFromCache fcsPo po =
 
     items
 
-let private getProjectOptions (loader: IWorkspaceLoader) (onEvent: ProjectSystemState -> unit) (generateBinlog: bool) (projectFileNames: string list) =
+let private getProjectOptions (loader: IWorkspaceLoader) (onEvent: ProjectSystemState -> unit) binaryLogs (projectFileNames: string list) =
     let existing, notExisting = projectFileNames |> List.partition (File.Exists)
 
     for e in notExisting do
@@ -46,9 +46,9 @@ let private getProjectOptions (loader: IWorkspaceLoader) (onEvent: ProjectSystem
             onEvent (ProjectSystemState.LoadedOther(po, items, isFromCache))
 
     use notif = loader.Notifications.Subscribe handler
-    loader.LoadProjects(existing, [], generateBinlog) |> ignore // TODO: Maybe we should move away from event driven approach???
+    loader.LoadProjects(existing, [], binaryLogs) |> ignore // TODO: Maybe we should move away from event driven approach???
 
-let internal loadInBackground onLoaded (loader: IWorkspaceLoader) (projects: Project list) (generateBinlog: bool) =
+let internal loadInBackground onLoaded (loader: IWorkspaceLoader) (projects: Project list) binaryLogs =
     let (resProjects, otherProjects) = projects |> List.partition (fun n -> n.Response.IsSome)
 
     for project in resProjects do
@@ -56,4 +56,4 @@ let internal loadInBackground onLoaded (loader: IWorkspaceLoader) (projects: Pro
         | Some res -> onLoaded (ProjectSystemState.Loaded(res.Options, res.ExtraInfo, res.Items, false))
         | None -> () //Shouldn't happen
 
-    otherProjects |> List.map (fun n -> n.FileName) |> getProjectOptions loader onLoaded generateBinlog
+    otherProjects |> List.map (fun n -> n.FileName) |> getProjectOptions loader onLoaded binaryLogs

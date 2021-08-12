@@ -6,25 +6,25 @@ storage: none
 framework: net5.0
 
 nuget FSharp.Core
-nuget FSharp.Compiler.Service
-nuget Argu ~> 5.1
+nuget FSharp.Compiler.Service ~> 39.0
+nuget Argu
 
 # copy_local: true doesn't expose sourcelink as a package dependency
 nuget Microsoft.SourceLink.GitHub copy_local: true
 
-nuget Expecto ~> 8.4
+nuget Expecto
 nuget Expecto.Diff
-nuget Expecto.TestResults ~> 8.4
+nuget Expecto.TestResults
 nuget MedallionShell ~> 1.5.0
 
-# copy_local: false exculdes runtime assets (desired for msbuild)
+# copy_local: false excludes runtime assets (desired for msbuild)
 nuget Microsoft.Build copy_local: false
 nuget Microsoft.Build.Framework copy_local: false
 nuget Microsoft.Build.Utilities.Core copy_local: false
 nuget Microsoft.Build.Tasks.Core copy_local: false
-nuget Microsoft.Build.Locator
 nuget Newtonsoft.Json
 nuget Fsharp.Control.Reactive
+nuget SemanticVersioning
 
 github TheAngryByrd/FsLibLog src/FsLibLog/FsLibLog.fs
 

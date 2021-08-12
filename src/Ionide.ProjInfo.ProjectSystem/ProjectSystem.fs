@@ -3,7 +3,7 @@ namespace Ionide.ProjInfo.ProjectSystem
 open System
 open System.IO
 open System.Collections.Concurrent
-open FSharp.Compiler.CodeAnalysis
+open FSharp.Compiler.SourceCodeServices
 open Ionide.ProjInfo.Types
 open Ionide.ProjInfo
 open Workspace
@@ -53,20 +53,17 @@ type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -
         |> Observable.map (List.ofSeq >> List.distinct) // Buffers the file changes together
 
     // This gets pushed to every time `onChange` get called in `loadProjects`
-    let projectsChanged = new System.Reactive.Subjects.Subject<string * bool>()
+    let projectsChanged = new System.Reactive.Subjects.Subject<string * BinaryLogGeneration>()
 
     let sub =
-        let loadProjects (projs: list<string * bool>) =
-            let gbs, nonGbs = projs |> List.partition (snd) |> fun (a, b) -> (a |> List.map fst, b |> List.map fst)
+        let loadProjects (projs: list<string * BinaryLogGeneration>) =
+            let projectGroups = projs |> List.groupBy snd |> List.map (fun (k, vs) -> k, vs |> List.map fst)
             projs |> List.iter (fun (fileName, _) -> fileName |> ProjectResponse.ProjectChanged |> notify.Trigger)
 
-            if gbs |> Seq.isEmpty |> not then
-                x.LoadWorkspace(gbs, true)
+            for (key, group) in projectGroups do
+                x.LoadWorkspace(group, key)
 
-            if nonGbs |> Seq.isEmpty |> not then
-                x.LoadWorkspace(nonGbs, false)
-
-        projectsChanged |> deduplicateBy fst |> Observable.subscribe (loadProjects)
+        projectsChanged |> deduplicateBy fst |> Observable.subscribe loadProjects
 
 
     let updateState (response: ProjectCrackerCache) =
@@ -82,17 +79,17 @@ type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -
                               else
                                   n) }
 
-        for file in response.Items
-                    |> List.choose
-                        (function
-                        | ProjectViewerItem.Compile (p, _) -> Some p) do
+        for file in
+            response.Items
+            |> List.choose
+                (function
+                | ProjectViewerItem.Compile (p, _) -> Some p) do
             fileCheckOptions.[file] <- normalizeOptions response.Options
 
 
-    member private x.loadProjects (files: string list) (generateBinlog: bool) =
+    member private x.loadProjects (files: string list) (binaryLogs: BinaryLogGeneration) =
         async {
-            let onChange fn =
-                projectsChanged.OnNext(fn, generateBinlog)
+            let onChange fn = projectsChanged.OnNext(fn, binaryLogs)
 
             let onLoaded p =
                 match p with
@@ -120,7 +117,7 @@ type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -
                             (function
                             | ProjectViewerItem.Compile (p, _) -> Some p)
 
-                    let projInfo : ProjectResult =
+                    let projInfo: ProjectResult =
                         { ProjectFileName = projectFileName
                           ProjectFiles = responseFiles
                           OutFileOpt = response.OutFile
@@ -137,7 +134,7 @@ type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -
                             (function
                             | ProjectViewerItem.Compile (p, _) -> Some p)
 
-                    let projInfo : ProjectResult =
+                    let projInfo: ProjectResult =
                         { ProjectFileName = extraInfo.ProjectFileName
                           ProjectFiles = responseFiles
                           OutFileOpt = Some(extraInfo.TargetPath)
@@ -167,7 +164,7 @@ type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -
             | _ -> ()
 
             let loader = workspaceLoaderFactory toolsPath
-            Workspace.loadInBackground onLoaded loader (prjs |> List.map snd) generateBinlog
+            Workspace.loadInBackground onLoaded loader (prjs |> List.map snd) binaryLogs
             ProjectResponse.WorkspaceLoad true |> notify.Trigger
 
             isWorkspaceReady <- true
@@ -179,7 +176,7 @@ type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -
     member private x.LoaderLoop =
         MailboxProcessor.Start
             (fun agent -> //If couldn't recive new event in 50 ms then just load previous one
-                let rec loop (previousStatus: (string list * bool) option) =
+                let rec loop (previousStatus: (string list * BinaryLogGeneration) option) =
                     async {
                         match previousStatus with
 
@@ -229,18 +226,19 @@ type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -
     member __.ProjectOptions = fileCheckOptions |> Seq.map (|KeyValue|)
 
     ///Loads a single project file
-    member x.LoadProject(projectFileName: string, generateBinlog: bool) =
-        x.LoaderLoop.Post([ projectFileName ], generateBinlog)
+    member x.LoadProject(projectFileName: string, binaryLogs: BinaryLogGeneration) =
+        x.LoaderLoop.Post([ projectFileName ], binaryLogs)
 
     ///Loads a single project file
-    member x.LoadProject(projectFileName: string) = x.LoadProject(projectFileName, false)
+    member x.LoadProject(projectFileName: string) =
+        x.LoadProject(projectFileName, BinaryLogGeneration.Off)
 
     ///Loads a set of project files
-    member x.LoadWorkspace(files: string list, generateBinlog: bool) =
-        x.LoaderLoop.Post(files, generateBinlog)
+    member x.LoadWorkspace(files: string list, binaryLogs: BinaryLogGeneration) = x.LoaderLoop.Post(files, binaryLogs)
 
     ///Loads a set of project files
-    member x.LoadWorkspace(files: string list) = x.LoadWorkspace(files, false)
+    member x.LoadWorkspace(files: string list) =
+        x.LoadWorkspace(files, BinaryLogGeneration.Off)
 
     ///Finds a list of potential workspaces (solution files/lists of projects) in given dir
     member __.PeekWorkspace(dir: string, deep: int, excludedDirs: string list) =

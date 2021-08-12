@@ -1,7 +1,7 @@
 ﻿namespace Ionide.ProjInfo
 
 open Ionide.ProjInfo.Types
-open FSharp.Compiler.CodeAnalysis
+open FSharp.Compiler.SourceCodeServices
 
 module FCS =
     let rec mapToFSharpProjectOptions (projectOptions: ProjectOptions) (allKnownProjects: ProjectOptions seq) : FSharpProjectOptions =
@@ -17,8 +17,7 @@ module FCS =
                       if d.ProjectFileName.EndsWith ".fsproj" then
                           let findProjOpt = allKnownProjects |> Seq.tryFind (fun n -> n.ProjectFileName = d.ProjectFileName)
 
-                          findProjOpt
-                          |> Option.map (fun p -> FSharpReferencedProject.CreateFSharp(p.TargetPath, mapToFSharpProjectOptions p allKnownProjects))
+                          findProjOpt |> Option.map (fun p -> p.TargetPath, (mapToFSharpProjectOptions p allKnownProjects))
                       else
                           None)
           IsIncompleteTypeCheckEnvironment = false
@@ -26,4 +25,5 @@ module FCS =
           LoadTime = projectOptions.LoadTime
           UnresolvedReferences = None // it's always None
           OriginalLoadReferences = [] // it's always empty list
-          Stamp = None }
+          Stamp = None
+          ExtraProjectInfo = None }

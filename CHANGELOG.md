@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.54.0] - 2021-08-08
+### Added
+
+- The save path for binary logs can now be set
+
+### Changed
+
+- Reverted to FCS 39 for compatibilties' sake
+- Removed dependency on MsBuild.Locator
+- Massively improved compatibility for cracking projects on a broader range of SDK versions
+- Fixed a regression in the MSBuild Graph Workspace Loader that resulted in it not working on SDKs greater than 5.0.10x
+- centralized the setting of process-level MSBuild and dotnet SDK environment variables into the `init` function, extracting them out of the individual workspace loaders. this should ensure a consistent experience regardless of loader chosen.
+
 ## [0.53.1] - 2021-06-23
 
 ### Changed

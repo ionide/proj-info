@@ -5,6 +5,40 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch Tool 5.0 graph resolver",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net5.0/Ionide.ProjInfo.Tool.dll",
+            "args": [
+                "--project",
+                "<your project>",
+                "--graph"
+            ],
+            "cwd": "${workspaceFolder}/src/Ionide.ProjInfo.Tool",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "justMyCode": true,
+        },
+        {
+            "name": "Launch Tool 5.0 normal resolver",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net5.0/Ionide.ProjInfo.Tool.dll",
+            "args": [
+                "--project",
+                "<your project>",
+            ],
+            "cwd": "${workspaceFolder}/src/Ionide.ProjInfo.Tool",
+            "stopAtEntry": false,
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "symbolOptions": {
+                "searchPaths": [],
+                "searchMicrosoftSymbolServer": false,
+                "searchNuGetOrgSymbolServer": true
+            }
+        },
+        {
             "name": "Ionide.ProjInfo.Tests",
             "type": "coreclr",
             "request": "launch",
