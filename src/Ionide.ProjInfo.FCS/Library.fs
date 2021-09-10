@@ -1,7 +1,7 @@
 ﻿namespace Ionide.ProjInfo
 
 open Ionide.ProjInfo.Types
-open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.CodeAnalysis
 
 module FCS =
     let rec mapToFSharpProjectOptions (projectOptions: ProjectOptions) (allKnownProjects: ProjectOptions seq) : FSharpProjectOptions =

@@ -11,7 +11,7 @@ open System.Collections.Generic
 open Ionide.ProjInfo.Types
 open Ionide.ProjInfo
 open Expecto.Logging.Message
-open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.CodeAnalysis
 
 #nowarn "25"
 
