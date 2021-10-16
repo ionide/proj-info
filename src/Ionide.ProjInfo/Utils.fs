@@ -1,10 +1,22 @@
 namespace Ionide.ProjInfo
 
+open System.Runtime.InteropServices
+open System.IO
+open System
+
 module Paths =
-    let private potentialRootEnvVars =
-        [ "DOTNET_HOST_PATH"
-          "DOTNET_ROOT"
-          "DOTNET_ROOT(x86)" ]
+    let private isUnix = RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+
+    let private dotnetBinaryName =
+        if isUnix then
+            "dotnet"
+        else
+            "dotnet.exe"
+
+    let private potentialDotnetHostEnvVars =
+        [ "DOTNET_HOST_PATH", id // is a full path to dotnet binary
+          "DOTNET_ROOT", (fun s -> Path.Combine(s, dotnetBinaryName)) // needs dotnet binary appended
+          "DOTNET_ROOT(x86)", (fun s -> Path.Combine(s, dotnetBinaryName)) ] // needs dotnet binary appended
 
     let private existingEnvVarValue envVarValue =
         match envVarValue with
@@ -16,8 +28,12 @@ module Paths =
     /// provides the path to the `dotnet` binary running this library, respecting various dotnet <see href="https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-environment-variables#dotnet_root-dotnet_rootx86%5D">environment variables</see>
     /// </summary>
     let dotnetRoot =
-        potentialRootEnvVars
-        |> List.tryPick (System.Environment.GetEnvironmentVariable >> existingEnvVarValue)
+        potentialDotnetHostEnvVars
+        |> List.tryPick
+            (fun (envVar, transformer) ->
+                match Environment.GetEnvironmentVariable envVar |> existingEnvVarValue with
+                | Some varValue -> Some(transformer varValue)
+                | None -> None)
         |> Option.defaultWith
             (fun _ ->
                 System
