@@ -1,19 +1,31 @@
 namespace Ionide.ProjInfo
 
 module Paths =
-    /// provides the path to the `dotnet` binary running this library, duplicated from
-    /// https://github.com/dotnet/sdk/blob/b91b88aec2684e3d2988df8d838d3aa3c6240a35/src/Cli/Microsoft.DotNet.Cli.Utils/Muxer.cs#L39
-    let dotnetRoot =
-        match System.Environment.GetEnvironmentVariable "DOTNET_HOST_PATH" with
+    let private potentialRootEnvVars =
+        [ "DOTNET_HOST_PATH"
+          "DOTNET_ROOT"
+          "DOTNET_ROOT(x86)" ]
+
+    let private existingEnvVarValue envVarValue =
+        match envVarValue with
         | null
-        | "" ->
-            System
-                .Diagnostics
-                .Process
-                .GetCurrentProcess()
-                .MainModule
-                .FileName
-        | alreadySet -> alreadySet
+        | "" -> None
+        | other -> Some other
+
+    /// <summary>
+    /// provides the path to the `dotnet` binary running this library, respecting various dotnet <see href="https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-environment-variables#dotnet_root-dotnet_rootx86%5D">environment variables</see>
+    /// </summary>
+    let dotnetRoot =
+        potentialRootEnvVars
+        |> List.tryPick (System.Environment.GetEnvironmentVariable >> existingEnvVarValue)
+        |> Option.defaultWith
+            (fun _ ->
+                System
+                    .Diagnostics
+                    .Process
+                    .GetCurrentProcess()
+                    .MainModule
+                    .FileName)
 
     let sdksPath (dotnetRoot: string) =
         System.IO.Path.Combine(dotnetRoot, "Sdks")
