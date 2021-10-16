@@ -17,46 +17,95 @@ module SdkDiscovery =
     let internal msbuildForSdk (sdkPath: DirectoryInfo) =
         Path.Combine(sdkPath.FullName, "MSBuild.dll")
 
-    let private versionedPaths (root: string) =
-        System.IO.Directory.EnumerateDirectories root
-        |> Seq.choose
-            (fun dir ->
-                let dirName = Path.GetFileName dir
+    type DotnetRuntimeInfo =
+        { RuntimeName: string
+          Version: SemanticVersioning.Version
+          Path: DirectoryInfo }
 
-                match SemanticVersioning.Version.TryParse dirName with
-                | true, v -> Some v
-                | false, _ -> None)
-        |> Seq.sortDescending
-        |> Seq.map (fun v -> v, Path.Combine(root, string v) |> DirectoryInfo)
-
-    /// Given the DOTNET_ROOT, that is the directory where the `dotnet` binary is present and the sdk/runtimes/etc are,
-    /// enumerates the available SDKs in descending version order
-    let sdks (dotnetDirectory: DirectoryInfo) =
-        let sdksPath = Path.Combine(dotnetDirectory.FullName, "sdk")
-        versionedPaths sdksPath
-
-    /// Given the DOTNET_ROOT, that is the directory where the `dotnet` binary is present and the sdk/runtimes/etc are,
-    /// enumerates the available runtimes in descending version order
-    let runtimes (dotnetDirectory: DirectoryInfo) =
-        let netcoreAppPath = Path.Combine(dotnetDirectory.FullName, "shared", "Microsoft.NETCore.App")
-        versionedPaths netcoreAppPath
-
-    /// performs a `dotnet --version` command at the given directory to get the version of the
-    /// SDK active at that location.
-    let versionAt (cwd: DirectoryInfo) =
-        let exe = Paths.dotnetRoot
+    let private execDotnet (cwd: DirectoryInfo) (binaryFullPath: FileInfo) args =
         let info = ProcessStartInfo()
         info.WorkingDirectory <- cwd.FullName
-        info.FileName <- exe
-        info.ArgumentList.Add("--version")
+        info.FileName <- binaryFullPath.FullName
+
+        for arg in args do
+            info.ArgumentList.Add arg
+
         info.RedirectStandardOutput <- true
         let p = System.Diagnostics.Process.Start(info)
         p.WaitForExit()
-        let stdout = p.StandardOutput.ReadToEnd()
 
-        match SemanticVersioning.Version.TryParse stdout with
-        | true, v -> Ok v
-        | false, _ -> Error(exe, info.ArgumentList, cwd, stdout)
+        seq {
+            while not p.StandardOutput.EndOfStream do
+                yield p.StandardOutput.ReadLine()
+        }
+
+    let private (|SemVer|_|) version =
+        match SemanticVersioning.Version.TryParse version with
+        | true, v -> Some v
+        | false, _ -> None
+
+    let private (|SdkOutputDirectory|) (path: string) =
+        path.TrimStart('[').TrimEnd(']') |> DirectoryInfo
+
+    let private (|RuntimeParts|_|) (line: string) =
+        match line.IndexOf ' ' with
+        | -1 -> None
+        | n ->
+            let runtimeName, rest = line.[0..n - 1], line.[n + 1..]
+
+            match rest.IndexOf ' ' with
+            | -1 -> None
+            | n -> Some(runtimeName, rest.[0..n - 1], rest.[n + 1..])
+
+    let private (|SdkParts|_|) (line: string) =
+        match line.IndexOf ' ' with
+        | -1 -> None
+        | n -> Some(line.[0..n - 1], line.[n + 1..])
+
+    /// Given the DOTNET_ROOT, that is the directory where the `dotnet` binary is present and the sdk/runtimes/etc are,
+    /// enumerates the available runtimes in descending version order
+    let runtimes (dotnetBinaryPath: FileInfo) : DotnetRuntimeInfo [] =
+        execDotnet dotnetBinaryPath.Directory dotnetBinaryPath [ "--list-runtimes" ]
+        |> Seq.choose
+            (fun line ->
+                match line with
+                | RuntimeParts (runtimeName, SemVer version, SdkOutputDirectory path) ->
+                    Some
+                        { RuntimeName = runtimeName
+                          Version = version
+                          Path = Path.Combine(path.FullName, string version) |> DirectoryInfo }
+                | line -> None)
+        |> Seq.toArray
+
+    type DotnetSdkInfo =
+        { Version: SemanticVersioning.Version
+          Path: DirectoryInfo }
+
+    /// Given the DOTNET_sROOT, that is the directory where the `dotnet` binary is present and the sdk/runtimes/etc are,
+    /// enumerates the available SDKs in descending version order
+    let sdks (dotnetBinaryPath: FileInfo) : DotnetSdkInfo [] =
+        execDotnet dotnetBinaryPath.Directory dotnetBinaryPath [ "--list-sdks" ]
+        |> Seq.choose
+            (fun line ->
+                match line with
+                | SdkParts (SemVer sdkVersion, SdkOutputDirectory path) ->
+                    Some
+                        { Version = sdkVersion
+                          Path = Path.Combine(path.FullName, string sdkVersion) |> DirectoryInfo }
+                | line -> None)
+        |> Seq.toArray
+
+    /// performs a `dotnet --version` command at the given directory to get the version of the
+    /// SDK active at that location.
+    let versionAt (cwd: DirectoryInfo) (dotnetBinaryPath: FileInfo) =
+        execDotnet cwd dotnetBinaryPath [ "--version" ]
+        |> Seq.head
+        |> function
+            | version ->
+                match SemanticVersioning.Version.TryParse version with
+                | true, v -> Ok v
+                | false, _ -> Error(dotnetBinaryPath, [ "--version" ], cwd, version)
+
 
 [<RequireQualifiedAccess>]
 module Init =
@@ -113,7 +162,7 @@ module Init =
 
         match System.Environment.GetEnvironmentVariable "DOTNET_HOST_PATH" with
         | null
-        | "" -> Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", Paths.dotnetRoot)
+        | "" -> Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", Paths.dotnetRoot.FullName)
         | alreadySet -> ()
 
         if resolveHandler <> null then
@@ -124,17 +173,20 @@ module Init =
 
     /// Initialize the MsBuild integration. Returns path to MsBuild tool that was detected by Locator. Needs to be called before doing anything else.
     /// Call it again when the working directory changes.
-    let init (workingDirectory: DirectoryInfo) =
-        match SdkDiscovery.versionAt workingDirectory with
-        | Ok dotnetSdkVersionAtPath ->
-            let sdkVersion, sdkPath =
-                SdkDiscovery.sdks (Path.GetDirectoryName Paths.dotnetRoot |> DirectoryInfo)
-                |> Seq.skipWhile (fun (v, path) -> v > dotnetSdkVersionAtPath)
-                |> Seq.head
+    let init (workingDirectory: DirectoryInfo) (dotnetExe: FileInfo option) =
+        let exe = dotnetExe |> Option.defaultWith (fun _ -> Paths.dotnetRoot)
 
-            let msbuild = SdkDiscovery.msbuildForSdk sdkPath
-            setupForSdkVersion sdkPath
-            ToolsPath msbuild
+        match SdkDiscovery.versionAt workingDirectory exe with
+        | Ok dotnetSdkVersionAtPath ->
+            let sdks = SdkDiscovery.sdks exe
+            let sdkInfo: SdkDiscovery.DotnetSdkInfo option = sdks |> Array.skipWhile (fun { Version = v } -> v < dotnetSdkVersionAtPath) |> Array.tryHead
+
+            match sdkInfo with
+            | Some sdkInfo ->
+                let msbuild = SdkDiscovery.msbuildForSdk sdkInfo.Path
+                setupForSdkVersion sdkInfo.Path
+                ToolsPath msbuild
+            | None -> failwithf $"Unable to get sdk versions at least from the string '{dotnetSdkVersionAtPath}'. This found sdks were {sdks |> Array.toList}"
         | Error (dotnetExe, args, cwd, erroringVersionString) -> failwithf $"Unable to parse sdk version from the string '{erroringVersionString}'. This value came from running `{dotnetExe} {args}` at path {cwd}"
 
 [<RequireQualifiedAccess>]

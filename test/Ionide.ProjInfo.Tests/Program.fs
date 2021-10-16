@@ -11,7 +11,7 @@ open Expecto.Logging
 
 [<EntryPoint>]
 let main argv =
-    let toolsPath = Init.init (IO.DirectoryInfo Environment.CurrentDirectory)
+    let toolsPath = Init.init (IO.DirectoryInfo Environment.CurrentDirectory) None
 
     Tests.runTests
         { defaultConfig with

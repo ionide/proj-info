@@ -32,7 +32,7 @@ module Paths =
         |> List.tryPick
             (fun (envVar, transformer) ->
                 match Environment.GetEnvironmentVariable envVar |> existingEnvVarValue with
-                | Some varValue -> Some(transformer varValue)
+                | Some varValue -> Some(transformer varValue |> FileInfo)
                 | None -> None)
         |> Option.defaultWith
             (fun _ ->
@@ -41,7 +41,8 @@ module Paths =
                     .Process
                     .GetCurrentProcess()
                     .MainModule
-                    .FileName)
+                    .FileName
+                |> FileInfo)
 
     let sdksPath (dotnetRoot: string) =
         System.IO.Path.Combine(dotnetRoot, "Sdks")
