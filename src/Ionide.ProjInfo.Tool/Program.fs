@@ -24,13 +24,13 @@ type LoaderFunc = ToolsPath * list<string * string> -> IWorkspaceLoader
 
 let parseProject (loaderFunc: LoaderFunc) (path: string) =
     let cwd = System.IO.Path.GetDirectoryName path |> System.IO.DirectoryInfo
-    let toolsPath = Ionide.ProjInfo.Init.init cwd
+    let toolsPath = Ionide.ProjInfo.Init.init cwd None
     let loader = loaderFunc (toolsPath, [])
     loader.LoadProjects([ path ], [], BinaryLogGeneration.Within cwd)
 
 let parseSolution (loaderFunc: LoaderFunc) (path: string) =
     let cwd = System.IO.Path.GetDirectoryName path |> System.IO.DirectoryInfo
-    let toolsPath = Ionide.ProjInfo.Init.init cwd
+    let toolsPath = Ionide.ProjInfo.Init.init cwd None
     let loader = loaderFunc (toolsPath, [])
     loader.LoadSln(path, [], BinaryLogGeneration.Within cwd)
 

@@ -1,19 +1,48 @@
 namespace Ionide.ProjInfo
 
+open System.Runtime.InteropServices
+open System.IO
+open System
+
 module Paths =
-    /// provides the path to the `dotnet` binary running this library, duplicated from
-    /// https://github.com/dotnet/sdk/blob/b91b88aec2684e3d2988df8d838d3aa3c6240a35/src/Cli/Microsoft.DotNet.Cli.Utils/Muxer.cs#L39
-    let dotnetRoot =
-        match System.Environment.GetEnvironmentVariable "DOTNET_HOST_PATH" with
+    let private isUnix = RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+
+    let private dotnetBinaryName =
+        if isUnix then
+            "dotnet"
+        else
+            "dotnet.exe"
+
+    let private potentialDotnetHostEnvVars =
+        [ "DOTNET_HOST_PATH", id // is a full path to dotnet binary
+          "DOTNET_ROOT", (fun s -> Path.Combine(s, dotnetBinaryName)) // needs dotnet binary appended
+          "DOTNET_ROOT(x86)", (fun s -> Path.Combine(s, dotnetBinaryName)) ] // needs dotnet binary appended
+
+    let private existingEnvVarValue envVarValue =
+        match envVarValue with
         | null
-        | "" ->
-            System
-                .Diagnostics
-                .Process
-                .GetCurrentProcess()
-                .MainModule
-                .FileName
-        | alreadySet -> alreadySet
+        | "" -> None
+        | other -> Some other
+
+    /// <summary>
+    /// provides the path to the `dotnet` binary running this library, respecting various dotnet <see href="https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-environment-variables#dotnet_root-dotnet_rootx86%5D">environment variables</see>
+    /// </summary>
+    let dotnetRoot =
+        potentialDotnetHostEnvVars
+        |> List.tryPick
+            (fun (envVar, transformer) ->
+                match Environment.GetEnvironmentVariable envVar |> existingEnvVarValue with
+                | Some varValue -> Some(transformer varValue |> FileInfo)
+                | None -> None)
+        |> Option.defaultWith
+            (fun _ ->
+                System
+                    .Diagnostics
+                    .Process
+                    .GetCurrentProcess()
+                    .MainModule
+                    .FileName
+                |> FileInfo)
 
     let sdksPath (dotnetRoot: string) =
         System.IO.Path.Combine(dotnetRoot, "Sdks")

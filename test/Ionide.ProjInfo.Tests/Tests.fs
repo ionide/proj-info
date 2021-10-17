@@ -1034,4 +1034,12 @@ let tests toolsPath =
           debugTets toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           //Binlog test
           testSample2WithBinLog toolsPath "WorkspaceLoader" WorkspaceLoader.Create
-          testSample2WithBinLog toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create ]
+          testSample2WithBinLog toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
+          test "can get runtimes" {
+              let runtimes = SdkDiscovery.runtimes Paths.dotnetRoot
+              Expect.isNonEmpty runtimes "should have found at least the currently-executing runtime"
+          }
+          test "can get sdks" {
+              let sdks = SdkDiscovery.sdks Paths.dotnetRoot
+              Expect.isNonEmpty sdks "should have found at least the currently-executing sdk"
+          } ]
