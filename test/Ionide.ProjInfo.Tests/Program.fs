@@ -22,8 +22,9 @@ let main argv =
     Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", IO.Path.Combine(baseDir, dotnetExe))
     let toolsPath = Init.init (IO.DirectoryInfo Environment.CurrentDirectory)
 
-    Tests.runTests
+    Tests.runTestsWithArgs
         { defaultConfig with
               printer = TestPrinters.summaryPrinter defaultConfig.printer
               verbosity = LogLevel.Info }
+        argv
         (Tests.tests toolsPath)
