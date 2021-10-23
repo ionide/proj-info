@@ -31,13 +31,18 @@ module SdkDiscovery =
             info.ArgumentList.Add arg
 
         info.RedirectStandardOutput <- true
-        let p = System.Diagnostics.Process.Start(info)
-        p.WaitForExit()
+        use p = System.Diagnostics.Process.Start(info)
 
-        seq {
-            while not p.StandardOutput.EndOfStream do
-                yield p.StandardOutput.ReadLine()
-        }
+        let output =
+            seq {
+                while not p.StandardOutput.EndOfStream do
+                    yield p.StandardOutput.ReadLine()
+            }
+            |> Seq.toArray
+
+        p.WaitForExit()
+        output
+
 
     let private (|SemVer|_|) version =
         match SemanticVersioning.Version.TryParse version with
