@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # Changelog
 
+## [0.54.2] - 2021-11-01
+
+### Fixed
+
+- [fetch dotnet runtimes more safely](https://github.com/ionide/proj-info/pull/119) (thanks @Booksbaum!)
+- [Misc. fixes for cracking found from FSAC, support normalized drive letters and resource paths](https://github.com/ionide/proj-info/pull/120/files)
+
+
 ## [0.54.1] - 2021-10-16
 
 ### Fixed
