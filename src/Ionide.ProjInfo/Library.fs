@@ -126,7 +126,7 @@ module Init =
     let private resolveFromSdkRoot (sdkRoot: DirectoryInfo) : Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly> =
         Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly>
             (fun assemblyLoadContext assemblyName ->
-                let paths = [ Path.Combine(sdkRoot.FullName, assemblyName.Name + ".dll") ]
+                let paths = [ Path.Combine(sdkRoot.FullName, assemblyName.Name + ".dll"); Path.Combine(sdkRoot.FullName, "en", assemblyName.Name + ".dll") ]
 
                 match paths |> List.tryFind File.Exists with
                 | Some path -> assemblyLoadContext.LoadFromAssemblyPath path

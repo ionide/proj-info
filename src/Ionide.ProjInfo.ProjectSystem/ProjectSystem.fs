@@ -69,7 +69,11 @@ type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -
     let updateState (response: ProjectCrackerCache) =
         let normalizeOptions (opts: FSharpProjectOptions) =
             { opts with
-                  SourceFiles = opts.SourceFiles |> Array.filter (FscArguments.isCompileFile) |> Array.map (Path.GetFullPath)
+                  SourceFiles =
+                    opts.SourceFiles
+                    |> Array.filter (FscArguments.isCompileFile)
+                    |> Array.map (Path.GetFullPath)
+                    |> Array.map (fun p -> (p.Chars 0).ToString().ToLower() + p.Substring(1))
                   OtherOptions =
                       opts.OtherOptions
                       |> Array.map
