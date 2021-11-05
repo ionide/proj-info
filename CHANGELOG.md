@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # Changelog
 
+## [0.55.0] - 2021-11-05
+
+### Changed
+
+- Updated to FCS 41
+
 ## [0.54.2] - 2021-11-01
 
 ### Fixed
