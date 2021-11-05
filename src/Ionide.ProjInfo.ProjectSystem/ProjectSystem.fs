@@ -3,7 +3,7 @@ namespace Ionide.ProjInfo.ProjectSystem
 open System
 open System.IO
 open System.Collections.Concurrent
-open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.CodeAnalysis
 open Ionide.ProjInfo.Types
 open Ionide.ProjInfo
 open Workspace

@@ -6,11 +6,11 @@ storage: none
 framework: net5.0
 
 nuget FSharp.Core
-nuget FSharp.Compiler.Service ~> 39.0
+nuget FSharp.Compiler.Service ~> 41.0
 nuget Argu
 
-# copy_local: true doesn't expose sourcelink as a package dependency
-nuget Microsoft.SourceLink.GitHub copy_local: true
+# copy_local: true because this is a build-time dependency only
+nuget Dotnet.ReproducibleBuilds copy_local: true
 
 nuget Expecto
 nuget Expecto.Diff

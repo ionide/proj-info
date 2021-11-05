@@ -2,7 +2,7 @@
 
 open System
 open System.IO
-open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.CodeAnalysis
 open Newtonsoft.Json
 open Ionide.ProjInfo
 

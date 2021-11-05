@@ -1,5 +1,5 @@
 FSharp.Core
 FSharp.Compiler.Service
 Newtonsoft.Json
-Microsoft.SourceLink.GitHub
+Dotnet.ReproducibleBuilds
 Fsharp.Control.Reactive
