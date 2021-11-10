@@ -139,6 +139,115 @@ module ExpectNotification =
     let watchNotifications logger loader =
         NotificationWatcher(loader, logNotification logger)
 
+let testLegacyFrameworkProject toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPath * (string * string) list -> IWorkspaceLoader) =
+    testCase
+    |> withLog
+        (sprintf "can load legacy project - %s - isRelease is %b" workspaceLoader isRelease)
+        (fun logger fs ->
+
+            let testDir = inDir fs "a"
+            copyDirFromAssets fs ``sample7 legacy framework project``.ProjDir testDir
+
+            let projPath = testDir / (``sample7 legacy framework project``.ProjectFile)
+            let projDir = Path.GetDirectoryName projPath
+
+            let config =
+                if isRelease then
+                    "Release"
+                else
+                    "Debug"
+
+            let props = [ ("Configuration", config) ]
+            let loader = workspaceFactory (toolsPath, props)
+
+            let watcher = watchNotifications logger loader
+
+            let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+
+            [ loading projPath
+              loaded projPath ]
+            |> expectNotifications watcher.Notifications
+
+            let [ _; WorkspaceProjectState.Loaded (n1Loaded, _, _) ] = watcher.Notifications
+
+            let n1Parsed = parsed |> expectFind projPath "first is a lib"
+
+            let expectedSources =
+                [ projDir / "Project1A.fs" ]
+                |> List.map Path.GetFullPath
+
+            Expect.equal parsed.Length 1 "console and lib"
+            Expect.equal n1Parsed n1Loaded "notificaton and parsed should be the same"
+            Expect.equal n1Parsed.SourceFiles expectedSources "check sources"
+            )
+
+let testLegacyFrameworkMultiProject toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPath * (string * string) list -> IWorkspaceLoader) =
+    testCase
+    |> withLog
+        (sprintf "can load legacy project - %s - isRelease is %b" workspaceLoader isRelease)
+        (fun logger fs ->
+
+            let testDir = inDir fs "load_sample7"
+            copyDirFromAssets fs ``sample7 legacy framework multi-project``.ProjDir testDir
+
+            let projPath = testDir / (``sample7 legacy framework multi-project``.ProjectFile)
+            let projDir = Path.GetDirectoryName projPath
+
+            let [ (l1, l1Dir); (l2, l2Dir) ] =
+                ``sample7 legacy framework multi-project``.ProjectReferences
+                |> List.map (fun p2p -> testDir / p2p.ProjectFile)
+                |> List.map Path.GetFullPath
+                |> List.map (fun path -> path, Path.GetDirectoryName(path))
+
+            let config =
+                if isRelease then
+                    "Release"
+                else
+                    "Debug"
+
+            let props = [ ("Configuration", config) ]
+            let loader = workspaceFactory (toolsPath, props)
+
+            let watcher = watchNotifications logger loader
+
+            let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+            [ loading projPath
+              loading l1
+              loaded l1
+              loading l2
+              loaded l2
+              loaded projPath
+             ]
+            |> expectNotifications watcher.Notifications
+
+            let [ _; _; WorkspaceProjectState.Loaded (l1Loaded, _, _); _; WorkspaceProjectState.Loaded (l2Loaded, _, _); WorkspaceProjectState.Loaded (n1Loaded, _, _) ] =
+                      watcher.Notifications
+
+            let n1Parsed = parsed |> expectFind projPath "first is a multi-project"
+            let n1ExpectedSources =
+                      [ projDir / "MultiProject1.fs"]
+                      |> List.map Path.GetFullPath
+
+            let l1Parsed = parsed |> expectFind l1 "the F# lib"
+            let l1ExpectedSources =
+                [ l1Dir / "Project1A.fs"]
+                |> List.map Path.GetFullPath
+
+            let l2Parsed = parsed |> expectFind l2 "the F# exe"
+            let l2ExpectedSources =
+                [ l2Dir / "Project1B.fs"]
+                |> List.map Path.GetFullPath
+
+            Expect.equal parsed.Length 3 "check whether all projects in the multi-project were loaded"
+            Expect.equal n1Parsed.SourceFiles n1ExpectedSources "check sources - N1"
+            Expect.equal l1Parsed.SourceFiles l1ExpectedSources "check sources - L1"
+            Expect.equal l2Parsed.SourceFiles l2ExpectedSources "check sources - L2"
+
+            Expect.equal l1Parsed l1Loaded "l1 notificaton and parsed should be the same"
+            Expect.equal l2Parsed l2Loaded "l2 notificaton and parsed should be the same"
+            Expect.equal n1Parsed n1Loaded "n1 notificaton and parsed should be the same"
+            )
+
 let testSample2 toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPath * (string * string) list -> IWorkspaceLoader) =
     testCase
     |> withLog (sprintf "can load sample2 - %s - isRelease is %b" workspaceLoader isRelease) (fun logger fs ->
@@ -1064,4 +1173,6 @@ let tests toolsPath =
                   SdkDiscovery.sdks (Paths.dotnetRoot.Value |> Option.defaultWith (fun _ -> failwith "unable to find dotnet binary"))
 
               Expect.isNonEmpty sdks "should have found at least the currently-executing sdk"
-          } ]
+          }
+          testLegacyFrameworkProject toolsPath "can load legacy project file" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
+          testLegacyFrameworkMultiProject toolsPath "can load legacy multi project file" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props)) ]

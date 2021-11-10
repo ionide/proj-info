@@ -10,6 +10,7 @@ open Microsoft.Build.Execution
 open Types
 open Microsoft.Build.Graph
 open System.Diagnostics
+open System.Runtime.InteropServices
 
 /// functions for .net sdk probing
 module SdkDiscovery =
@@ -22,7 +23,7 @@ module SdkDiscovery =
           Version: SemanticVersioning.Version
           Path: DirectoryInfo }
 
-    let private execDotnet (cwd: DirectoryInfo) (binaryFullPath: FileInfo) args =
+    let internal execDotnet (cwd: DirectoryInfo) (binaryFullPath: FileInfo) args =
         let info = ProcessStartInfo()
         info.WorkingDirectory <- cwd.FullName
         info.FileName <- binaryFullPath.FullName
@@ -109,6 +110,44 @@ module SdkDiscovery =
                 | true, v -> Ok v
                 | false, _ -> Error(dotnetBinaryPath, [ "--version" ], cwd, version)
 
+// functions for legacy style project files
+module LegacyFrameworkDiscovery =
+
+    let isLinux = RuntimeInformation.IsOSPlatform OSPlatform.Linux
+    let isMac = RuntimeInformation.IsOSPlatform OSPlatform.OSX
+    let isUnix = isLinux || isMac
+
+    let internal msbuildBinary =
+        if isLinux then
+            "/usr/bin/msbuild" |> FileInfo |> Some
+        elif isMac then
+            "/Library/Frameworks/Mono.framework/Versions/Current/Commands/msbuild" |> FileInfo |> Some
+        else
+            // taken from https://github.com/microsoft/vswhere
+            // vswhere.exe is guranteed to be at the following location. refer to https://github.com/Microsoft/vswhere/issues/162
+            let vsWhereDir =
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Microsoft Visual Studio", "Installer")
+                |> DirectoryInfo
+
+            let vsWhereExe = Path.Combine(vsWhereDir.FullName, "vswhere.exe") |> FileInfo
+            // example: C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe
+            let msbuildExe =
+                SdkDiscovery.execDotnet vsWhereDir vsWhereExe [ "-find"; "MSBuild\**\Bin\MSBuild.exe" ]
+                |> Seq.last
+                |> FileInfo
+            if msbuildExe.Exists then
+                msbuildExe |> Some
+            else
+                None
+
+    let internal msbuildLibPath(msbuildDir: DirectoryInfo) =
+        if isLinux then
+            "/usr/lib/mono/xbuild"
+        elif isMac then
+            "/Library/Frameworks/Mono.framework/Versions/Current/lib/mono/xbuild"
+        else
+            // example: C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild
+            Path.Combine(msbuildDir.FullName, "..", "..") |> Path.GetFullPath
 
 [<RequireQualifiedAccess>]
 module Init =
@@ -177,6 +216,21 @@ module Init =
         resolveHandler <- resolveFromSdkRoot sdkRoot
         AssemblyLoadContext.Default.add_Resolving resolveHandler
 
+    let internal setupForLegacyFramework (msbuildPathDir: DirectoryInfo) =
+        let msbuildLibPath = LegacyFrameworkDiscovery.msbuildLibPath msbuildPathDir
+
+        // gotta set some env variables so msbuild interop works        
+        if LegacyFrameworkDiscovery.isUnix then
+            Environment.SetEnvironmentVariable("MSBuildBinPath", "/usr/lib/mono/msbuild/Current/bin")
+            Environment.SetEnvironmentVariable("FrameworkPathOverride", "/usr/lib/mono/4.5")
+        else
+            // VsInstallRoot is required for legacy project files
+            // example: C:\Program Files (x86)\Microsoft Visual Studio\2019\Community
+            let vsInstallRoot = Path.Combine(msbuildPathDir.FullName, "..", "..", "..") |> Path.GetFullPath
+            Environment.SetEnvironmentVariable("VsInstallRoot", vsInstallRoot)
+
+        Environment.SetEnvironmentVariable("MSBuildExtensionsPath32", ensureTrailer msbuildLibPath)
+
     /// Initialize the MsBuild integration. Returns path to MsBuild tool that was detected by Locator. Needs to be called before doing anything else.
     /// Call it again when the working directory changes.
     let init (workingDirectory: DirectoryInfo) (dotnetExe: FileInfo option) =
@@ -240,9 +294,9 @@ module ProjectLoader =
             member this.Verbosity
                 with set (v: LoggerVerbosity): unit = () }
 
-    let getTfm (path: string) readingProps =
+    let getTfm (path: string) readingProps isLegacyFrameworkProj =
         let pi = ProjectInstance(path, globalProperties = readingProps, toolsVersion = null)
-        let tfm = pi.GetPropertyValue "TargetFramework"
+        let tfm = pi.GetPropertyValue (if isLegacyFrameworkProj then "TargetFrameworkVersion" else "TargetFramework")
 
         if String.IsNullOrWhiteSpace tfm then
             let tfms = pi.GetPropertyValue "TargetFrameworks"
@@ -308,18 +362,44 @@ module ProjectLoader =
     /// </list>
     /// </remarks>
     /// </summary>
-    let designTimeBuildTargets =
-        [| "ResolveAssemblyReferencesDesignTime"
-           "ResolveProjectReferencesDesignTime"
-           "ResolvePackageDependenciesDesignTime"
-           "_GenerateCompileDependencyCache"
-           "_ComputeNonExistentFileProperty"
-           "CoreCompile" |]
+    let designTimeBuildTargets isLegacyFrameworkProjFile =
+        if isLegacyFrameworkProjFile then
+            [|
+                "_GenerateCompileDependencyCache"
+                "_ComputeNonExistentFileProperty"
+                "CoreCompile" |]
+        else
+            [|                      
+                "ResolveAssemblyReferencesDesignTime"
+                "ResolveProjectReferencesDesignTime"
+                "ResolvePackageDependenciesDesignTime"
+                "_GenerateCompileDependencyCache"
+                "_ComputeNonExistentFileProperty"
+                "CoreCompile" |]
+
+    let setLegacyMsbuildProperties isOldStyleProjFile =
+        match LegacyFrameworkDiscovery.msbuildBinary with
+        | Some file ->
+            let msbuildBinaryDir = file.Directory
+            Init.setupForLegacyFramework msbuildBinaryDir
+        | _ -> ()
 
     let loadProject (path: string) (binaryLogs: BinaryLogGeneration) globalProperties =
         try
+            let isLegacyFrameworkProjFile =
+                if path.ToLower().EndsWith ".fsproj" && File.Exists path then
+                    let legacyProjFormatXmlns = "xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\""
+                    let lines:seq<string> = File.ReadLines path
+                    (Seq.tryFind (fun (line: string) -> line.Contains legacyProjFormatXmlns) lines).IsSome
+                else
+                    false
+
             let readingProps = getGlobalProps path None globalProperties
-            let tfm = getTfm path readingProps
+
+            if isLegacyFrameworkProjFile then
+                setLegacyMsbuildProperties isLegacyFrameworkProjFile
+
+            let tfm = getTfm path readingProps isLegacyFrameworkProjFile
 
             let globalProperties = getGlobalProps path tfm globalProperties
 
@@ -333,8 +413,7 @@ module ProjectLoader =
 
             let pi = pi.CreateProjectInstance()
 
-
-            let build = pi.Build(designTimeBuildTargets, loggers)
+            let build = pi.Build(designTimeBuildTargets isLegacyFrameworkProjFile, loggers)
 
             let t = sw.ToString()
 
@@ -448,7 +527,10 @@ module ProjectLoader =
           MSBuildToolsVersion = msbuildPropString "MSBuildToolsVersion" |> Option.defaultValue ""
 
           ProjectAssetsFile = msbuildPropString "ProjectAssetsFile" |> Option.defaultValue ""
-          RestoreSuccess = msbuildPropBool "RestoreSuccess" |> Option.defaultValue false
+          RestoreSuccess =
+              match msbuildPropString "TargetFrameworkVersion" with
+              | Some _ -> true
+              | None -> msbuildPropBool "RestoreSuccess" |> Option.defaultValue false
 
           Configurations = msbuildPropStringList "Configurations" |> Option.defaultValue []
           TargetFrameworks = msbuildPropStringList "TargetFrameworks" |> Option.defaultValue []
@@ -629,7 +711,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
             None
 
     let projectInstanceFactory projectPath (_globalProperties: IDictionary<string, string>) (projectCollection: ProjectCollection) =
-        let tfm = ProjectLoader.getTfm projectPath (dict globalProperties)
+        let tfm = ProjectLoader.getTfm projectPath (dict globalProperties) false
         //let globalProperties = globalProperties |> Seq.toList |> List.map (fun (KeyValue(k,v)) -> (k,v))
         let globalProperties = ProjectLoader.getGlobalProps projectPath tfm globalProperties
         ProjectInstance(projectPath, globalProperties, toolsVersion = null, projectCollection = projectCollection)
@@ -676,7 +758,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                 )
 
                 let gbr =
-                    GraphBuildRequestData(projects, ProjectLoader.designTimeBuildTargets, null, BuildRequestDataFlags.ReplaceExistingProjectInstance)
+                    GraphBuildRequestData(projects, ProjectLoader.designTimeBuildTargets false, null, BuildRequestDataFlags.ReplaceExistingProjectInstance)
 
                 let bm = BuildManager.DefaultBuildManager
                 use sw = new StringWriter()
