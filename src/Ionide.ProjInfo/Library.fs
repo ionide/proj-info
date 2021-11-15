@@ -56,30 +56,29 @@ module SdkDiscovery =
         match line.IndexOf ' ' with
         | -1 -> None
         | n ->
-            let runtimeName, rest = line.[0..n - 1], line.[n + 1..]
+            let runtimeName, rest = line.[0 .. n - 1], line.[n + 1 ..]
 
             match rest.IndexOf ' ' with
             | -1 -> None
-            | n -> Some(runtimeName, rest.[0..n - 1], rest.[n + 1..])
+            | n -> Some(runtimeName, rest.[0 .. n - 1], rest.[n + 1 ..])
 
     let private (|SdkParts|_|) (line: string) =
         match line.IndexOf ' ' with
         | -1 -> None
-        | n -> Some(line.[0..n - 1], line.[n + 1..])
+        | n -> Some(line.[0 .. n - 1], line.[n + 1 ..])
 
     /// Given the DOTNET_ROOT, that is the directory where the `dotnet` binary is present and the sdk/runtimes/etc are,
     /// enumerates the available runtimes in descending version order
     let runtimes (dotnetBinaryPath: FileInfo) : DotnetRuntimeInfo [] =
         execDotnet dotnetBinaryPath.Directory dotnetBinaryPath [ "--list-runtimes" ]
-        |> Seq.choose
-            (fun line ->
-                match line with
-                | RuntimeParts (runtimeName, SemVer version, SdkOutputDirectory path) ->
-                    Some
-                        { RuntimeName = runtimeName
-                          Version = version
-                          Path = Path.Combine(path.FullName, string version) |> DirectoryInfo }
-                | line -> None)
+        |> Seq.choose (fun line ->
+            match line with
+            | RuntimeParts (runtimeName, SemVer version, SdkOutputDirectory path) ->
+                Some
+                    { RuntimeName = runtimeName
+                      Version = version
+                      Path = Path.Combine(path.FullName, string version) |> DirectoryInfo }
+            | line -> None)
         |> Seq.toArray
 
     type DotnetSdkInfo =
@@ -90,14 +89,13 @@ module SdkDiscovery =
     /// enumerates the available SDKs in descending version order
     let sdks (dotnetBinaryPath: FileInfo) : DotnetSdkInfo [] =
         execDotnet dotnetBinaryPath.Directory dotnetBinaryPath [ "--list-sdks" ]
-        |> Seq.choose
-            (fun line ->
-                match line with
-                | SdkParts (SemVer sdkVersion, SdkOutputDirectory path) ->
-                    Some
-                        { Version = sdkVersion
-                          Path = Path.Combine(path.FullName, string sdkVersion) |> DirectoryInfo }
-                | line -> None)
+        |> Seq.choose (fun line ->
+            match line with
+            | SdkParts (SemVer sdkVersion, SdkOutputDirectory path) ->
+                Some
+                    { Version = sdkVersion
+                      Path = Path.Combine(path.FullName, string sdkVersion) |> DirectoryInfo }
+            | line -> None)
         |> Seq.toArray
 
     /// performs a `dotnet --version` command at the given directory to get the version of the
@@ -121,16 +119,18 @@ module Init =
         else
             path + string Path.DirectorySeparatorChar
 
-    let mutable private resolveHandler: Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly> = null
+    let mutable private resolveHandler: Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly> =
+        null
 
     let private resolveFromSdkRoot (sdkRoot: DirectoryInfo) : Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly> =
-        Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly>
-            (fun assemblyLoadContext assemblyName ->
-                let paths = [ Path.Combine(sdkRoot.FullName, assemblyName.Name + ".dll"); Path.Combine(sdkRoot.FullName, "en", assemblyName.Name + ".dll") ]
+        Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly> (fun assemblyLoadContext assemblyName ->
+            let paths =
+                [ Path.Combine(sdkRoot.FullName, assemblyName.Name + ".dll")
+                  Path.Combine(sdkRoot.FullName, "en", assemblyName.Name + ".dll") ]
 
-                match paths |> List.tryFind File.Exists with
-                | Some path -> assemblyLoadContext.LoadFromAssemblyPath path
-                | None -> null)
+            match paths |> List.tryFind File.Exists with
+            | Some path -> assemblyLoadContext.LoadFromAssemblyPath path
+            | None -> null)
 
 
     /// <summary>
@@ -154,8 +154,9 @@ module Init =
     /// for more examples of this.
     /// </remarks>
     /// <param name="sdkRoot">the versioned root path of a given SDK version, for example '/usr/local/share/dotnet/sdk/5.0.300'</param>
+    /// <param name="dotnetExe">The full path to a dotnet binary to use as the root binary. This will be set as the DOTNET_HOST_PATH</param>
     /// <returns></returns>
-    let setupForSdkVersion (sdkRoot: DirectoryInfo) =
+    let setupForSdkVersion (sdkRoot: DirectoryInfo) (dotnetExe: FileInfo) =
         let msbuild = SdkDiscovery.msbuildForSdk sdkRoot
 
         // gotta set some env variables so msbuild interop works, see the locator for details: https://github.com/microsoft/MSBuildLocator/blob/d83904bff187ce8245f430b93e8b5fbfefb6beef/src/MSBuildLocator/MSBuildLocator.cs#L289
@@ -167,7 +168,7 @@ module Init =
 
         match System.Environment.GetEnvironmentVariable "DOTNET_HOST_PATH" with
         | null
-        | "" -> Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", Paths.dotnetRoot.FullName)
+        | "" -> Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", dotnetExe.FullName)
         | alreadySet -> ()
 
         if resolveHandler <> null then
@@ -179,20 +180,26 @@ module Init =
     /// Initialize the MsBuild integration. Returns path to MsBuild tool that was detected by Locator. Needs to be called before doing anything else.
     /// Call it again when the working directory changes.
     let init (workingDirectory: DirectoryInfo) (dotnetExe: FileInfo option) =
-        let exe = dotnetExe |> Option.defaultWith (fun _ -> Paths.dotnetRoot)
+        let exe = dotnetExe |> Option.orElseWith (fun _ -> Paths.dotnetRoot)
 
-        match SdkDiscovery.versionAt workingDirectory exe with
-        | Ok dotnetSdkVersionAtPath ->
-            let sdks = SdkDiscovery.sdks exe
-            let sdkInfo: SdkDiscovery.DotnetSdkInfo option = sdks |> Array.skipWhile (fun { Version = v } -> v < dotnetSdkVersionAtPath) |> Array.tryHead
+        match exe with
+        | None -> failwith "No dotnet binary could be found via the DOTNET_HOST_PATH or DOTNET_ROOT environment variables, the PATH environment variable, or the default install locations"
+        | Some exe ->
 
-            match sdkInfo with
-            | Some sdkInfo ->
-                let msbuild = SdkDiscovery.msbuildForSdk sdkInfo.Path
-                setupForSdkVersion sdkInfo.Path
-                ToolsPath msbuild
-            | None -> failwithf $"Unable to get sdk versions at least from the string '{dotnetSdkVersionAtPath}'. This found sdks were {sdks |> Array.toList}"
-        | Error (dotnetExe, args, cwd, erroringVersionString) -> failwithf $"Unable to parse sdk version from the string '{erroringVersionString}'. This value came from running `{dotnetExe} {args}` at path {cwd}"
+            match SdkDiscovery.versionAt workingDirectory exe with
+            | Ok dotnetSdkVersionAtPath ->
+                let sdks = SdkDiscovery.sdks exe
+
+                let sdkInfo: SdkDiscovery.DotnetSdkInfo option =
+                    sdks |> Array.skipWhile (fun { Version = v } -> v < dotnetSdkVersionAtPath) |> Array.tryHead
+
+                match sdkInfo with
+                | Some sdkInfo ->
+                    let msbuild = SdkDiscovery.msbuildForSdk sdkInfo.Path
+                    setupForSdkVersion sdkInfo.Path exe
+                    ToolsPath msbuild
+                | None -> failwithf $"Unable to get sdk versions at least from the string '{dotnetSdkVersionAtPath}'. This found sdks were {sdks |> Array.toList}"
+            | Error (dotnetExe, args, cwd, erroringVersionString) -> failwithf $"Unable to parse sdk version from the string '{erroringVersionString}'. This value came from running `{dotnetExe} {args}` at path {cwd}"
 
 [<RequireQualifiedAccess>]
 type BinaryLogGeneration =
@@ -262,10 +269,9 @@ module ProjectLoader =
         | BinaryLogGeneration.Within dir ->
             let loggers =
                 paths
-                |> Seq.map
-                    (fun path ->
-                        let logPath = logFilePath (dir, path)
-                        Microsoft.Build.Logging.BinaryLogger(Parameters = logPath) :> ILogger)
+                |> Seq.map (fun path ->
+                    let logPath = logFilePath (dir, path)
+                    Microsoft.Build.Logging.BinaryLogger(Parameters = logPath) :> ILogger)
 
             [ logger; yield! loggers ]
 
@@ -348,60 +354,56 @@ module ProjectLoader =
     let getP2Prefs (LoadedProject project) =
         project.Items
         |> Seq.filter (fun p -> p.ItemType = "_MSBuildProjectReferenceExistent")
-        |> Seq.map
-            (fun p ->
-                let relativePath = p.EvaluatedInclude
-                let path = p.GetMetadataValue "FullPath"
+        |> Seq.map (fun p ->
+            let relativePath = p.EvaluatedInclude
+            let path = p.GetMetadataValue "FullPath"
 
-                let tfms =
-                    if p.HasMetadata "TargetFramework" then
-                        p.GetMetadataValue "TargetFramework"
-                    else
-                        p.GetMetadataValue "TargetFrameworks"
+            let tfms =
+                if p.HasMetadata "TargetFramework" then
+                    p.GetMetadataValue "TargetFramework"
+                else
+                    p.GetMetadataValue "TargetFrameworks"
 
-                { RelativePath = relativePath
-                  ProjectFileName = path
-                  TargetFramework = tfms })
+            { RelativePath = relativePath
+              ProjectFileName = path
+              TargetFramework = tfms })
 
     let getCompileItems (LoadedProject project) =
         project.Items
         |> Seq.filter (fun p -> p.ItemType = "Compile")
-        |> Seq.map
-            (fun p ->
-                let name = p.EvaluatedInclude
+        |> Seq.map (fun p ->
+            let name = p.EvaluatedInclude
 
-                let link =
-                    if p.HasMetadata "Link" then
-                        Some(p.GetMetadataValue "Link")
-                    else
-                        None
+            let link =
+                if p.HasMetadata "Link" then
+                    Some(p.GetMetadataValue "Link")
+                else
+                    None
 
-                let fullPath = p.GetMetadataValue "FullPath"
+            let fullPath = p.GetMetadataValue "FullPath"
 
-                { Name = name
-                  FullPath = fullPath
-                  Link = link })
+            { Name = name
+              FullPath = fullPath
+              Link = link })
 
     let getNuGetReferences (LoadedProject project) =
         project.Items
         |> Seq.filter (fun p -> p.ItemType = "Reference" && p.GetMetadataValue "NuGetSourceType" = "Package")
-        |> Seq.map
-            (fun p ->
-                let name = p.GetMetadataValue "NuGetPackageId"
-                let version = p.GetMetadataValue "NuGetPackageVersion"
-                let fullPath = p.GetMetadataValue "FullPath"
+        |> Seq.map (fun p ->
+            let name = p.GetMetadataValue "NuGetPackageId"
+            let version = p.GetMetadataValue "NuGetPackageVersion"
+            let fullPath = p.GetMetadataValue "FullPath"
 
-                { Name = name
-                  Version = version
-                  FullPath = fullPath })
+            { Name = name
+              Version = version
+              FullPath = fullPath })
 
     let getProperties (LoadedProject project) (properties: string list) =
         project.Properties
         |> Seq.filter (fun p -> List.contains p.Name properties)
-        |> Seq.map
-            (fun p ->
-                { Name = p.Name
-                  Value = p.EvaluatedValue })
+        |> Seq.map (fun p ->
+            { Name = p.Name
+              Value = p.EvaluatedValue })
 
     let (|ConditionEquals|_|) (str: string) (arg: string) =
         if System.String.Compare(str, arg, System.StringComparison.OrdinalIgnoreCase) = 0 then
@@ -574,13 +576,13 @@ type IWorkspaceLoader =
     /// <param name="customProperties">any custom msbuild properties that should be extracted from the build results. these will be available under the CustomProperties property of the returned ProjectOptions</param>
     /// <param name="binaryLog">determines if and where to write msbuild binary logs</param>
     /// <returns>the loaded project structures</returns>
-    abstract member LoadProjects : projectPaths: string list * customProperties: list<string> * binaryLog: BinaryLogGeneration -> seq<ProjectOptions>
+    abstract member LoadProjects: projectPaths: string list * customProperties: list<string> * binaryLog: BinaryLogGeneration -> seq<ProjectOptions>
 
     /// <summary>
     /// Load a list of projects with no additional custom properties, without generating binary logs
     /// </summary>
     /// <returns>the loaded project structures</returns>
-    abstract member LoadProjects : projectPaths: string list -> seq<ProjectOptions>
+    abstract member LoadProjects: projectPaths: string list -> seq<ProjectOptions>
 
     /// <summary>
     /// Load every project contained in the solution file, extra
@@ -589,17 +591,17 @@ type IWorkspaceLoader =
     /// <param name="solutionPath">path to the solution to be loaded</param>
     /// <param name="customProperties">any custom msbuild properties that should be extracted from the build results. these will be available under the CustomProperties property of the returned ProjectOptions</param>
     /// <param name="binaryLog">determines if and where to write msbuild binary logs</param>
-    abstract member LoadSln : solutionPath: string * customProperties: list<string> * binaryLog: BinaryLogGeneration -> seq<ProjectOptions>
+    abstract member LoadSln: solutionPath: string * customProperties: list<string> * binaryLog: BinaryLogGeneration -> seq<ProjectOptions>
 
     /// <summary>
     /// Load every project contained in the solution file with no additional custom properties, without generating binary logs
     /// </summary>
     /// <param name="solutionPath">path to the solution to be loaded</param>
     /// <returns>the loaded project structures</returns>
-    abstract member LoadSln : solutionPath: string -> seq<ProjectOptions>
+    abstract member LoadSln: solutionPath: string -> seq<ProjectOptions>
 
     [<CLIEvent>]
-    abstract Notifications : IEvent<WorkspaceProjectState>
+    abstract Notifications: IEvent<WorkspaceProjectState>
 
 open Ionide.ProjInfo.Logging
 
@@ -713,29 +715,26 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                 let projects =
                     resultsByNode
                     |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
-                    |> Seq.map
-                        (fun p ->
+                    |> Seq.map (fun p ->
 
-                            p.ProjectInstance.FullPath, ProjectLoader.getLoadedProjectInfo p.ProjectInstance.FullPath customProperties (ProjectLoader.LoadedProject p.ProjectInstance))
+                        p.ProjectInstance.FullPath, ProjectLoader.getLoadedProjectInfo p.ProjectInstance.FullPath customProperties (ProjectLoader.LoadedProject p.ProjectInstance))
 
-                    |> Seq.choose
-                        (fun (projectPath, projectOptionResult) ->
-                            match projectOptionResult with
-                            | Ok projectOptions ->
+                    |> Seq.choose (fun (projectPath, projectOptionResult) ->
+                        match projectOptionResult with
+                        | Ok projectOptions ->
 
-                                Some projectOptions
-                            | Error e ->
-                                logger.error (Log.setMessage "Failed loading projects {error}" >> Log.addContextDestructured "error" e)
-                                loadingNotification.Trigger(WorkspaceProjectState.Failed(projectPath, GenericError(projectPath, e)))
-                                None)
+                            Some projectOptions
+                        | Error e ->
+                            logger.error (Log.setMessage "Failed loading projects {error}" >> Log.addContextDestructured "error" e)
+                            loadingNotification.Trigger(WorkspaceProjectState.Failed(projectPath, GenericError(projectPath, e)))
+                            None)
 
                 let allProjectOptions = projects |> Seq.toList
 
                 allProjectOptions
-                |> Seq.iter
-                    (fun po ->
-                        logger.info (Log.setMessage "Project loaded {project}" >> Log.addContextDestructured "project" po.ProjectFileName)
-                        loadingNotification.Trigger(WorkspaceProjectState.Loaded(po, allProjectOptions |> Seq.toList, false)))
+                |> Seq.iter (fun po ->
+                    logger.info (Log.setMessage "Project loaded {project}" >> Log.addContextDestructured "project" po.ProjectFileName)
+                    loadingNotification.Trigger(WorkspaceProjectState.Loaded(po, allProjectOptions |> Seq.toList, false)))
 
                 allProjectOptions :> seq<_>
         with
@@ -746,17 +745,16 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
             projects.ProjectNodesTopologicallySorted
             |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
-            |> Seq.iter
-                (fun p ->
+            |> Seq.iter (fun p ->
 
-                    let p = p.ProjectInstance.FullPath
+                let p = p.ProjectInstance.FullPath
 
-                    if msg.Contains "The project file could not be loaded." then
-                        loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
-                    elif msg.Contains "not restored" then
-                        loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotRestored(p)))
-                    else
-                        loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg))))
+                if msg.Contains "The project file could not be loaded." then
+                    loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
+                elif msg.Contains "not restored" then
+                    loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotRestored(p)))
+                else
+                    loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg))))
 
             Seq.empty
 
@@ -942,12 +940,11 @@ module ProjectViewer =
                 name.EndsWith(sprintf "%s.AssemblyInfo.fs" projName)
 
             sources
-            |> List.choose
-                (function
+            |> List.choose (function
                 | ProjectItem.Compile (name, fullpath) -> Some(name, fullpath))
             |> List.filter (fun (_, p) -> not (isGeneratedAssemblyinfo p))
 
         { ProjectViewerTree.Name = proj.ProjectFileName |> Path.GetFileNameWithoutExtension
           Items =
-              compileFiles
-              |> List.map (fun (name, fullpath) -> ProjectViewerItem.Compile(fullpath, { ProjectViewerItemConfig.Link = name })) }
+            compileFiles
+            |> List.map (fun (name, fullpath) -> ProjectViewerItem.Compile(fullpath, { ProjectViewerItemConfig.Link = name })) }
