@@ -5,7 +5,10 @@ open System.IO
 open System
 
 module Paths =
-    let private isUnix = RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+    let private isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+    let private isMac = RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+    let private isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
+    let private isUnix = isLinux || isMac
 
     let private dotnetBinaryName =
         if isUnix then
@@ -24,25 +27,61 @@ module Paths =
         | "" -> None
         | other -> Some other
 
+    let private tryFindFromEnvVar () =
+        potentialDotnetHostEnvVars
+        |> List.tryPick (fun (envVar, transformer) ->
+            match Environment.GetEnvironmentVariable envVar |> existingEnvVarValue with
+            | Some varValue -> Some(transformer varValue |> FileInfo)
+            | None -> None)
+
+    let private PATHSeparator =
+        if isUnix then
+            ':'
+        else
+            ';'
+
+    let private tryFindFromPATH () =
+        System
+            .Environment
+            .GetEnvironmentVariable("PATH")
+            .Split(PATHSeparator, StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
+        |> Array.tryPick (fun d ->
+            let fi = Path.Combine(d, dotnetBinaryName) |> FileInfo
+
+            if fi.Exists then
+                Some fi
+            else
+                None)
+
+
+    let private tryFindFromDefaultDirs () =
+        let windowsPath = $"C:\\Program Files\\dotnet\\{dotnetBinaryName}"
+        let macosPath = $"/usr/local/share/dotnet/{dotnetBinaryName}"
+        let linuxPath = $"/usr/share/dotnet/{dotnetBinaryName}"
+
+        let tryFindFile p =
+            let f = FileInfo p
+
+            if f.Exists then
+                Some f
+            else
+                None
+
+        if isWindows then
+            tryFindFile windowsPath
+        else if isMac then
+            tryFindFile macosPath
+        else if isLinux then
+            tryFindFile linuxPath
+        else
+            None
+
     /// <summary>
-    /// provides the path to the `dotnet` binary running this library, respecting various dotnet <see href="https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-environment-variables#dotnet_root-dotnet_rootx86%5D">environment variables</see>
+    /// provides the path to the `dotnet` binary running this library, respecting various dotnet <see href="https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-environment-variables#dotnet_root-dotnet_rootx86%5D">environment variables</see>.
+    /// Also probes the PATH and checks the default installation locations
     /// </summary>
     let dotnetRoot =
-        potentialDotnetHostEnvVars
-        |> List.tryPick
-            (fun (envVar, transformer) ->
-                match Environment.GetEnvironmentVariable envVar |> existingEnvVarValue with
-                | Some varValue -> Some(transformer varValue |> FileInfo)
-                | None -> None)
-        |> Option.defaultWith
-            (fun _ ->
-                System
-                    .Diagnostics
-                    .Process
-                    .GetCurrentProcess()
-                    .MainModule
-                    .FileName
-                |> FileInfo)
+        lazy (tryFindFromEnvVar () |> Option.orElseWith tryFindFromPATH |> Option.orElseWith tryFindFromDefaultDirs)
 
     let sdksPath (dotnetRoot: string) =
         System.IO.Path.Combine(dotnetRoot, "Sdks")
