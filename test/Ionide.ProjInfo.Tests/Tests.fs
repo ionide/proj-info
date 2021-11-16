@@ -1038,10 +1038,10 @@ let tests toolsPath =
           testSample2WithBinLog toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           testSample2WithBinLog toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           test "can get runtimes" {
-              let runtimes = SdkDiscovery.runtimes Paths.dotnetRoot
+              let runtimes = SdkDiscovery.runtimes (Paths.dotnetRoot.Value |> Option.defaultWith (fun _ -> failwith "unable to find dotnet binary"))
               Expect.isNonEmpty runtimes "should have found at least the currently-executing runtime"
           }
           test "can get sdks" {
-              let sdks = SdkDiscovery.sdks Paths.dotnetRoot
+              let sdks = SdkDiscovery.sdks (Paths.dotnetRoot.Value |> Option.defaultWith (fun _ -> failwith "unable to find dotnet binary"))
               Expect.isNonEmpty sdks "should have found at least the currently-executing sdk"
           } ]

@@ -18,17 +18,21 @@ type Args =
             | Solution (path) -> "Analyze a solution of projects at {path}"
             | Graph -> "Use the graph loader"
 
-let parser = Argu.ArgumentParser.Create("proj", "analyze msbuild projects", errorHandler = ProcessExiter(), checkStructure = true)
+let parser =
+    Argu.ArgumentParser.Create("proj", "analyze msbuild projects", errorHandler = ProcessExiter(), checkStructure = true)
 
 type LoaderFunc = ToolsPath * list<string * string> -> IWorkspaceLoader
 
-let parseProject (loaderFunc: LoaderFunc) (path: string) =
+let (|Rooted|) (s: string) =
+    System.IO.Path.Combine(System.Environment.CurrentDirectory, s)
+
+let parseProject (loaderFunc: LoaderFunc) (Rooted path) =
     let cwd = System.IO.Path.GetDirectoryName path |> System.IO.DirectoryInfo
     let toolsPath = Ionide.ProjInfo.Init.init cwd None
     let loader = loaderFunc (toolsPath, [])
     loader.LoadProjects([ path ], [], BinaryLogGeneration.Within cwd)
 
-let parseSolution (loaderFunc: LoaderFunc) (path: string) =
+let parseSolution (loaderFunc: LoaderFunc) (Rooted path) =
     let cwd = System.IO.Path.GetDirectoryName path |> System.IO.DirectoryInfo
     let toolsPath = Ionide.ProjInfo.Init.init cwd None
     let loader = loaderFunc (toolsPath, [])

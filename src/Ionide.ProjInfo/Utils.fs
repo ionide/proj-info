@@ -80,7 +80,8 @@ module Paths =
     /// provides the path to the `dotnet` binary running this library, respecting various dotnet <see href="https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-environment-variables#dotnet_root-dotnet_rootx86%5D">environment variables</see>.
     /// Also probes the PATH and checks the default installation locations
     /// </summary>
-    let dotnetRoot = tryFindFromEnvVar () |> Option.orElseWith tryFindFromPATH |> Option.orElseWith tryFindFromDefaultDirs
+    let dotnetRoot =
+        lazy (tryFindFromEnvVar () |> Option.orElseWith tryFindFromPATH |> Option.orElseWith tryFindFromDefaultDirs)
 
     let sdksPath (dotnetRoot: string) =
         System.IO.Path.Combine(dotnetRoot, "Sdks")

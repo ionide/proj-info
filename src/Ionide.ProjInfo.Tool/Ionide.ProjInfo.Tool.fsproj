@@ -4,6 +4,7 @@
         <OutputType>Exe</OutputType>
         <TargetFrameworks>net5.0</TargetFrameworks>
         <PackAsTool>true</PackAsTool>
+        <ToolCommandName>proj-info</ToolCommandName>
     </PropertyGroup>
 
     <ItemGroup>

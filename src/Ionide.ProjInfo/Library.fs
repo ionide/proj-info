@@ -180,7 +180,7 @@ module Init =
     /// Initialize the MsBuild integration. Returns path to MsBuild tool that was detected by Locator. Needs to be called before doing anything else.
     /// Call it again when the working directory changes.
     let init (workingDirectory: DirectoryInfo) (dotnetExe: FileInfo option) =
-        let exe = dotnetExe |> Option.orElseWith (fun _ -> Paths.dotnetRoot)
+        let exe = dotnetExe |> Option.orElseWith (fun _ -> Paths.dotnetRoot.Value)
 
         match exe with
         | None -> failwith "No dotnet binary could be found via the DOTNET_HOST_PATH or DOTNET_ROOT environment variables, the PATH environment variable, or the default install locations"
