@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-# Changelog
+## [0.55.1] - 2021-11-16
+
+### Fixed
+
+- [fix the dotnet binary probing logic to not use the host app name](https://github.com/ionide/proj-info/pull/126)
 
 ## [0.55.0] - 2021-11-05
 
