@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.55.2] - 2021-11-17
+
+### Changed
+
+- [no longer set DOTNET_HOST_PATH, instead preferring some F#-specific build parameters](https://github.com/ionide/proj-info/pull/127). This should be safer for more categories of applications.
+
 ## [0.55.1] - 2021-11-16
 
 ### Fixed
