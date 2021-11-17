@@ -10,7 +10,7 @@ module Paths =
     let private isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
     let private isUnix = isLinux || isMac
 
-    let private dotnetBinaryName =
+    let dotnetBinaryName =
         if isUnix then
             "dotnet"
         else
