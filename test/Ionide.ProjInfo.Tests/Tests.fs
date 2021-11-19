@@ -710,7 +710,7 @@ let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
         )
 
 let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
-    ftestCase
+    testCase
     |> withLog (sprintf "can load sample3 with FCS - %s" workspaceLoader) (fun logger fs ->
 
         let rec allFCSProjects (po: FSharpProjectOptions) =
