@@ -709,6 +709,55 @@ let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
 
         )
 
+let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
+    ftestCase
+    |> withLog (sprintf "can load sample3 with FCS - %s" workspaceLoader) (fun logger fs ->
+
+        let rec allFCSProjects (po: FSharpProjectOptions) =
+            [ yield po
+              for reference in po.ReferencedProjects do
+                  match internalGetProjectOptions reference with
+                  | Some opts -> yield! allFCSProjects opts
+                  | None -> () ]
+
+
+        let rec allP2P (po: FSharpProjectOptions) =
+            [ for reference in po.ReferencedProjects do
+                  let opts = internalGetProjectOptions reference |> Option.get
+                  yield reference.FileName, opts
+                  yield! allP2P opts ]
+
+        let expectP2PKeyIsTargetPath (pos: Map<string, ProjectOptions>) fcsPo =
+            for (tar, fcsPO) in allP2P fcsPo do
+                let dpoPo = pos |> Map.find fcsPo.ProjectFileName
+                Expect.equal tar dpoPo.TargetPath (sprintf "p2p key is TargetPath, fsc projet options was '%A'" fcsPO)
+
+        let testDir = inDir fs "load_sample_fsc"
+        copyDirFromAssets fs  ``sample3 Netsdk projs``.ProjDir testDir
+
+        let projPath = testDir / (``sample3 Netsdk projs``.ProjectFile)
+
+        dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
+
+        let loader = workspaceFactory toolsPath
+
+        let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+        let mutable pos = Map.empty
+
+        loader.Notifications.Add (function | WorkspaceProjectState.Loaded (po, knownProjects, _) -> pos <- Map.add po.ProjectFileName po pos)
+
+        let fcsPo = FCS.mapToFSharpProjectOptions parsed.Head parsed
+        let hasCSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l1.dll")
+        let hasCSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.FileName.EndsWith "l1.dll")
+        let hasFSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l2.dll")
+        let hasFSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.FileName.EndsWith "l2.dll")
+        Expect.equal hasCSharpRef true "Should have direct dll reference to C# reference"
+        Expect.equal hasCSharpProjectRef false "Should NOT have project reference to C# reference"
+        Expect.equal hasFSharpRef true "Should have direct dll reference to F# reference"
+        Expect.equal hasFSharpProjectRef true "Should have project reference to F# reference"
+
+        )
+
 let testSample2WithBinLog toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog (sprintf "can load sample2 with bin log - %s" workspaceLoader) (fun logger fs ->
@@ -991,6 +1040,9 @@ let tests toolsPath =
           //FCS tests
           testFCSmap toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           testFCSmap toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
+          //FCS multi-project tests
+          testFCSmapManyProj toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+          testFCSmapManyProj toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           //ProjectSystem tests
           testProjectSystem toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           testProjectSystem toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create

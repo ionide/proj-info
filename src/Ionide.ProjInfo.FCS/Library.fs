@@ -15,9 +15,9 @@ module FCS =
               |> Array.choose
                   (fun d ->
                       if d.ProjectFileName.EndsWith ".fsproj" then
-                          allKnownProjects 
+                          allKnownProjects
                           |> Seq.tryFind (fun n -> n.ProjectFileName = d.ProjectFileName)
-                          |> Option.map (fun p -> FSharpReferencedProject.CreateFSharp(d.ProjectFileName, mapToFSharpProjectOptions p allKnownProjects))
+                          |> Option.map (fun p -> FSharpReferencedProject.CreateFSharp(p.TargetPath, mapToFSharpProjectOptions p allKnownProjects))
                       else
                           // TODO: map other project types to references here
                           None)
