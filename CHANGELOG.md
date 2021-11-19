@@ -1,8 +1,15 @@
 # Changelog
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.55.3] - 2021-11-19
+
+### Fixed
+
+- [Fix the project references in FCS layer](https://github.com/ionide/proj-info/pull/128)
 
 ## [0.55.2] - 2021-11-17
 
@@ -29,7 +36,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [fetch dotnet runtimes more safely](https://github.com/ionide/proj-info/pull/119) (thanks @Booksbaum!)
 - [Misc. fixes for cracking found from FSAC, support normalized drive letters and resource paths](https://github.com/ionide/proj-info/pull/120/files)
 
-
 ## [0.54.1] - 2021-10-16
 
 ### Fixed
@@ -37,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added more environment variable lookups for the `dotnet` binary, so modes like running under `dotnet test` should work more consistently.
 
 ## [0.54.0] - 2021-08-08
+
 ### Added
 
 - The save path for binary logs can now be set
@@ -113,19 +120,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a bug with loading same project multiple times at the same time.
 - Fix a bug where C# projects were passed as project references when creating `FSharpProjectOptions`
 
-
 ## [0.45.0] - 2020-12-19
 
 ### Changed
+
 - Rename from `Dotnet.ProjInfo` to `Ionide.ProjInfo`
 - Rewrite using MsBuild API
 
 ### Added
+
 - Add `Ionide.ProjInfo.Sln` (ported from `enricosada/Sln`)
 - Add `Ionide.ProjInfo.ProjectSystem` (ported from `fsharp/FsAutocomplete`)
 - Add `Ionide.ProjInfo.FCS`
 
 ### Removed
+
 - Remove support for old/verbose project files
 - Remove CLI tool
 - Remove `Ionide.ProjInfo.Workspace` - functionality now in new `Ionide.ProjInfo`
@@ -134,4 +143,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.44.0] - 2020-08-11
 
 ### Added
+
 - Last version using manual MsBuild invoke and custom targets
