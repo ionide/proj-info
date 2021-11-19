@@ -154,14 +154,22 @@ module Init =
     /// for more examples of this.
     /// </remarks>
     /// <param name="sdkRoot">the versioned root path of a given SDK version, for example '/usr/local/share/dotnet/sdk/5.0.300'</param>
+    /// <param name="dotnetExe">The full path to a dotnet binary to use as the root binary. This will be set as the DOTNET_HOST_PATH</param>
     /// <returns></returns>
-    let setupForSdkVersion (sdkRoot: DirectoryInfo) =
+    let setupForSdkVersion (sdkRoot: DirectoryInfo) (dotnetExe: FileInfo) =
         let msbuild = SdkDiscovery.msbuildForSdk sdkRoot
 
         // gotta set some env variables so msbuild interop works, see the locator for details: https://github.com/microsoft/MSBuildLocator/blob/d83904bff187ce8245f430b93e8b5fbfefb6beef/src/MSBuildLocator/MSBuildLocator.cs#L289
         Environment.SetEnvironmentVariable("MSBUILD_EXE_PATH", msbuild)
         Environment.SetEnvironmentVariable("MSBuildExtensionsPath", ensureTrailer sdkRoot.FullName)
         Environment.SetEnvironmentVariable("MSBuildSDKsPath", Path.Combine(sdkRoot.FullName, "Sdks"))
+        // .net 6 sdk includes workload stuff and this breaks for some reason
+        Environment.SetEnvironmentVariable("MSBuildEnableWorkloadResolver", "false")
+
+        match System.Environment.GetEnvironmentVariable "DOTNET_HOST_PATH" with
+        | null
+        | "" -> Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", dotnetExe.FullName)
+        | alreadySet -> ()
 
         if resolveHandler <> null then
             AssemblyLoadContext.Default.remove_Resolving resolveHandler
@@ -188,7 +196,7 @@ module Init =
                 match sdkInfo with
                 | Some sdkInfo ->
                     let msbuild = SdkDiscovery.msbuildForSdk sdkInfo.Path
-                    setupForSdkVersion sdkInfo.Path
+                    setupForSdkVersion sdkInfo.Path exe
                     ToolsPath msbuild
                 | None -> failwithf $"Unable to get sdk versions at least from the string '{dotnetSdkVersionAtPath}'. This found sdks were {sdks |> Array.toList}"
             | Error (dotnetExe, args, cwd, erroringVersionString) -> failwithf $"Unable to parse sdk version from the string '{erroringVersionString}'. This value came from running `{dotnetExe} {args}` at path {cwd}"
@@ -267,7 +275,7 @@ module ProjectLoader =
 
             [ logger; yield! loggers ]
 
-    let getGlobalProps (ToolsPath msbuildDllPath) (path: string) (tfm: string option) (globalProperties: (string * string) list) =
+    let getGlobalProps (path: string) (tfm: string option) (globalProperties: (string * string) list) =
         dict [ "ProvideCommandLineArgs", "true"
                "DesignTimeBuild", "true"
                "SkipCompilerExecution", "true"
@@ -276,21 +284,10 @@ module ProjectLoader =
                "DefineExplicitDefaults", "true"
                "BuildProjectReferences", "false"
                "UseCommonOutputDirectory", "false"
-               "MSBuildEnableWorkloadResolver", "false" // some .net 6 workload stuff was breaking design-time builds
                if tfm.IsSome then
                    "TargetFramework", tfm.Value
                if path.EndsWith ".csproj" then
                    "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__")
-               else if path.EndsWith ".fsproj" then
-                   let dotnetRoot = Path.GetFullPath(Path.Combine(Path.GetDirectoryName msbuildDllPath, $"../../"))
-                   // instead of setting DOTNET_HOST_PATH, set some F#-specific target properties here
-                   // see https://github.com/dotnet/fsharp/blob/eccf87b7c8ea1a62dbb9481f12c5ba02ca80b8e6/src/fsharp/FSharp.Build/Microsoft.FSharp.NetSdk.props#L59-L67
-                   "FscToolPath", dotnetRoot
-                   "FscToolExe", Paths.dotnetBinaryName
-                   "DotnetFscCompilerPath", Path.Combine(Path.GetDirectoryName msbuildDllPath, "./FSharp/fsc.dll")
-                   "FsiToolPath", dotnetRoot
-                   "FsiToolExe", Paths.dotnetBinaryName
-                   "DotnetFsiCompilerPath", Path.Combine(Path.GetDirectoryName msbuildDllPath, "./FSharp/fsi.dll")
                "DotnetProjInfo", "true"
                yield! globalProperties ]
 
@@ -319,20 +316,20 @@ module ProjectLoader =
            "_ComputeNonExistentFileProperty"
            "CoreCompile" |]
 
-    let loadProject toolsPath (projectPath: string) (binaryLogs: BinaryLogGeneration) globalProperties =
+    let loadProject (path: string) (binaryLogs: BinaryLogGeneration) globalProperties =
         try
-            let readingProps = getGlobalProps toolsPath projectPath None globalProperties
-            let tfm = getTfm projectPath readingProps
+            let readingProps = getGlobalProps path None globalProperties
+            let tfm = getTfm path readingProps
 
-            let globalProperties = getGlobalProps toolsPath projectPath tfm globalProperties
+            let globalProperties = getGlobalProps path tfm globalProperties
 
             use pc = new ProjectCollection(globalProperties)
 
-            let pi = pc.LoadProject(projectPath, globalProperties, toolsVersion = null)
+            let pi = pc.LoadProject(path, globalProperties, toolsVersion = null)
 
             use sw = new StringWriter()
 
-            let loggers = createLoggers [ projectPath ] binaryLogs sw
+            let loggers = createLoggers [ path ] binaryLogs sw
 
             let pi = pi.CreateProjectInstance()
 
@@ -554,17 +551,16 @@ module ProjectLoader =
     /// <summary>
     /// Main entry point for project loading.
     /// </summary>
-    /// <param name="toolsPath">The path to the MSBuild DLL, as returned by the init function</param>
-    /// <param name="projectPath">Full path to the `.fsproj` file</param>
+    /// <param name="path">Full path to the `.fsproj` file</param>
     /// <param name="binaryLogs">describes if and how to generate MsBuild binary logs</param>
     /// <param name="globalProperties">The global properties to use (e.g. Configuration=Release). Some additional global properties are pre-set by the tool</param>
     /// <param name="customProperties">List of additional MsBuild properties that you want to obtain.</param>
     /// <returns>Returns the record instance representing the loaded project or string containing error message</returns>
-    let getProjectInfo toolsPath (projectPath: string) (globalProperties: (string * string) list) (binaryLogs: BinaryLogGeneration) (customProperties: string list) : Result<Types.ProjectOptions, string> =
-        let loadedProject = loadProject toolsPath projectPath binaryLogs globalProperties
+    let getProjectInfo (path: string) (globalProperties: (string * string) list) (binaryLogs: BinaryLogGeneration) (customProperties: string list) : Result<Types.ProjectOptions, string> =
+        let loadedProject = loadProject path binaryLogs globalProperties
 
         match loadedProject with
-        | ProjectLoadingStatus.Success project -> getLoadedProjectInfo projectPath customProperties project
+        | ProjectLoadingStatus.Success project -> getLoadedProjectInfo path customProperties project
         | ProjectLoadingStatus.Error e -> Result.Error e
 
 /// A type that turns project files or solution files into deconstructed options.
@@ -615,6 +611,7 @@ module WorkspaceLoaderViaProjectGraph =
 
 
 type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (string * string) list) =
+    let (ToolsPath toolsPath) = toolsPath
     let globalProperties = defaultArg globalProperties []
     let logger = LogProvider.getLoggerFor<WorkspaceLoaderViaProjectGraph> ()
     let loadingNotification = new Event<Types.WorkspaceProjectState>()
@@ -634,7 +631,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
     let projectInstanceFactory projectPath (_globalProperties: IDictionary<string, string>) (projectCollection: ProjectCollection) =
         let tfm = ProjectLoader.getTfm projectPath (dict globalProperties)
         //let globalProperties = globalProperties |> Seq.toList |> List.map (fun (KeyValue(k,v)) -> (k,v))
-        let globalProperties = ProjectLoader.getGlobalProps toolsPath projectPath tfm globalProperties
+        let globalProperties = ProjectLoader.getGlobalProps projectPath tfm globalProperties
         ProjectInstance(projectPath, globalProperties, toolsVersion = null, projectCollection = projectCollection)
 
     let projectGraphProjs (paths: string seq) =
@@ -826,7 +823,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
                 cache |> Seq.map (fun n -> n.Value) |> Seq.toList
 
             let rec loadProject p =
-                let res = ProjectLoader.getProjectInfo toolsPath p globalProperties binaryLogs customProperties
+                let res = ProjectLoader.getProjectInfo p globalProperties binaryLogs customProperties
 
                 match res with
                 | Ok project ->
