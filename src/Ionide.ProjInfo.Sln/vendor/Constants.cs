@@ -96,6 +96,10 @@ namespace Ionide.ProjInfo.Sln.Shared
 #endif
             }
         }
+
+        internal static readonly char[] DirectorySeparatorChar = { System.IO.Path.DirectorySeparatorChar };
+
+        internal static readonly char[] SpaceChar = { ' ' };
     }
 
     /// <summary>
