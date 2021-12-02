@@ -28,8 +28,7 @@ module internal ProjectCrackerCache =
 
         let projViewerItemsNormalized =
             projViewerItemsNormalized
-            |> List.map
-                (function
+            |> List.map (function
                 | ProjectViewerItem.Compile (p, c) -> ProjectViewerItem.Compile(fullPathNormalized p, c))
 
         { ProjectCrackerCache.Options = opts
@@ -47,7 +46,10 @@ type private ProjectPersistentCacheMessage =
 type internal ProjectPersistentCache(projectFile: string) =
     let cachePath = (Path.GetDirectoryName projectFile) </> "obj" </> "fsac.cache"
     let settings = JsonSerializerSettings()
-    do settings.MissingMemberHandling <- MissingMemberHandling.Error
+
+    do
+        settings.MissingMemberHandling <- MissingMemberHandling.Error
+        settings.ConstructorHandling <- ConstructorHandling.AllowNonPublicDefaultConstructor
 
     let agent =
         MailboxProcessor.Start
@@ -185,7 +187,8 @@ type internal Project(projectFile, onChange: string -> unit) =
             projectAssetsFile |> Path.GetDirectoryName |> Directory.CreateDirectory |> ignore
 
     ///File System Watcher for `obj` dir, at the moment only `project.assets.json` and `*.props`
-    let afsw = new FileSystemWatcher(Path = Path.GetDirectoryName projectAssetsFile, Filter = Path.GetFileName projectAssetsFile)
+    let afsw =
+        new FileSystemWatcher(Path = Path.GetDirectoryName projectAssetsFile, Filter = Path.GetFileName projectAssetsFile)
 
     do afsw.Changed.Add(fun _ -> agent.Post(Changed(File.GetLastWriteTimeUtc projectAssetsFile)))
     do afsw.Created.Add(fun _ -> agent.Post(Changed(File.GetLastWriteTimeUtc projectAssetsFile)))
