@@ -17,6 +17,7 @@ module WorkspacePeek =
     type private UsefulFile =
         | FsProj
         | Sln
+        | Slnf
         | Fsx
 
     let private partitionByChoice3 =
@@ -43,13 +44,13 @@ module WorkspacePeek =
                 let hasExt (ext: string) (s: FileInfo) = s.FullName.EndsWith(ext)
 
                 dirInfo.EnumerateFiles("*.*", SearchOption.TopDirectoryOnly)
-                |> Seq.choose
-                    (fun s ->
-                        match s with
-                        | x when x |> hasExt ".sln" -> Some(UsefulFile.Sln, x)
-                        | x when x |> hasExt ".fsx" -> Some(UsefulFile.Fsx, x)
-                        | x when x |> hasExt ".fsproj" -> Some(UsefulFile.FsProj, x)
-                        | _ -> None)
+                |> Seq.choose (fun s ->
+                    match s with
+                    | x when x |> hasExt ".sln" -> Some(UsefulFile.Sln, x)
+                    | x when x |> hasExt ".slnf" -> Some(UsefulFile.Slnf, x)
+                    | x when x |> hasExt ".fsx" -> Some(UsefulFile.Fsx, x)
+                    | x when x |> hasExt ".fsproj" -> Some(UsefulFile.FsProj, x)
+                    | _ -> None)
                 |> Seq.toArray
 
             let dirs =
@@ -59,15 +60,16 @@ module WorkspacePeek =
                             yield dirInfo
 
                             for s in dirInfo.GetDirectories() do
-                                if not (ignored s.Name)
-                                then yield! scanDirs s (lvl + 1)
+                                if not (ignored s.Name) then
+                                    yield! scanDirs s (lvl + 1)
                     }
 
                 scanDirs dirInfo 0 |> Array.ofSeq
 
             let getInfo (t, (f: FileInfo)) =
                 match t with
-                | UsefulFile.Sln ->
+                | UsefulFile.Sln
+                | UsefulFile.Slnf ->
                     match InspectSln.tryParseSln f.FullName with
                     | Ok (p, d) -> Some(Choice1Of3(p, d))
                     | _ -> None

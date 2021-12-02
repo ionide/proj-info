@@ -43,9 +43,10 @@ module InspectSln =
 
             let makeAbsoluteFromSlnDir =
                 let makeAbs (path: string) =
-                    if Path.IsPathRooted path
-                    then path
-                    else Path.Combine(slnDir, path) |> Path.GetFullPath
+                    if Path.IsPathRooted path then
+                        path
+                    else
+                        Path.Combine(slnDir, path) |> Path.GetFullPath
 
                 normalizeDirSeparators >> makeAbs
 
@@ -54,7 +55,9 @@ module InspectSln =
                     match item.ProjectType with
                     | Sln.Construction.SolutionProjectType.KnownToBeMSBuildFormat -> (item.RelativePath |> makeAbsoluteFromSlnDir), SolutionItemKind.MsbuildFormat []
                     | Sln.Construction.SolutionProjectType.SolutionFolder ->
-                        let children = sln.ProjectsInOrder |> Seq.filter (fun x -> x.ParentProjectGuid = item.ProjectGuid) |> Seq.map parseItem |> List.ofSeq
+                        let children =
+                            sln.ProjectsInOrder |> Seq.filter (fun x -> x.ParentProjectGuid = item.ProjectGuid) |> Seq.map parseItem |> List.ofSeq
+
                         let files = item.FolderFiles |> Seq.map makeAbsoluteFromSlnDir |> List.ofSeq
                         item.ProjectName, SolutionItemKind.Folder(children, files)
                     | Sln.Construction.SolutionProjectType.EtpSubProject
@@ -75,11 +78,12 @@ module InspectSln =
                 { Items = items |> List.ofSeq
                   Configurations = [] }
 
-            (slnFilePath, data)
+            data
 
         try
-            slnFilePath |> Sln.Construction.SolutionFile.Parse |> parseSln |> Ok
-        with ex -> Error ex
+            Ok(slnFilePath, slnFilePath |> Sln.Construction.SolutionFile.Parse |> parseSln)
+        with
+        | ex -> Error ex
 
     let loadingBuildOrder (data: SolutionData) =
 

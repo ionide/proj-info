@@ -2,21 +2,26 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Xml;
 using System.IO;
 using System.Text;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Security;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
-using ErrorUtilities = Ionide.ProjInfo.Sln.Shared.ErrorUtilities;
-using VisualStudioConstants = Ionide.ProjInfo.Sln.Shared.VisualStudioConstants;
-using ProjectFileErrorUtilities = Ionide.ProjInfo.Sln.Shared.ProjectFileErrorUtilities;
-using BuildEventFileInfo = Ionide.ProjInfo.Sln.Shared.BuildEventFileInfo;
-using ResourceUtilities = Ionide.ProjInfo.Sln.Shared.ResourceUtilities;
-using ExceptionUtilities = Ionide.ProjInfo.Sln.Shared.ExceptionHandling;
+// using ErrorUtilities = Microsoft.Build.Shared.ErrorUtilities;
+// using VisualStudioConstants = Microsoft.Build.Shared.VisualStudioConstants;
+// using ProjectFileErrorUtilities = Microsoft.Build.Shared.ProjectFileErrorUtilities;
+// using BuildEventFileInfo = Microsoft.Build.Shared.BuildEventFileInfo;
+// using ResourceUtilities = Microsoft.Build.Shared.ResourceUtilities;
+// using ExceptionUtilities = Microsoft.Build.Shared.ExceptionHandling;
+// using System.Collections.ObjectModel;
+// using Microsoft.Build.Shared;
+// using Microsoft.Build.Shared.FileSystem;
+using Ionide.ProjInfo.Sln.Shared;
 using System.Collections.ObjectModel;
 
 namespace Ionide.ProjInfo.Sln.Construction
@@ -50,7 +55,7 @@ namespace Ionide.ProjInfo.Sln.Construction
         // An example of a property line looks like this:
         //      AspNetCompiler.VirtualPath = "/webprecompile"
         // Because website projects now include the target framework moniker as
-        // one of their properties, <PROPERTYVALUE> may now have '=' in it.
+        // one of their properties, <PROPERTYVALUE> may now have '=' in it. 
 
         private static readonly Lazy<Regex> s_crackPropertyLine = new Lazy<Regex>(
             () => new Regex
@@ -73,32 +78,31 @@ namespace Ionide.ProjInfo.Sln.Construction
         private const string cpsProjectGuid = "{13B669BE-BB05-4DDF-9536-439F39A36129}";
         private const string cpsCsProjectGuid = "{9A19103F-16F7-4668-BE54-9A1E7A4F7556}";
         private const string cpsVbProjectGuid = "{778DAE3C-4631-46EA-AA77-85C1314464D9}";
+        private const string cpsFsProjectGuid = "{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}";
         private const string vjProjectGuid = "{E6FDF86B-F3D1-11D4-8576-0002A516ECE8}";
         private const string vcProjectGuid = "{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}";
         private const string fsProjectGuid = "{F2A71F9B-5D33-465A-A702-920D77279786}";
-        private const string cpsFsProjectGuid = "{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}";
         private const string dbProjectGuid = "{C8D11400-126E-41CD-887F-60BD40844F9E}";
         private const string wdProjectGuid = "{2CFEAB61-6A3B-4EB8-B523-560B4BEEF521}";
+        private const string synProjectGuid = "{BBD0F5D1-1CC4-42FD-BA4C-A96779C64378}";
         private const string webProjectGuid = "{E24C65DC-7377-472B-9ABA-BC803B73C61A}";
         private const string solutionFolderGuid = "{2150E333-8FDC-42A3-9474-1A3956D46DE8}";
+        private const string sharedProjectGuid = "{D954291E-2A0B-460D-934E-DC6B0785DB48}";
 
+        private const char CommentStartChar = '#';
         #endregion
-
         #region Member data
-
-        private int _slnFileActualVersion = 0;               // The major version number of the .SLN file we're reading.
-        private string _solutionFile = null;                 // Could be absolute or relative path to the .SLN file.
-        private string _solutionFileDirectory = null;        // Absolute path the solution file
-        private bool _solutionContainsWebProjects = false;    // Does this SLN contain any web projects?
-        private bool _solutionContainsWebDeploymentProjects = false; // Does this SLN contain .wdproj projects?
-        private bool _parsingForConversionOnly = false;      // Are we parsing this solution to get project reference data during
-                                                             // conversion, or in preparation for actually building the solution?
+        private string _solutionFile;                 // Could be absolute or relative path to the .SLN file.
+        private string _solutionFilterFile;          // Could be absolute or relative path to the .SLNF file.
+        private HashSet<string> _solutionFilter;     // The project files to include in loading the solution.
+        private bool _parsingForConversionOnly;      // Are we parsing this solution to get project reference data during
+                                                     // conversion, or in preparation for actually building the solution?
 
         // The list of projects in this SLN, keyed by the project GUID.
-        private Dictionary<string, ProjectInSolution> _projects = null;
+        private Dictionary<string, ProjectInSolution> _projects;
 
         // The list of projects in the SLN, in order of their appearance in the SLN.
-        private List<ProjectInSolution> _projectsInOrder = null;
+        private List<ProjectInSolution> _projectsInOrder;
 
         // The list of solution configurations in the solution
         private List<SolutionConfigurationInSolution> _solutionConfigurations;
@@ -109,20 +113,15 @@ namespace Ionide.ProjInfo.Sln.Construction
         // cached default platform name for GetDefaultPlatformName
         private string _defaultPlatformName;
 
-        //List of warnings that occured while parsing solution
-        private ArrayList _solutionParserWarnings = null;
-
-        //List of comments that occured while parsing solution
-        private ArrayList _solutionParserComments = null;
-
-        // unit-testing only
-        private ArrayList _solutionParserErrorCodes = null;
-
         // VisualStudionVersion specified in Dev12+ solutions
-        private Version _currentVisualStudioVersion = null;
+        private Version _currentVisualStudioVersion;
+        private int _currentLineNumber;
 
-        private StreamReader _reader = null;
-        private int _currentLineNumber = 0;
+        // TODO: Unify to NativeMethodsShared.OSUsesCaseSensitive paths
+        // when possible.
+        private static StringComparer _pathComparer = RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
+            ? StringComparer.Ordinal
+            : StringComparer.OrdinalIgnoreCase;
 
         #endregion
 
@@ -133,9 +132,6 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// </summary>
         internal SolutionFile()
         {
-            _solutionParserWarnings = new ArrayList();
-            _solutionParserErrorCodes = new ArrayList();
-            _solutionParserComments = new ArrayList();
         }
 
         #endregion
@@ -145,46 +141,22 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// <summary>
         /// This property returns the list of warnings that were generated during solution parsing
         /// </summary>
-        internal ArrayList SolutionParserWarnings
-        {
-            get
-            {
-                return _solutionParserWarnings;
-            }
-        }
+        internal List<string> SolutionParserWarnings { get; } = new List<string>();
 
         /// <summary>
         /// This property returns the list of comments that were generated during the solution parsing
         /// </summary>
-        internal ArrayList SolutionParserComments
-        {
-            get
-            {
-                return _solutionParserComments;
-            }
-        }
+        internal List<string> SolutionParserComments { get; } = new List<string>();
 
         /// <summary>
-        /// This property returns the list of error codes for warnings/errors that were generated during solution parsing.
+        /// This property returns the list of error codes for warnings/errors that were generated during solution parsing. 
         /// </summary>
-        internal ArrayList SolutionParserErrorCodes
-        {
-            get
-            {
-                return _solutionParserErrorCodes;
-            }
-        }
+        internal List<string> SolutionParserErrorCodes { get; } = new List<string>();
 
         /// <summary>
         /// Returns the actual major version of the parsed solution file
         /// </summary>
-        internal int Version
-        {
-            get
-            {
-                return _slnFileActualVersion;
-            }
-        }
+        internal int Version { get; private set; }
 
         /// <summary>
         /// Returns Visual Studio major version
@@ -199,7 +171,7 @@ namespace Ionide.ProjInfo.Sln.Construction
                 }
                 else
                 {
-                    return this.Version - 1;
+                    return Version - 1;
                 }
             }
         }
@@ -207,48 +179,24 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// <summary>
         /// Returns true if the solution contains any web projects
         /// </summary>
-        internal bool ContainsWebProjects
-        {
-            get
-            {
-                return _solutionContainsWebProjects;
-            }
-        }
+        internal bool ContainsWebProjects { get; private set; }
 
         /// <summary>
         /// Returns true if the solution contains any .wdproj projects.  Used to determine
-        /// whether we need to load up any projects to examine dependencies.
+        /// whether we need to load up any projects to examine dependencies. 
         /// </summary>
-        internal bool ContainsWebDeploymentProjects
-        {
-            get
-            {
-                return _solutionContainsWebDeploymentProjects;
-            }
-        }
+        internal bool ContainsWebDeploymentProjects { get; private set; }
 
         /// <summary>
         /// All projects in this solution, in the order they appeared in the solution file
         /// </summary>
-        public IReadOnlyList<ProjectInSolution> ProjectsInOrder
-        {
-            get
-            {
-                return _projectsInOrder.AsReadOnly();
-            }
-        }
+        public IReadOnlyList<ProjectInSolution> ProjectsInOrder => _projectsInOrder.AsReadOnly();
 
         /// <summary>
-        /// The collection of projects in this solution, accessible by their guids as a
+        /// The collection of projects in this solution, accessible by their guids as a 
         /// string in "{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" form
         /// </summary>
-        public IReadOnlyDictionary<string, ProjectInSolution> ProjectsByGuid
-        {
-            get
-            {
-                return new ReadOnlyDictionary<string, ProjectInSolution>(_projects);
-            }
-        }
+        public IReadOnlyDictionary<string, ProjectInSolution> ProjectsByGuid => new ReadOnlyDictionary<string, ProjectInSolution>(_projects);
 
         /// <summary>
         /// This is the read/write accessor for the solution file which we will parse.  This
@@ -257,63 +205,57 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// <value></value>
         internal string FullPath
         {
-            get
-            {
-                return _solutionFile;
-            }
+            get => _solutionFile;
 
             set
             {
                 // Should already be canonicalized to a full path
                 ErrorUtilities.VerifyThrowInternalRooted(value);
-                _solutionFile = value;
+                // To reduce code duplication, this should be
+                //   if (FileUtilities.IsSolutionFilterFilename(value))
+                // But that's in Microsoft.Build.Framework and this codepath
+                // is called from old versions of NuGet that can't resolve
+                // Framework (see https://github.com/dotnet/msbuild/issues/5313).
+                if (value.EndsWith(".slnf", StringComparison.OrdinalIgnoreCase))
+                {
+                    ParseSolutionFilter(value);
+                }
+                else
+                {
+                    _solutionFile = value;
+                    _solutionFilter = null;
+
+                    SolutionFileDirectory = Path.GetDirectoryName(_solutionFile);
+                }
             }
         }
 
         internal string SolutionFileDirectory
         {
-            get
-            {
-                return _solutionFileDirectory;
-            }
+            get;
             // This setter is only used by the unit tests
-            set
-            {
-                _solutionFileDirectory = value;
-            }
+            set;
         }
 
         /// <summary>
         /// For unit-testing only.
         /// </summary>
         /// <value></value>
-        internal StreamReader SolutionReader
-        {
-            get
-            {
-                return _reader;
-            }
-
-            set
-            {
-                _reader = value;
-            }
-        }
+        internal StreamReader SolutionReader { get; set; }
 
         /// <summary>
         /// The list of all full solution configurations (configuration + platform) in this solution
         /// </summary>
-        public IReadOnlyList<SolutionConfigurationInSolution> SolutionConfigurations
-        {
-            get
-            {
-                return _solutionConfigurations.AsReadOnly();
-            }
-        }
+        public IReadOnlyList<SolutionConfigurationInSolution> SolutionConfigurations => _solutionConfigurations.AsReadOnly();
 
         #endregion
 
         #region Methods
+
+        internal bool ProjectShouldBuild(string projectFile)
+        {
+            return _solutionFilter?.Contains(FileUtilities.FixFilePath(projectFile)) != false;
+        }
 
         /// <summary>
         /// This method takes a path to a solution file, parses the projects and project dependencies
@@ -322,30 +264,27 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// </summary>
         public static SolutionFile Parse(string solutionFile)
         {
-            SolutionFile parser = new SolutionFile();
-            parser.FullPath = solutionFile;
-
+            var parser = new SolutionFile { FullPath = solutionFile };
             parser.ParseSolutionFile();
-
             return parser;
         }
 
         /// <summary>
-        /// Returns "true" if it's a project that's expected to be buildable, or false if it's
-        /// not (e.g. a solution folder)
+        /// Returns "true" if it's a project that's expected to be buildable, or false if it's 
+        /// not (e.g. a solution folder) 
         /// </summary>
         /// <param name="project">The project in the solution</param>
         /// <returns>Whether the project is expected to be buildable</returns>
         internal static bool IsBuildableProject(ProjectInSolution project)
         {
-            return (project.ProjectType != SolutionProjectType.SolutionFolder && project.ProjectConfigurations.Count > 0);
+            return project.ProjectType != SolutionProjectType.SolutionFolder && project.ProjectConfigurations.Count > 0;
         }
 
         /// <summary>
         /// Given a solution file, parses the header and returns the major version numbers of the solution file
-        /// and the visual studio.
-        /// Throws InvalidProjectFileException if the solution header is invalid, or if the version is less than
-        /// our minimum version.
+        /// and the visual studio. 
+        /// Throws InvalidProjectFileException if the solution header is invalid, or if the version is less than 
+        /// our minimum version. 
         /// </summary>
         internal static void GetSolutionFileAndVisualStudioMajorVersions(string solutionFile, out int solutionVersion, out int visualStudioMajorVersion)
         {
@@ -367,7 +306,7 @@ namespace Ionide.ProjInfo.Sln.Construction
                 fileStream = File.OpenRead(solutionFile);
                 reader = new StreamReader(fileStream, Encoding.GetEncoding(0)); // HIGHCHAR: If solution files have no byte-order marks, then assume ANSI rather than ASCII.
 
-                // Read first 4 lines of the solution file.
+                // Read first 4 lines of the solution file. 
                 // The header is expected to be in line 1 or 2
                 // VisualStudioVersion is expected to be in line 3 or 4.
                 for (int i = 0; i < 4; i++)
@@ -384,13 +323,10 @@ namespace Ionide.ProjInfo.Sln.Construction
                         // Found it.  Validate the version.
                         string fileVersionFromHeader = line.Substring(slnFileHeaderNoVersion.Length);
 
-                        Version version = null;
-                        if (!System.Version.TryParse(fileVersionFromHeader, out version))
+                        if (!System.Version.TryParse(fileVersionFromHeader, out Version version))
                         {
-                            ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile
+                            ProjectFileErrorUtilities.ThrowInvalidProjectFile
                                 (
-                                    false /* just throw the exception */,
-                                    "SubCategoryForSolutionParsingErrors",
                                     new BuildEventFileInfo(solutionFile),
                                     "SolutionParseVersionMismatchError",
                                     slnFileMinUpgradableVersion,
@@ -425,15 +361,8 @@ namespace Ionide.ProjInfo.Sln.Construction
             }
             finally
             {
-                if (fileStream != null)
-                {
-                    fileStream.Dispose();
-                }
-
-                if (reader != null)
-                {
-                    reader.Dispose();
-                }
+                fileStream?.Dispose();
+                reader?.Dispose();
             }
 
             if (validVersionFound)
@@ -442,15 +371,76 @@ namespace Ionide.ProjInfo.Sln.Construction
             }
 
             // Didn't find the header in lines 1-4, so the solution file is invalid.
-            ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile
+            ProjectFileErrorUtilities.ThrowInvalidProjectFile
                 (
-                    false /* just throw the exception */,
-                    "SubCategoryForSolutionParsingErrors",
                     new BuildEventFileInfo(solutionFile),
                     "SolutionParseNoHeaderError"
                  );
+        }
 
-            return; /* UNREACHABLE */
+        private void ParseSolutionFilter(string solutionFilterFile)
+        {
+            _solutionFilterFile = solutionFilterFile;
+            try
+            {
+                _solutionFile = ParseSolutionFromSolutionFilter(solutionFilterFile, out JsonElement solution);
+                if (!File.Exists(_solutionFile))
+                {
+                    ProjectFileErrorUtilities.ThrowInvalidProjectFile
+                    (
+                        new BuildEventFileInfo(_solutionFile),
+                        "SolutionFilterMissingSolutionError",
+                        solutionFilterFile,
+                        _solutionFile
+                    );
+                }
+
+                SolutionFileDirectory = Path.GetDirectoryName(_solutionFile);
+
+                _solutionFilter = new HashSet<string>(_pathComparer);
+                foreach (JsonElement project in solution.GetProperty("projects").EnumerateArray())
+                {
+                    _solutionFilter.Add(FileUtilities.FixFilePath(project.GetString()));
+                }
+            }
+            catch (Exception e) when (e is JsonException || e is KeyNotFoundException || e is InvalidOperationException)
+            {
+                ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile
+                (
+                    false, /* Just throw the exception */
+                    "SubCategoryForSolutionParsingErrors",
+                    new BuildEventFileInfo(solutionFilterFile),
+                    e,
+                    "SolutionFilterJsonParsingError",
+                    solutionFilterFile
+                );
+            }
+        }
+
+        internal static string ParseSolutionFromSolutionFilter(string solutionFilterFile, out JsonElement solution)
+        {
+            try
+            {
+                // This is to align MSBuild with what VS permits in loading solution filter files. These are not in them by default but can be added manually.
+                JsonDocumentOptions options = new JsonDocumentOptions() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip };
+                JsonDocument text = JsonDocument.Parse(File.ReadAllText(solutionFilterFile), options);
+                solution = text.RootElement.GetProperty("solution");
+                return FileUtilities.GetFullPath(solution.GetProperty("path").GetString(), Path.GetDirectoryName(solutionFilterFile));
+            }
+            catch (Exception e) when (e is JsonException || e is KeyNotFoundException || e is InvalidOperationException)
+            {
+                ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile
+                (
+                    false, /* Just throw the exception */
+                    "SubCategoryForSolutionParsingErrors",
+                    new BuildEventFileInfo(solutionFilterFile),
+                    e,
+                    "SolutionFilterJsonParsingError",
+                    solutionFilterFile
+                );
+            }
+            solution = new JsonElement();
+            return string.Empty;
         }
 
         /// <summary>
@@ -467,23 +457,18 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// <returns></returns>
         private string ReadLine()
         {
-            ErrorUtilities.VerifyThrow(_reader != null, "ParseFileHeader(): reader is null!");
+            ErrorUtilities.VerifyThrow(SolutionReader != null, "ParseFileHeader(): reader is null!");
 
-            string line = _reader.ReadLine();
+            string line = SolutionReader.ReadLine();
             _currentLineNumber++;
 
-            if (line != null)
-            {
-                line = line.Trim();
-            }
-
-            return line;
+            return line?.Trim();
         }
 
         /// <summary>
         /// This method takes a path to a solution file, parses the projects and project dependencies
         /// in the solution file, and creates internal data structures representing the projects within
-        /// the SLN.  Used for conversion, which means it allows situations that we refuse to actually build.
+        /// the SLN.  Used for conversion, which means it allows situations that we refuse to actually build. 
         /// </summary>
         internal void ParseSolutionFileForConversion()
         {
@@ -498,37 +483,27 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// </summary>
         internal void ParseSolutionFile()
         {
-            ErrorUtilities.VerifyThrow((_solutionFile != null) && (_solutionFile.Length != 0), "ParseSolutionFile() got a null solution file!");
+            ErrorUtilities.VerifyThrow(!string.IsNullOrEmpty(_solutionFile), "ParseSolutionFile() got a null solution file!");
             ErrorUtilities.VerifyThrowInternalRooted(_solutionFile);
 
             FileStream fileStream = null;
-            _reader = null;
+            SolutionReader = null;
 
             try
             {
                 // Open the file
                 fileStream = File.OpenRead(_solutionFile);
-                // Store the directory of the file as the current directory may change while we are processes the file
-                _solutionFileDirectory = Path.GetDirectoryName(_solutionFile);
-                _reader = new StreamReader(fileStream, Encoding.GetEncoding(0)); // HIGHCHAR: If solution files have no byte-order marks, then assume ANSI rather than ASCII.
-                this.ParseSolution();
+                SolutionReader = new StreamReader(fileStream, Encoding.GetEncoding(0)); // HIGHCHAR: If solution files have no byte-order marks, then assume ANSI rather than ASCII.
+                ParseSolution();
             }
-            catch (Exception e)
+            catch (Exception)
             {
-                ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile(!ExceptionUtilities.IsIoRelatedException(e), new BuildEventFileInfo(_solutionFile), "InvalidProjectFile", e.Message);
                 throw;
             }
             finally
             {
-                if (fileStream != null)
-                {
-                    fileStream.Dispose();
-                }
-
-                if (_reader != null)
-                {
-                    _reader.Dispose();
-                }
+                fileStream?.Dispose();
+                SolutionReader?.Dispose();
             }
         }
 
@@ -540,15 +515,15 @@ namespace Ionide.ProjInfo.Sln.Construction
         {
             _projects = new Dictionary<string, ProjectInSolution>(StringComparer.OrdinalIgnoreCase);
             _projectsInOrder = new List<ProjectInSolution>();
-            _solutionContainsWebProjects = false;
-            _slnFileActualVersion = 0;
+            ContainsWebProjects = false;
+            Version = 0;
             _currentLineNumber = 0;
             _solutionConfigurations = new List<SolutionConfigurationInSolution>();
             _defaultConfigurationName = null;
             _defaultPlatformName = null;
 
             // the raw list of project configurations in solution configurations, to be processed after it's fully read in.
-            Hashtable rawProjectConfigurationsEntries = null;
+            Dictionary<string, string> rawProjectConfigurationsEntries = null;
 
             ParseFileHeader();
 
@@ -582,13 +557,37 @@ namespace Ionide.ProjInfo.Sln.Construction
                 }
             }
 
+            if (_solutionFilter != null)
+            {
+                HashSet<string> projectPaths = new HashSet<string>(_projectsInOrder.Count, _pathComparer);
+                foreach (ProjectInSolution project in _projectsInOrder)
+                {
+                    projectPaths.Add(FileUtilities.FixFilePath(project.RelativePath));
+                }
+                foreach (string project in _solutionFilter)
+                {
+                    if (!projectPaths.Contains(project))
+                    {
+                        ProjectFileErrorUtilities.ThrowInvalidProjectFile
+                        (
+                            new BuildEventFileInfo(FileUtilities.GetFullPath(project, Path.GetDirectoryName(_solutionFile))),
+                            "SolutionFilterFilterContainsProjectNotInSolution",
+                            _solutionFilterFile,
+                            project,
+                            _solutionFile
+                        );
+                    }
+                }
+            }
+
             if (rawProjectConfigurationsEntries != null)
             {
                 ProcessProjectConfigurationSection(rawProjectConfigurationsEntries);
             }
 
             // Cache the unique name of each project, and check that we don't have any duplicates.
-            Hashtable projectsByUniqueName = new Hashtable(StringComparer.OrdinalIgnoreCase);
+            var projectsByUniqueName = new Dictionary<string, ProjectInSolution>(StringComparer.OrdinalIgnoreCase);
+            var projectsByOriginalName = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (ProjectInSolution proj in _projectsInOrder)
             {
@@ -599,8 +598,7 @@ namespace Ionide.ProjInfo.Sln.Construction
                 if (proj.ProjectType == SolutionProjectType.WebProject)
                 {
                     // Examine port information and determine if we need to disambiguate similarly-named projects with different ports.
-                    Uri uri;
-                    if (Uri.TryCreate(proj.RelativePath, UriKind.Absolute, out uri))
+                    if (Uri.TryCreate(proj.RelativePath, UriKind.Absolute, out Uri uri))
                     {
                         if (!uri.IsDefaultPort)
                         {
@@ -608,14 +606,14 @@ namespace Ionide.ProjInfo.Sln.Construction
                             // we will create a new unique name with the port added.
                             foreach (ProjectInSolution otherProj in _projectsInOrder)
                             {
-                                if (Object.ReferenceEquals(proj, otherProj))
+                                if (ReferenceEquals(proj, otherProj))
                                 {
                                     continue;
                                 }
 
                                 if (String.Equals(otherProj.ProjectName, proj.ProjectName, StringComparison.OrdinalIgnoreCase))
                                 {
-                                    uniqueName = String.Format(CultureInfo.InvariantCulture, "{0}:{1}", uniqueName, uri.Port);
+                                    uniqueName = $"{uniqueName}:{uri.Port}";
                                     proj.UpdateUniqueProjectName(uniqueName);
                                     break;
                                 }
@@ -624,31 +622,60 @@ namespace Ionide.ProjInfo.Sln.Construction
                     }
                 }
 
-                // Throw an error if there are any duplicates
+                // Detect collision caused by unique name's normalization
+                if (projectsByUniqueName.TryGetValue(uniqueName, out ProjectInSolution project))
+                {
+                    // Did normalization occur in the current project?
+                    if (uniqueName != proj.ProjectName)
+                    {
+                        // Generates a new unique name
+                        string tempUniqueName = $"{uniqueName}_{proj.GetProjectGuidWithoutCurlyBrackets()}";
+                        proj.UpdateUniqueProjectName(tempUniqueName);
+                        uniqueName = tempUniqueName;
+                    }
+                    // Did normalization occur in a previous project?
+                    else if (uniqueName != project.ProjectName)
+                    {
+                        // Generates a new unique name
+                        string tempUniqueName = $"{uniqueName}_{project.GetProjectGuidWithoutCurlyBrackets()}";
+                        project.UpdateUniqueProjectName(tempUniqueName);
+
+                        projectsByUniqueName.Remove(uniqueName);
+                        projectsByUniqueName.Add(tempUniqueName, project);
+                    }
+                }
+
+                bool uniqueNameExists = projectsByUniqueName.ContainsKey(uniqueName);
+
+                // Add the unique name (if it does not exist) to the hash table 
+                if (!uniqueNameExists)
+                {
+                    projectsByUniqueName.Add(uniqueName, proj);
+                }
+
+                bool didntAlreadyExist = !uniqueNameExists && projectsByOriginalName.Add(proj.GetOriginalProjectName());
+
                 ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile(
-                    projectsByUniqueName[uniqueName] == null,
+                    didntAlreadyExist,
                     "SubCategoryForSolutionParsingErrors",
                     new BuildEventFileInfo(FullPath),
                     "SolutionParseDuplicateProject",
-                    uniqueName);
-
-                // Update the hash table with this unique name
-                projectsByUniqueName[uniqueName] = proj;
+                    uniqueNameExists ? uniqueName : proj.ProjectName);
             }
         } // ParseSolutionFile()
 
         /// <summary>
         /// This method searches the first two lines of the solution file opened by the specified
         /// StreamReader for the solution file header.  An exception is thrown if it is not found.
-        ///
+        /// 
         /// The solution file header looks like this:
-        ///
+        /// 
         ///     Microsoft Visual Studio Solution File, Format Version 9.00
-        ///
+        /// 
         /// </summary>
         private void ParseFileHeader()
         {
-            ErrorUtilities.VerifyThrow(_reader != null, "ParseFileHeader(): reader is null!");
+            ErrorUtilities.VerifyThrow(SolutionReader != null, "ParseFileHeader(): reader is null!");
 
             const string slnFileHeaderNoVersion = "Microsoft Visual Studio Solution File, Format Version ";
 
@@ -678,9 +705,9 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// <summary>
         /// This method parses the Visual Studio version in Dev 12 solution files
         /// The version line looks like this:
-        ///
+        /// 
         /// VisualStudioVersion = 12.0.20311.0 VSPRO_PLATFORM
-        ///
+        /// 
         /// If such a line is found, the version is stored in this.currentVisualStudioVersion
         /// </summary>
         private static Version ParseVisualStudioVersion(string str)
@@ -704,45 +731,43 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// This method extracts the whole part of the version number from the specified line
         /// containing the solution file format header, and throws an exception if the version number
         /// is outside of the valid range.
-        ///
+        /// 
         /// The solution file header looks like this:
-        ///
+        /// 
         ///     Microsoft Visual Studio Solution File, Format Version 9.00
-        ///
+        /// 
         /// </summary>
         /// <param name="versionString"></param>
         private void ValidateSolutionFileVersion(string versionString)
         {
             ErrorUtilities.VerifyThrow(versionString != null, "ValidateSolutionFileVersion() got a null line!");
 
-            Version version = null;
-
-            if (!System.Version.TryParse(versionString, out version))
+            if (!System.Version.TryParse(versionString, out Version version))
             {
                 ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile(false, "SubCategoryForSolutionParsingErrors",
                     new BuildEventFileInfo(FullPath, _currentLineNumber, 0), "SolutionParseVersionMismatchError",
                     slnFileMinUpgradableVersion, slnFileMaxVersion);
             }
 
-            _slnFileActualVersion = version.Major;
+            Version = version.Major;
 
             // Validate against our min & max
             ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile(
-                _slnFileActualVersion >= slnFileMinUpgradableVersion,
+                Version >= slnFileMinUpgradableVersion,
                 "SubCategoryForSolutionParsingErrors",
                 new BuildEventFileInfo(FullPath, _currentLineNumber, 0),
                 "SolutionParseVersionMismatchError",
                 slnFileMinUpgradableVersion, slnFileMaxVersion);
             // If the solution file version is greater than the maximum one we will create a comment rather than warn
             // as users such as blend opening a dev10 project cannot do anything about it.
-            if (_slnFileActualVersion > slnFileMaxVersion)
+            if (Version > slnFileMaxVersion)
             {
-                _solutionParserComments.Add(ResourceUtilities.FormatResourceString("UnrecognizedSolutionComment", _slnFileActualVersion));
+                SolutionParserComments.Add(ResourceUtilities.FormatResourceString("UnrecognizedSolutionComment", Version));
             }
         }
 
         /// <summary>
-        ///
+        /// 
         /// This method processes a "Project" section in the solution file opened by the specified
         /// StreamReader, and returns a populated ProjectInSolution instance, if successful.
         /// An exception is thrown if the solution file is invalid.
@@ -755,16 +780,14 @@ namespace Ionide.ProjInfo.Sln.Construction
         ///          ...
         ///      EndProjectSection
         ///  EndProject
-        ///
+        /// 
         /// </summary>
-        /// <param name="firstLine"></param>
-        /// <returns></returns>
         private void ParseProject(string firstLine)
         {
-            ErrorUtilities.VerifyThrow((firstLine != null) && (firstLine.Length != 0), "ParseProject() got a null firstLine!");
-            ErrorUtilities.VerifyThrow(_reader != null, "ParseProject() got a null reader!");
+            ErrorUtilities.VerifyThrow(!string.IsNullOrEmpty(firstLine), "ParseProject() got a null firstLine!");
+            ErrorUtilities.VerifyThrow(SolutionReader != null, "ParseProject() got a null reader!");
 
-            ProjectInSolution proj = new ProjectInSolution(this);
+            var proj = new ProjectInSolution(this);
 
             // Extract the important information from the first line.
             ParseFirstProjectLine(firstLine, proj);
@@ -785,7 +808,7 @@ namespace Ionide.ProjInfo.Sln.Construction
                     // We have a ProjectDependencies section.  Each subsequent line should identify
                     // a dependency.
                     line = ReadLine();
-                    while ((line != null) && (!line.StartsWith("EndProjectSection", StringComparison.Ordinal)))
+                    while ((line?.StartsWith("EndProjectSection", StringComparison.Ordinal) == false))
                     {
                         // This should be a dependency.  The GUID identifying the parent project should
                         // be both the property name and the property value.
@@ -793,13 +816,32 @@ namespace Ionide.ProjInfo.Sln.Construction
                         ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile(match.Success, "SubCategoryForSolutionParsingErrors",
                             new BuildEventFileInfo(FullPath, _currentLineNumber, 0), "SolutionParseProjectDepGuidError", proj.ProjectName);
 
-                        string parentGuid = match.Groups["PROPERTYNAME"].Value.Trim();
-                        proj.AddDependency(parentGuid);
+                        string referenceGuid = match.Groups["PROPERTYNAME"].Value.Trim();
+                        proj.AddDependency(referenceGuid);
 
                         line = ReadLine();
                     }
                 }
-#if FULL_SLN_PARSER
+                else if (line.StartsWith("ProjectSection(WebsiteProperties)", StringComparison.Ordinal))
+                {
+                    // We have a WebsiteProperties section.  This section is present only in Venus
+                    // projects, and contains properties that we'll need in order to call the 
+                    // AspNetCompiler task.
+                    line = ReadLine();
+                    while ((line?.StartsWith("EndProjectSection", StringComparison.Ordinal) == false))
+                    {
+                        Match match = s_crackPropertyLine.Value.Match(line);
+                        ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile(match.Success, "SubCategoryForSolutionParsingErrors",
+                            new BuildEventFileInfo(FullPath, _currentLineNumber, 0), "SolutionParseWebProjectPropertiesError", proj.ProjectName);
+
+                        string propertyName = match.Groups["PROPERTYNAME"].Value.Trim();
+                        string propertyValue = match.Groups["PROPERTYVALUE"].Value.Trim();
+
+                        ParseAspNetCompilerProperty(proj, propertyName, propertyValue);
+
+                        line = ReadLine();
+                    }
+                }
                 else if (line.StartsWith("ProjectSection(SolutionItems)", StringComparison.Ordinal))
                 {
                     // We have a SolutionItems section.  Each subsequent line should identify
@@ -821,26 +863,18 @@ namespace Ionide.ProjInfo.Sln.Construction
                         line = ReadLine();
                     }
                 }
-#endif
-                else if (line.StartsWith("ProjectSection(WebsiteProperties)", StringComparison.Ordinal))
+                else if (line.StartsWith("Project(", StringComparison.Ordinal))
                 {
-                    // We have a WebsiteProperties section.  This section is present only in Venus
-                    // projects, and contains properties that we'll need in order to call the
-                    // AspNetCompiler task.
-                    line = ReadLine();
-                    while ((line != null) && (!line.StartsWith("EndProjectSection", StringComparison.Ordinal)))
-                    {
-                        Match match = s_crackPropertyLine.Value.Match(line);
-                        ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile(match.Success, "SubCategoryForSolutionParsingErrors",
-                            new BuildEventFileInfo(FullPath, _currentLineNumber, 0), "SolutionParseWebProjectPropertiesError", proj.ProjectName);
+                    // Another Project spotted instead of EndProject for the current one - solution file is malformed
+                    string warning = ResourceUtilities.FormatResourceString(out _, out _, "Shared.InvalidProjectFile",
+                        _solutionFile, proj.ProjectName);
+                    SolutionParserWarnings.Add(warning);
 
-                        string propertyName = match.Groups["PROPERTYNAME"].Value.Trim();
-                        string propertyValue = match.Groups["PROPERTYVALUE"].Value.Trim();
+                    // The line with new project is already read and we can't go one line back - we have no choice but to recursively parse spotted project
+                    ParseProject(line);
 
-                        ParseAspNetCompilerProperty(proj, propertyName, propertyValue);
-
-                        line = ReadLine();
-                    }
+                    // We're not waiting for the EndProject for malformed project, so we carry on
+                    break;
                 }
             }
 
@@ -849,7 +883,7 @@ namespace Ionide.ProjInfo.Sln.Construction
 
             // Add the project to the collection
             AddProjectToSolution(proj);
-            // If the project is an etp project then parse the etp project file
+            // If the project is an etp project then parse the etp project file 
             // to get the projects contained in it.
             if (IsEtpProjectFile(proj.RelativePath))
             {
@@ -858,15 +892,15 @@ namespace Ionide.ProjInfo.Sln.Construction
         } // ParseProject()
 
         /// <summary>
-        /// This method will parse a .etp project recursively and
+        /// This method will parse a .etp project recursively and 
         /// add all the projects found to projects and projectsInOrder
         /// </summary>
         /// <param name="etpProj">ETP Project</param>
         internal void ParseEtpProject(ProjectInSolution etpProj)
         {
-            XmlDocument etpProjectDocument = new XmlDocument();
+            var etpProjectDocument = new XmlDocument();
             // Get the full path to the .etp project file
-            string fullPathToEtpProj = Path.Combine(_solutionFileDirectory, etpProj.RelativePath);
+            string fullPathToEtpProj = Path.Combine(SolutionFileDirectory, etpProj.RelativePath);
             string etpProjectRelativeDir = Path.GetDirectoryName(etpProj.RelativePath);
             try
             {
@@ -892,8 +926,7 @@ namespace Ionide.ProjInfo.Sln.Construction
                 *</EFPROJECT>
                 **********************************************************************************/
                 // Make sure the XML reader ignores DTD processing
-                XmlReaderSettings readerSettings = new XmlReaderSettings();
-                readerSettings.DtdProcessing = DtdProcessing.Ignore;
+                var readerSettings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore };
 
                 // Load the .etp project file thru the XML reader
                 using (XmlReader xmlReader = XmlReader.Create(fullPathToEtpProj, readerSettings))
@@ -903,8 +936,8 @@ namespace Ionide.ProjInfo.Sln.Construction
 
                 // We need to parse the .etp project file to get the names of projects contained
                 // in the .etp Project. The projects are listed under /EFPROJECT/GENERAL/References/Reference node in the .etp project file.
-                // The /EFPROJECT/GENERAL/Views/ProjectExplorer node will not necessarily contain
-                // all the projects in the .etp project. Therefore, we need to look at
+                // The /EFPROJECT/GENERAL/Views/ProjectExplorer node will not necessarily contain 
+                // all the projects in the .etp project. Therefore, we need to look at 
                 // /EFPROJECT/GENERAL/References/Reference.
                 // Find the /EFPROJECT/GENERAL/References/Reference node
                 // Note that this is case sensitive
@@ -918,28 +951,25 @@ namespace Ionide.ProjInfo.Sln.Construction
                     if (fileElementValue != null)
                     {
                         // Create and populate a ProjectInSolution for the project
-                        ProjectInSolution proj = new ProjectInSolution(this);
-                        proj.RelativePath = Path.Combine(etpProjectRelativeDir, fileElementValue);
+                        var proj = new ProjectInSolution(this)
+                        {
+                            RelativePath = Path.Combine(etpProjectRelativeDir, fileElementValue)
+                        };
 
                         // Verify the relative path specified in the .etp proj file
                         ValidateProjectRelativePath(proj);
                         proj.ProjectType = SolutionProjectType.EtpSubProject;
                         proj.ProjectName = proj.RelativePath;
                         XmlNode projGuidNode = referenceNode.SelectSingleNode("GUIDPROJECTID");
-                        if (projGuidNode != null)
-                        {
-                            proj.ProjectGuid = projGuidNode.InnerText;
-                        }
+
                         // It is ok for a project to not have a guid inside an etp project.
-                        // If a solution file contains a project without a guid it fails to
-                        // load in Everett. But if an etp project contains a project without
+                        // If a solution file contains a project without a guid it fails to 
+                        // load in Everett. But if an etp project contains a project without 
                         // a guid it loads well in Everett and p2p references to/from this project
-                        // are preserved. So we should make sure that we don’t error in this
+                        // are preserved. So we should make sure that we don’t error in this 
                         // situation while upgrading.
-                        else
-                        {
-                            proj.ProjectGuid = String.Empty;
-                        }
+                        proj.ProjectGuid = projGuidNode?.InnerText ?? String.Empty;
+
                         // Add the recently created proj to the collection of projects
                         AddProjectToSolution(proj);
                         // If the project is an etp project recurse
@@ -955,52 +985,47 @@ namespace Ionide.ProjInfo.Sln.Construction
             // handle security errors
             catch (SecurityException e)
             {
-                // Log a warning
-                string errorCode, ignoredKeyword;
-                string warning = ResourceUtilities.FormatResourceString(out errorCode, out ignoredKeyword, "Shared.ProjectFileCouldNotBeLoaded",
+                // Log a warning 
+                string warning = ResourceUtilities.FormatResourceString(out string errorCode, out _, "Shared.ProjectFileCouldNotBeLoaded",
                     etpProj.RelativePath, e.Message);
-                _solutionParserWarnings.Add(warning);
-                _solutionParserErrorCodes.Add(errorCode);
+                SolutionParserWarnings.Add(warning);
+                SolutionParserErrorCodes.Add(errorCode);
             }
             // handle errors in path resolution
             catch (NotSupportedException e)
             {
-                // Log a warning
-                string errorCode, ignoredKeyword;
-                string warning = ResourceUtilities.FormatResourceString(out errorCode, out ignoredKeyword, "Shared.ProjectFileCouldNotBeLoaded",
+                // Log a warning 
+                string warning = ResourceUtilities.FormatResourceString(out string errorCode, out _, "Shared.ProjectFileCouldNotBeLoaded",
                     etpProj.RelativePath, e.Message);
-                _solutionParserWarnings.Add(warning);
-                _solutionParserErrorCodes.Add(errorCode);
+                SolutionParserWarnings.Add(warning);
+                SolutionParserErrorCodes.Add(errorCode);
             }
             // handle errors in loading project file
             catch (IOException e)
             {
-                // Log a warning
-                string errorCode, ignoredKeyword;
-                string warning = ResourceUtilities.FormatResourceString(out errorCode, out ignoredKeyword, "Shared.ProjectFileCouldNotBeLoaded",
+                // Log a warning 
+                string warning = ResourceUtilities.FormatResourceString(out string errorCode, out _, "Shared.ProjectFileCouldNotBeLoaded",
                     etpProj.RelativePath, e.Message);
-                _solutionParserWarnings.Add(warning);
-                _solutionParserErrorCodes.Add(errorCode);
+                SolutionParserWarnings.Add(warning);
+                SolutionParserErrorCodes.Add(errorCode);
             }
             // handle errors in loading project file
             catch (UnauthorizedAccessException e)
             {
-                // Log a warning
-                string errorCode, ignoredKeyword;
-                string warning = ResourceUtilities.FormatResourceString(out errorCode, out ignoredKeyword, "Shared.ProjectFileCouldNotBeLoaded",
+                // Log a warning 
+                string warning = ResourceUtilities.FormatResourceString(out string errorCode, out _, "Shared.ProjectFileCouldNotBeLoaded",
                     etpProj.RelativePath, e.Message);
-                _solutionParserWarnings.Add(warning);
-                _solutionParserErrorCodes.Add(errorCode);
+                SolutionParserWarnings.Add(warning);
+                SolutionParserErrorCodes.Add(errorCode);
             }
-            // handle XML parsing errors
+            // handle XML parsing errors 
             catch (XmlException e)
             {
-                // Log a warning
-                string errorCode, ignoredKeyword;
-                string warning = ResourceUtilities.FormatResourceString(out errorCode, out ignoredKeyword, "Shared.InvalidProjectFile",
+                // Log a warning 
+                string warning = ResourceUtilities.FormatResourceString(out string errorCode, out _, "Shared.InvalidProjectFile",
                    etpProj.RelativePath, e.Message);
-                _solutionParserWarnings.Add(warning);
-                _solutionParserErrorCodes.Add(errorCode);
+                SolutionParserWarnings.Add(warning);
+                SolutionParserErrorCodes.Add(errorCode);
             }
         }
 
@@ -1021,7 +1046,7 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// Checks whether a given project has a .etp extension.
         /// </summary>
         /// <param name="projectFile"></param>
-        private bool IsEtpProjectFile(string projectFile)
+        private static bool IsEtpProjectFile(string projectFile)
         {
             return projectFile.EndsWith(".etp", StringComparison.OrdinalIgnoreCase);
         }
@@ -1054,10 +1079,7 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// Takes a property name / value that comes from the SLN file for a Venus project, and
         /// stores it appropriately in our data structures.
         /// </summary>
-        /// <param name="proj"></param>
-        /// <param name="propertyName"></param>
-        /// <param name="propertyValue"></param>
-        private void ParseAspNetCompilerProperty
+        private static void ParseAspNetCompilerProperty
             (
             ProjectInSolution proj,
             string propertyName,
@@ -1069,7 +1091,7 @@ namespace Ionide.ProjInfo.Sln.Construction
             // Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "c:\...\myfirstwebsite\", "..\..\..\..\..\..\rajeev\temp\websites\myfirstwebsite", "{956CC04E-FD59-49A9-9099-96888CB6F366}"
             //     ProjectSection(WebsiteProperties) = preProject
             //       TargetFrameworkMoniker = ".NETFramework,Version%3Dv4.0"
-            //       ProjectReferences = "{FD705688-88D1-4C22-9BFF-86235D89C2FC}|CSClassLibrary1.dll;{F0726D09-042B-4A7A-8A01-6BED2422BD5D}|VCClassLibrary1.dll;"
+            //       ProjectReferences = "{FD705688-88D1-4C22-9BFF-86235D89C2FC}|CSClassLibrary1.dll;{F0726D09-042B-4A7A-8A01-6BED2422BD5D}|VCClassLibrary1.dll;" 
             //       Debug.AspNetCompiler.VirtualPath = "/publishfirst"
             //       Debug.AspNetCompiler.PhysicalPath = "..\..\..\..\..\..\rajeev\temp\websites\myfirstwebsite\"
             //       Debug.AspNetCompiler.TargetPath = "..\..\..\..\..\..\rajeev\temp\publishfirst\"
@@ -1121,18 +1143,20 @@ namespace Ionide.ProjInfo.Sln.Construction
                 if (aspNetCompilerParametersObject == null)
                 {
                     // If it didn't exist, create a new one.
-                    aspNetCompilerParameters = new AspNetCompilerParameters();
-                    aspNetCompilerParameters.aspNetVirtualPath = String.Empty;
-                    aspNetCompilerParameters.aspNetPhysicalPath = String.Empty;
-                    aspNetCompilerParameters.aspNetTargetPath = String.Empty;
-                    aspNetCompilerParameters.aspNetForce = String.Empty;
-                    aspNetCompilerParameters.aspNetUpdateable = String.Empty;
-                    aspNetCompilerParameters.aspNetDebug = String.Empty;
-                    aspNetCompilerParameters.aspNetKeyFile = String.Empty;
-                    aspNetCompilerParameters.aspNetKeyContainer = String.Empty;
-                    aspNetCompilerParameters.aspNetDelaySign = String.Empty;
-                    aspNetCompilerParameters.aspNetAPTCA = String.Empty;
-                    aspNetCompilerParameters.aspNetFixedNames = String.Empty;
+                    aspNetCompilerParameters = new AspNetCompilerParameters
+                    {
+                        aspNetVirtualPath = String.Empty,
+                        aspNetPhysicalPath = String.Empty,
+                        aspNetTargetPath = String.Empty,
+                        aspNetForce = String.Empty,
+                        aspNetUpdateable = String.Empty,
+                        aspNetDebug = String.Empty,
+                        aspNetKeyFile = String.Empty,
+                        aspNetKeyContainer = String.Empty,
+                        aspNetDelaySign = String.Empty,
+                        aspNetAPTCA = String.Empty,
+                        aspNetFixedNames = String.Empty
+                    };
                 }
                 else
                 {
@@ -1191,8 +1215,8 @@ namespace Ionide.ProjInfo.Sln.Construction
             }
             else
             {
-                // ProjectReferences = "{FD705688-88D1-4C22-9BFF-86235D89C2FC}|CSClassLibrary1.dll;{F0726D09-042B-4A7A-8A01-6BED2422BD5D}|VCClassLibrary1.dll;"
-                if (string.Compare(propertyName, "ProjectReferences", StringComparison.OrdinalIgnoreCase) == 0)
+                // ProjectReferences = "{FD705688-88D1-4C22-9BFF-86235D89C2FC}|CSClassLibrary1.dll;{F0726D09-042B-4A7A-8A01-6BED2422BD5D}|VCClassLibrary1.dll;" 
+                if (string.Equals(propertyName, "ProjectReferences", StringComparison.OrdinalIgnoreCase))
                 {
                     string[] projectReferenceEntries = propertyValue.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
 
@@ -1200,7 +1224,7 @@ namespace Ionide.ProjInfo.Sln.Construction
                     {
                         int indexOfBar = projectReferenceEntry.IndexOf('|');
 
-                        // indexOfBar could be -1 if we had semicolons in the file names, so skip entries that
+                        // indexOfBar could be -1 if we had semicolons in the file names, so skip entries that 
                         // don't contain a guid. File names may not contain the '|' character
                         if (indexOfBar != -1)
                         {
@@ -1220,13 +1244,13 @@ namespace Ionide.ProjInfo.Sln.Construction
                         }
                     }
                 }
-                else if (String.Compare(propertyName, "TargetFrameworkMoniker", StringComparison.OrdinalIgnoreCase) == 0)
+                else if (String.Equals(propertyName, "TargetFrameworkMoniker", StringComparison.OrdinalIgnoreCase))
                 {
                     //Website project need to back support 3.5 msbuild parser for the Blend (it is not move to .Net4.0 yet.)
-                    //However, 3.5 version of Solution parser can't handle a equal sign in the value.
+                    //However, 3.5 version of Solution parser can't handle a equal sign in the value.  
                     //The "=" in targetframeworkMoniker was escaped to "%3D" for Orcas
                     string targetFrameworkMoniker = TrimQuotes(propertyValue);
-                    proj.TargetFrameworkMoniker = Ionide.ProjInfo.Sln.Shared.EscapingUtilities.UnescapeAll(targetFrameworkMoniker);
+                    proj.TargetFrameworkMoniker = Shared.EscapingUtilities.UnescapeAll(targetFrameworkMoniker);
                 }
             }
         }
@@ -1234,15 +1258,13 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// <summary>
         /// Strips a single pair of leading/trailing double-quotes from a string.
         /// </summary>
-        /// <param name="property"></param>
-        /// <returns></returns>
-        private string TrimQuotes
+        private static string TrimQuotes
             (
             string property
             )
         {
             // If the incoming string starts and ends with a double-quote, strip the double-quotes.
-            if ((property != null) && (property.Length > 0) && (property[0] == '"') && (property[property.Length - 1] == '"'))
+            if (!string.IsNullOrEmpty(property) && (property[0] == '"') && (property[property.Length - 1] == '"'))
             {
                 return property.Substring(1, property.Length - 2);
             }
@@ -1256,7 +1278,7 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// Parse the first line of a Project section of a solution file. This line should look like:
         ///
         ///  Project("{Project type GUID}") = "Project name", "Relative path to project file", "{Project GUID}"
-        ///
+        /// 
         /// </summary>
         /// <param name="firstLine"></param>
         /// <param name="proj"></param>
@@ -1275,8 +1297,8 @@ namespace Ionide.ProjInfo.Sln.Construction
             proj.RelativePath = match.Groups["RELATIVEPATH"].Value.Trim();
             proj.ProjectGuid = match.Groups["PROJECTGUID"].Value.Trim();
 
-            // If the project name is empty (as in some bad solutions) set it to some generated generic value.
-            // This allows us to at least generate reasonable target names etc. instead of crashing.
+            // If the project name is empty (as in some bad solutions) set it to some generated generic value.  
+            // This allows us to at least generate reasonable target names etc. instead of crashing. 
             if (String.IsNullOrEmpty(proj.ProjectName))
             {
                 proj.ProjectName = "EmptyProjectName." + Guid.NewGuid();
@@ -1286,25 +1308,30 @@ namespace Ionide.ProjInfo.Sln.Construction
             ValidateProjectRelativePath(proj);
 
             // Figure out what type of project this is.
-            if ((String.Compare(projectTypeGuid, vbProjectGuid, StringComparison.OrdinalIgnoreCase) == 0) ||
-                (String.Compare(projectTypeGuid, csProjectGuid, StringComparison.OrdinalIgnoreCase) == 0) ||
-                (String.Compare(projectTypeGuid, cpsProjectGuid, StringComparison.OrdinalIgnoreCase) == 0) ||
-                (String.Compare(projectTypeGuid, cpsCsProjectGuid, StringComparison.OrdinalIgnoreCase) == 0) ||
-                (String.Compare(projectTypeGuid, cpsVbProjectGuid, StringComparison.OrdinalIgnoreCase) == 0) ||
-                (String.Compare(projectTypeGuid, fsProjectGuid, StringComparison.OrdinalIgnoreCase) == 0) ||
-                (String.Compare(projectTypeGuid, cpsFsProjectGuid, StringComparison.OrdinalIgnoreCase) == 0) ||
-                (String.Compare(projectTypeGuid, dbProjectGuid, StringComparison.OrdinalIgnoreCase) == 0) ||
-                (String.Compare(projectTypeGuid, vjProjectGuid, StringComparison.OrdinalIgnoreCase) == 0))
+            if ((String.Equals(projectTypeGuid, vbProjectGuid, StringComparison.OrdinalIgnoreCase)) ||
+                (String.Equals(projectTypeGuid, csProjectGuid, StringComparison.OrdinalIgnoreCase)) ||
+                (String.Equals(projectTypeGuid, cpsProjectGuid, StringComparison.OrdinalIgnoreCase)) ||
+                (String.Equals(projectTypeGuid, cpsCsProjectGuid, StringComparison.OrdinalIgnoreCase)) ||
+                (String.Equals(projectTypeGuid, cpsVbProjectGuid, StringComparison.OrdinalIgnoreCase)) ||
+                (String.Equals(projectTypeGuid, cpsFsProjectGuid, StringComparison.OrdinalIgnoreCase)) ||
+                (String.Equals(projectTypeGuid, fsProjectGuid, StringComparison.OrdinalIgnoreCase)) ||
+                (String.Equals(projectTypeGuid, dbProjectGuid, StringComparison.OrdinalIgnoreCase)) ||
+                (String.Equals(projectTypeGuid, vjProjectGuid, StringComparison.OrdinalIgnoreCase)) ||
+                (String.Equals(projectTypeGuid, synProjectGuid, StringComparison.OrdinalIgnoreCase)))
             {
                 proj.ProjectType = SolutionProjectType.KnownToBeMSBuildFormat;
             }
-            else if (String.Compare(projectTypeGuid, solutionFolderGuid, StringComparison.OrdinalIgnoreCase) == 0)
+            else if (String.Equals(projectTypeGuid, sharedProjectGuid, StringComparison.OrdinalIgnoreCase))
+            {
+                proj.ProjectType = SolutionProjectType.SharedProject;
+            }
+            else if (String.Equals(projectTypeGuid, solutionFolderGuid, StringComparison.OrdinalIgnoreCase))
             {
                 proj.ProjectType = SolutionProjectType.SolutionFolder;
             }
             // MSBuild format VC projects have the same project type guid as old style VC projects.
             // If it's not an old-style VC project, we'll assume it's MSBuild format
-            else if (String.Compare(projectTypeGuid, vcProjectGuid, StringComparison.OrdinalIgnoreCase) == 0)
+            else if (String.Equals(projectTypeGuid, vcProjectGuid, StringComparison.OrdinalIgnoreCase))
             {
                 if (String.Equals(proj.Extension, ".vcproj", StringComparison.OrdinalIgnoreCase))
                 {
@@ -1312,7 +1339,7 @@ namespace Ionide.ProjInfo.Sln.Construction
                     {
                         ProjectFileErrorUtilities.ThrowInvalidProjectFile(new BuildEventFileInfo(FullPath), "ProjectUpgradeNeededToVcxProj", proj.RelativePath);
                     }
-                    // otherwise, we're parsing this solution file because we want the P2P information during
+                    // otherwise, we're parsing this solution file because we want the P2P information during 
                     // conversion, and it's perfectly valid for an unconverted solution file to still contain .vcprojs
                 }
                 else
@@ -1320,15 +1347,15 @@ namespace Ionide.ProjInfo.Sln.Construction
                     proj.ProjectType = SolutionProjectType.KnownToBeMSBuildFormat;
                 }
             }
-            else if (String.Compare(projectTypeGuid, webProjectGuid, StringComparison.OrdinalIgnoreCase) == 0)
+            else if (String.Equals(projectTypeGuid, webProjectGuid, StringComparison.OrdinalIgnoreCase))
             {
                 proj.ProjectType = SolutionProjectType.WebProject;
-                _solutionContainsWebProjects = true;
+                ContainsWebProjects = true;
             }
-            else if (String.Compare(projectTypeGuid, wdProjectGuid, StringComparison.OrdinalIgnoreCase) == 0)
+            else if (String.Equals(projectTypeGuid, wdProjectGuid, StringComparison.OrdinalIgnoreCase))
             {
                 proj.ProjectType = SolutionProjectType.WebDeploymentProject;
-                _solutionContainsWebDeploymentProjects = true;
+                ContainsWebDeploymentProjects = true;
             }
             else
             {
@@ -1342,17 +1369,16 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// </summary>
         internal void ParseNestedProjects()
         {
-            string str;
-
             do
             {
-                str = ReadLine();
+                string str = ReadLine();
                 if ((str == null) || (str == "EndGlobalSection"))
                 {
                     break;
                 }
 
-                if (String.IsNullOrWhiteSpace(str))
+                // Ignore empty line or comment
+                if (String.IsNullOrWhiteSpace(str) || str[0] == CommentStartChar)
                 {
                     continue;
                 }
@@ -1364,8 +1390,7 @@ namespace Ionide.ProjInfo.Sln.Construction
                 string projectGuid = match.Groups["PROPERTYNAME"].Value.Trim();
                 string parentProjectGuid = match.Groups["PROPERTYVALUE"].Value.Trim();
 
-                ProjectInSolution proj;
-                if (!_projects.TryGetValue(projectGuid, out proj))
+                if (!_projects.TryGetValue(projectGuid, out ProjectInSolution proj))
                 {
                     ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile(proj != null, "SubCategoryForSolutionParsingErrors",
                        new BuildEventFileInfo(FullPath, _currentLineNumber, 0), "SolutionParseNestedProjectUndefinedError", projectGuid, parentProjectGuid);
@@ -1376,11 +1401,11 @@ namespace Ionide.ProjInfo.Sln.Construction
         }
 
         /// <summary>
-        /// Read solution configuration section.
+        /// Read solution configuration section. 
         /// </summary>
         /// <remarks>
         /// A sample section:
-        ///
+        /// 
         /// GlobalSection(SolutionConfigurationPlatforms) = preSolution
         ///     Debug|Any CPU = Debug|Any CPU
         ///     Release|Any CPU = Release|Any CPU
@@ -1388,47 +1413,59 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// </remarks>
         internal void ParseSolutionConfigurations()
         {
-            string str;
-            char[] nameValueSeparators = new char[] { '=' };
-            char[] configPlatformSeparators = new char[] { SolutionConfigurationInSolution.ConfigurationPlatformSeparator };
+            var nameValueSeparators = '=';
 
             do
             {
-                str = ReadLine();
+                string str = ReadLine();
 
                 if ((str == null) || (str == "EndGlobalSection"))
                 {
                     break;
                 }
 
-                if (String.IsNullOrWhiteSpace(str))
+                // Ignore empty line or comment
+                if (String.IsNullOrWhiteSpace(str) || str[0] == CommentStartChar)
                 {
                     continue;
                 }
 
                 string[] configurationNames = str.Split(nameValueSeparators);
 
-                // There should be exactly one '=' character, separating two names.
+                // There should be exactly one '=' character, separating two names. 
                 ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile(configurationNames.Length == 2, "SubCategoryForSolutionParsingErrors",
                     new BuildEventFileInfo(FullPath, _currentLineNumber, 0), "SolutionParseInvalidSolutionConfigurationEntry", str);
 
                 string fullConfigurationName = configurationNames[0].Trim();
 
                 //Fixing bug 555577: Solution file can have description information, in which case we ignore.
-                if (0 == String.Compare(fullConfigurationName, "DESCRIPTION", StringComparison.OrdinalIgnoreCase))
+                if (String.Equals(fullConfigurationName, "DESCRIPTION", StringComparison.OrdinalIgnoreCase))
+                {
                     continue;
+                }
 
                 // Both names must be identical
                 ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile(fullConfigurationName == configurationNames[1].Trim(), "SubCategoryForSolutionParsingErrors",
                     new BuildEventFileInfo(FullPath, _currentLineNumber, 0), "SolutionParseInvalidSolutionConfigurationEntry", str);
 
-                string[] configurationPlatformParts = fullConfigurationName.Split(configPlatformSeparators);
+                var (configuration, platform) = ParseConfigurationName(fullConfigurationName, FullPath, _currentLineNumber, str);
 
-                ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile(configurationPlatformParts.Length == 2, "SubCategoryForSolutionParsingErrors",
-                    new BuildEventFileInfo(FullPath, _currentLineNumber, 0), "SolutionParseInvalidSolutionConfigurationEntry", str);
-
-                _solutionConfigurations.Add(new SolutionConfigurationInSolution(configurationPlatformParts[0], configurationPlatformParts[1]));
+                _solutionConfigurations.Add(new SolutionConfigurationInSolution(configuration, platform));
             } while (true);
+        }
+
+        internal static (string Configuration, string Platform) ParseConfigurationName(string fullConfigurationName, string projectPath, int lineNumber, string containingString)
+        {
+            string[] configurationPlatformParts = fullConfigurationName.Split(SolutionConfigurationInSolution.ConfigurationPlatformSeparatorArray);
+
+            ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile(
+                configurationPlatformParts.Length == 2,
+                "SubCategoryForSolutionParsingErrors",
+                new BuildEventFileInfo(projectPath, lineNumber, 0),
+                "SolutionParseInvalidSolutionConfigurationEntry",
+                containingString);
+
+            return (configurationPlatformParts[0], configurationPlatformParts[1]);
         }
 
         /// <summary>
@@ -1436,7 +1473,7 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// </summary>
         /// <remarks>
         /// A sample (incomplete) section:
-        ///
+        /// 
         /// GlobalSection(ProjectConfigurationPlatforms) = postSolution
         /// 	{6185CC21-BE89-448A-B3C0-D1C27112E595}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
         /// 	{6185CC21-BE89-448A-B3C0-D1C27112E595}.Debug|Any CPU.Build.0 = Debug|Any CPU
@@ -1451,28 +1488,28 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// EndGlobalSection
         /// </remarks>
         /// <returns>An unprocessed hashtable of entries in this section</returns>
-        internal Hashtable ParseProjectConfigurations()
+        internal Dictionary<string, string> ParseProjectConfigurations()
         {
-            Hashtable rawProjectConfigurationsEntries = new Hashtable(StringComparer.OrdinalIgnoreCase);
-            string str;
+            var rawProjectConfigurationsEntries = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             do
             {
-                str = ReadLine();
+                string str = ReadLine();
 
                 if ((str == null) || (str == "EndGlobalSection"))
                 {
                     break;
                 }
 
-                if (String.IsNullOrWhiteSpace(str))
+                // Ignore empty line or comment
+                if (String.IsNullOrWhiteSpace(str) || str[0] == CommentStartChar)
                 {
                     continue;
                 }
 
-                string[] nameValue = str.Split(new char[] { '=' });
+                string[] nameValue = str.Split('=');
 
-                // There should be exactly one '=' character, separating the name and value.
+                // There should be exactly one '=' character, separating the name and value. 
                 ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile(nameValue.Length == 2, "SubCategoryForSolutionParsingErrors",
                     new BuildEventFileInfo(FullPath, _currentLineNumber, 0), "SolutionParseInvalidProjectSolutionConfigurationEntry", str);
 
@@ -1483,21 +1520,19 @@ namespace Ionide.ProjInfo.Sln.Construction
         }
 
         /// <summary>
-        /// Read the project configuration information for every project in the solution, using pre-cached
-        /// solution section data.
+        /// Read the project configuration information for every project in the solution, using pre-cached 
+        /// solution section data. 
         /// </summary>
         /// <param name="rawProjectConfigurationsEntries">Cached data from the project configuration section</param>
-        internal void ProcessProjectConfigurationSection(Hashtable rawProjectConfigurationsEntries)
+        internal void ProcessProjectConfigurationSection(Dictionary<string, string> rawProjectConfigurationsEntries)
         {
-            // Instead of parsing the data line by line, we parse it project by project, constructing the
-            // entry name (e.g. "{A6F99D27-47B9-4EA4-BFC9-25157CBDC281}.Release|Any CPU.ActiveCfg") and retrieving its
+            // Instead of parsing the data line by line, we parse it project by project, constructing the 
+            // entry name (e.g. "{A6F99D27-47B9-4EA4-BFC9-25157CBDC281}.Release|Any CPU.ActiveCfg") and retrieving its 
             // value from the raw data. The reason for this is that the IDE does it this way, and as the result
             // the '.' character is allowed in configuration names although it technically separates different
-            // parts of the entry name string. This could lead to ambiguous results if we tried to parse
+            // parts of the entry name string. This could lead to ambiguous results if we tried to parse 
             // the entry name instead of constructing it and looking it up. Although it's pretty unlikely that
             // this would ever be a problem, it's safer to do it the same way VS IDE does it.
-            char[] configPlatformSeparators = new char[] { SolutionConfigurationInSolution.ConfigurationPlatformSeparator };
-
             foreach (ProjectInSolution project in _projectsInOrder)
             {
                 // Solution folders don't have configurations
@@ -1511,23 +1546,23 @@ namespace Ionide.ProjInfo.Sln.Construction
                             project.ProjectGuid, solutionConfiguration.FullName);
 
                         // The "Build.0" entry tells us whether to build the project configuration in the given solution configuration.
-                        // Technically, it specifies a configuration name of its own which seems to be a remnant of an initial,
-                        // more flexible design of solution configurations (as well as the '.0' suffix - no higher values are ever used).
-                        // The configuration name is not used, and the whole entry means "build the project configuration"
+                        // Technically, it specifies a configuration name of its own which seems to be a remnant of an initial, 
+                        // more flexible design of solution configurations (as well as the '.0' suffix - no higher values are ever used). 
+                        // The configuration name is not used, and the whole entry means "build the project configuration" 
                         // if it's present in the solution file, and "don't build" if it's not.
                         string entryNameBuild = string.Format(CultureInfo.InvariantCulture, "{0}.{1}.Build.0",
                             project.ProjectGuid, solutionConfiguration.FullName);
 
-                        if (rawProjectConfigurationsEntries.ContainsKey(entryNameActiveConfig))
+                        if (rawProjectConfigurationsEntries.TryGetValue(entryNameActiveConfig, out string configurationPlatform))
                         {
-                            string[] configurationPlatformParts = ((string)(rawProjectConfigurationsEntries[entryNameActiveConfig])).Split(configPlatformSeparators);
+                            string[] configurationPlatformParts = configurationPlatform.Split(SolutionConfigurationInSolution.ConfigurationPlatformSeparatorArray);
 
                             // Project configuration may not necessarily contain the platform part. Some project support only the configuration part.
                             ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile(configurationPlatformParts.Length <= 2, "SubCategoryForSolutionParsingErrors",
                                 new BuildEventFileInfo(FullPath), "SolutionParseInvalidProjectSolutionConfigurationEntry",
-                                string.Format(CultureInfo.InvariantCulture, "{0} = {1}", entryNameActiveConfig, rawProjectConfigurationsEntries[entryNameActiveConfig]));
+                                $"{entryNameActiveConfig} = {configurationPlatform}");
 
-                            ProjectConfigurationInSolution projectConfiguration = new ProjectConfigurationInSolution(
+                            var projectConfiguration = new ProjectConfigurationInSolution(
                                 configurationPlatformParts[0],
                                 (configurationPlatformParts.Length > 1) ? configurationPlatformParts[1] : string.Empty,
                                 rawProjectConfigurationsEntries.ContainsKey(entryNameBuild)
@@ -1555,9 +1590,9 @@ namespace Ionide.ProjInfo.Sln.Construction
             _defaultConfigurationName = string.Empty;
 
             // Pick the Debug configuration as default if present
-            foreach (SolutionConfigurationInSolution solutionConfiguration in this.SolutionConfigurations)
+            foreach (SolutionConfigurationInSolution solutionConfiguration in SolutionConfigurations)
             {
-                if (string.Compare(solutionConfiguration.ConfigurationName, "Debug", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(solutionConfiguration.ConfigurationName, "Debug", StringComparison.OrdinalIgnoreCase))
                 {
                     _defaultConfigurationName = solutionConfiguration.ConfigurationName;
                     break;
@@ -1565,9 +1600,9 @@ namespace Ionide.ProjInfo.Sln.Construction
             }
 
             // Failing that, just pick the first configuration name as default
-            if ((_defaultConfigurationName.Length == 0) && (this.SolutionConfigurations.Count > 0))
+            if ((_defaultConfigurationName.Length == 0) && (SolutionConfigurations.Count > 0))
             {
-                _defaultConfigurationName = this.SolutionConfigurations[0].ConfigurationName;
+                _defaultConfigurationName = SolutionConfigurations[0].ConfigurationName;
             }
 
             return _defaultConfigurationName;
@@ -1588,24 +1623,24 @@ namespace Ionide.ProjInfo.Sln.Construction
             _defaultPlatformName = string.Empty;
 
             // Pick the Mixed Platforms platform as default if present
-            foreach (SolutionConfigurationInSolution solutionConfiguration in this.SolutionConfigurations)
+            foreach (SolutionConfigurationInSolution solutionConfiguration in SolutionConfigurations)
             {
-                if (string.Compare(solutionConfiguration.PlatformName, "Mixed Platforms", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(solutionConfiguration.PlatformName, "Mixed Platforms", StringComparison.OrdinalIgnoreCase))
                 {
                     _defaultPlatformName = solutionConfiguration.PlatformName;
                     break;
                 }
                 // We would like this to be chosen if Mixed platforms does not exist.
-                else if (string.Compare(solutionConfiguration.PlatformName, "Any CPU", StringComparison.OrdinalIgnoreCase) == 0)
+                else if (string.Equals(solutionConfiguration.PlatformName, "Any CPU", StringComparison.OrdinalIgnoreCase))
                 {
                     _defaultPlatformName = solutionConfiguration.PlatformName;
                 }
             }
 
             // Failing that, just pick the first platform name as default
-            if ((_defaultPlatformName.Length == 0) && (this.SolutionConfigurations.Count > 0))
+            if ((_defaultPlatformName.Length == 0) && (SolutionConfigurations.Count > 0))
             {
-                _defaultPlatformName = this.SolutionConfigurations[0].PlatformName;
+                _defaultPlatformName = SolutionConfigurations[0].PlatformName;
             }
 
             return _defaultPlatformName;
@@ -1619,8 +1654,7 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// <returns></returns>
         internal string GetProjectUniqueNameByGuid(string projectGuid)
         {
-            ProjectInSolution proj;
-            if (_projects.TryGetValue(projectGuid, out proj))
+            if (_projects.TryGetValue(projectGuid, out ProjectInSolution proj))
             {
                 return proj.GetUniqueProjectName();
             }
@@ -1636,8 +1670,7 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// <returns></returns>
         internal string GetProjectRelativePathByGuid(string projectGuid)
         {
-            ProjectInSolution proj;
-            if (_projects.TryGetValue(projectGuid, out proj))
+            if (_projects.TryGetValue(projectGuid, out ProjectInSolution proj))
             {
                 return proj.RelativePath;
             }

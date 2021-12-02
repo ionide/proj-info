@@ -8,12 +8,9 @@ using System.IO;
 using System.Security;
 using System.Text;
 using System.Xml;
-
-using XMakeAttributes = Ionide.ProjInfo.Sln.Shared.XMakeAttributes;
-using ProjectFileErrorUtilities = Ionide.ProjInfo.Sln.Shared.ProjectFileErrorUtilities;
-using BuildEventFileInfo = Ionide.ProjInfo.Sln.Shared.BuildEventFileInfo;
-using ErrorUtilities = Ionide.ProjInfo.Sln.Shared.ErrorUtilities;
 using System.Collections.ObjectModel;
+using System.Linq;
+using Ionide.ProjInfo.Sln.Shared;
 
 namespace Ionide.ProjInfo.Sln.Construction
 {
@@ -27,7 +24,7 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// </summary>
         Unknown,
         /// <summary>
-        /// C#, VB, and VJ# projects
+        /// C#, VB, F#, and VJ# projects
         /// </summary>
         KnownToBeMSBuildFormat,
         /// <summary>
@@ -45,7 +42,11 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// <summary>
         /// Project inside an Enterprise Template project
         /// </summary>
-        EtpSubProject
+        EtpSubProject,
+        /// <summary>
+        /// A shared project represents a collection of shared files that is not buildable on its own.
+        /// </summary>
+        SharedProject
     }
 
     internal struct AspNetCompilerParameters
@@ -86,33 +87,23 @@ namespace Ionide.ProjInfo.Sln.Construction
         private const char cleanCharacter = '_';
 
         #endregion
-
         #region Member data
-
-        private SolutionProjectType _projectType;      // For example, KnownToBeMSBuildFormat, VCProject, WebProject, etc.
-        private string _projectName;          // For example, "WindowsApplication1"
         private string _relativePath;         // Relative from .SLN file.  For example, "WindowsApplication1\WindowsApplication1.csproj"
-        private string _projectGuid;          // The unique Guid assigned to this project or SLN folder.
-        private List<string> _dependencies;     // A list of strings representing the Guids of the dependent projects.
-        private ArrayList _projectReferences; // A list of strings representing the guids of referenced projects.
-                                              // This is only used for VC/Venus projects
-        private string _parentProjectGuid;    // If this project (or SLN folder) is within a SLN folder, this is the Guid of the parent SLN folder.
-        private string _uniqueProjectName;    // For example, "MySlnFolder\MySubSlnFolder\WindowsApplication1"
-        private Hashtable _aspNetConfigurations;    // Key is configuration name, value is [struct] AspNetCompilerParameters
-        private SolutionFile _parentSolution; // The parent solution for this project
-        private string _targetFrameworkMoniker; // used for website projects, since they don't have a project file in which the
-                                                // target framework is stored.  Defaults to .NETFX 3.5
+        private string _absolutePath;         // Absolute path to the project file
+        private readonly List<string> _dependencies;     // A list of strings representing the Guids of the dependent projects.
+        private IReadOnlyList<string> _dependenciesAsReadonly;
+        private string _uniqueProjectName;    // For example, "MySlnFolder\MySubSlnFolder\Windows_Application1"
+        private string _originalProjectName;    // For example, "MySlnFolder\MySubSlnFolder\Windows.Application1"
 
-#if FULL_SLN_PARSER
-        private List<string> _folderFiles; // A list of name and path of files inside a solution folder
-#endif
+        private List<string> _files;
 
         /// <summary>
         /// The project configuration in given solution configuration
         /// K: full solution configuration name (cfg + platform)
-        /// V: project configuration
+        /// V: project configuration 
         /// </summary>
-        private Dictionary<string, ProjectConfigurationInSolution> _projectConfigurations;
+        private readonly Dictionary<string, ProjectConfigurationInSolution> _projectConfigurations;
+        private IReadOnlyDictionary<string, ProjectConfigurationInSolution> _projectConfigurationsReadOnly;
 
         #endregion
 
@@ -120,27 +111,23 @@ namespace Ionide.ProjInfo.Sln.Construction
 
         internal ProjectInSolution(SolutionFile solution)
         {
-            _projectType = SolutionProjectType.Unknown;
-            _projectName = null;
+            ProjectType = SolutionProjectType.Unknown;
+            ProjectName = null;
             _relativePath = null;
-            _projectGuid = null;
+            ProjectGuid = null;
             _dependencies = new List<string>();
-            _projectReferences = new ArrayList();
-            _parentProjectGuid = null;
+            ParentProjectGuid = null;
             _uniqueProjectName = null;
-            _parentSolution = solution;
+            ParentSolution = solution;
+            _files = new List<string>();
 
             // default to .NET Framework 3.5 if this is an old solution that doesn't explicitly say.
-            _targetFrameworkMoniker = ".NETFramework,Version=v3.5";
+            TargetFrameworkMoniker = ".NETFramework,Version=v3.5";
 
             // This hashtable stores a AspNetCompilerParameters struct for each configuration name supported.
-            _aspNetConfigurations = new Hashtable(StringComparer.OrdinalIgnoreCase);
+            AspNetConfigurations = new Hashtable(StringComparer.OrdinalIgnoreCase);
 
             _projectConfigurations = new Dictionary<string, ProjectConfigurationInSolution>(StringComparer.OrdinalIgnoreCase);
-
-#if FULL_SLN_PARSER
-            _folderFiles = new List<string>();
-#endif
         }
 
         #endregion
@@ -150,11 +137,7 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// <summary>
         /// This project's name
         /// </summary>
-        public string ProjectName
-        {
-            get { return _projectName; }
-            internal set { _projectName = value; }
-        }
+        public string ProjectName { get; internal set; }
 
         /// <summary>
         /// The path to this project file, relative to the solution location
@@ -162,7 +145,19 @@ namespace Ionide.ProjInfo.Sln.Construction
         public string RelativePath
         {
             get { return _relativePath; }
-            internal set { _relativePath = value; }
+            internal set
+            {
+                // Avoid loading System.Runtime.InteropServices.RuntimeInformation in full-framework
+                // cases. It caused https://github.com/NuGet/Home/issues/6918.
+                _relativePath = value;
+            }
+        }
+
+        ///<summary>
+        ///</summary>
+        public void AddFolderFile(string path)
+        {
+            _files.Add(path);
         }
 
         /// <summary>
@@ -172,109 +167,85 @@ namespace Ionide.ProjInfo.Sln.Construction
         {
             get
             {
-                return Path.Combine(this.ParentSolution.SolutionFileDirectory, this.RelativePath);
+                if (_absolutePath == null)
+                {
+                    _absolutePath = Path.Combine(ParentSolution.SolutionFileDirectory, _relativePath);
+
+                    // For web site projects, Visual Studio stores the URL of the site as the relative path so it cannot be normalized.
+                    // Legacy behavior dictates that we must just return the result of Path.Combine()
+                    if (!Uri.TryCreate(_relativePath, UriKind.Absolute, out Uri _))
+                    {
+                        try
+                        {
+                            _absolutePath = Path.GetFullPath(_absolutePath);
+                        }
+                        catch (Exception)
+                        {
+                            // The call to GetFullPath() can throw if the relative path is some unsupported value or the paths are too long for the current file system
+                            // This falls back to previous behavior of returning a path that may not be correct but at least returns some value
+                        }
+                    }
+                }
+
+                return _absolutePath;
             }
         }
 
         /// <summary>
         /// The unique guid associated with this project, in "{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" form
         /// </summary>
-        public string ProjectGuid
-        {
-            get { return _projectGuid; }
-            internal set { _projectGuid = value; }
-        }
+        public string ProjectGuid { get; internal set; }
 
         /// <summary>
-        /// The guid, in "{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" form, of this project's
-        /// parent project, if any.
+        /// The guid, in "{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" form, of this project's 
+        /// parent project, if any. 
         /// </summary>
-        public string ParentProjectGuid
-        {
-            get { return _parentProjectGuid; }
-            internal set { _parentProjectGuid = value; }
-        }
+        public string ParentProjectGuid { get; internal set; }
 
         /// <summary>
-        /// List of guids, in "{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" form, mapping to projects
-        /// that this project has a build order dependency on, as defined in the solution file.
+        /// List of guids, in "{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" form, mapping to projects 
+        /// that this project has a build order dependency on, as defined in the solution file. 
         /// </summary>
-        public IReadOnlyList<string> Dependencies
-        {
-            get { return _dependencies.AsReadOnly(); }
-        }
+        public IReadOnlyList<string> Dependencies => _dependenciesAsReadonly ?? (_dependenciesAsReadonly = _dependencies.AsReadOnly());
 
         /// <summary>
         /// Configurations for this project, keyed off the configuration's full name, e.g. "Debug|x86"
+        /// They contain only the project configurations from the solution file that fully matched (configuration and platform) against the solution configurations.
         /// </summary>
         public IReadOnlyDictionary<string, ProjectConfigurationInSolution> ProjectConfigurations
-        {
-            get { return new ReadOnlyDictionary<string, ProjectConfigurationInSolution>(_projectConfigurations); }
-        }
+            =>
+                _projectConfigurationsReadOnly
+                ?? (_projectConfigurationsReadOnly = new ReadOnlyDictionary<string, ProjectConfigurationInSolution>(_projectConfigurations));
 
         /// <summary>
         /// Extension of the project file, if any
         /// </summary>
-        internal string Extension
-        {
-            get
-            {
-                return Path.GetExtension(_relativePath);
-            }
-        }
+        internal string Extension => Path.GetExtension(_relativePath);
 
         /// <summary>
         /// This project's type.
         /// </summary>
-        public SolutionProjectType ProjectType
-        {
-            get { return _projectType; }
-            set { _projectType = value; }
-        }
+        public SolutionProjectType ProjectType { get; set; }
 
         /// <summary>
-        /// Only applies to websites -- for other project types, references are
+        /// Only applies to websites -- for other project types, references are 
         /// either specified as Dependencies above, or as ProjectReferences in the
-        /// project file, which the solution doesn't have insight into.
+        /// project file, which the solution doesn't have insight into. 
         /// </summary>
-        internal ArrayList ProjectReferences
-        {
-            get { return _projectReferences; }
-        }
+        internal List<string> ProjectReferences { get; } = new List<string>();
 
-        internal SolutionFile ParentSolution
-        {
-            get { return _parentSolution; }
-            set { _parentSolution = value; }
-        }
+        internal SolutionFile ParentSolution { get; set; }
 
-        internal Hashtable AspNetConfigurations
-        {
-            get { return _aspNetConfigurations; }
-            set { _aspNetConfigurations = value; }
-        }
+        // Key is configuration name, value is [struct] AspNetCompilerParameters
+        internal Hashtable AspNetConfigurations { get; set; }
 
-        internal string TargetFrameworkMoniker
-        {
-            get { return _targetFrameworkMoniker; }
-            set { _targetFrameworkMoniker = value; }
-        }
-
-#if FULL_SLN_PARSER
-        /// <summary>
-        /// Only apply to solution folder
-        /// </summary>
-        public IReadOnlyList<string> FolderFiles
-        {
-            get { return _folderFiles.AsReadOnly(); }
-        }
-#endif
+        internal string TargetFrameworkMoniker { get; set; }
 
         #endregion
 
         #region Methods
 
-        private bool _checkedIfCanBeMSBuildProjectFile = false;
+        private bool _checkedIfCanBeMSBuildProjectFile;
         private bool _canBeMSBuildProjectFile;
         private string _canBeMSBuildProjectFileErrorMessage;
 
@@ -284,14 +255,16 @@ namespace Ionide.ProjInfo.Sln.Construction
         internal void AddDependency(string referencedProjectGuid)
         {
             _dependencies.Add(referencedProjectGuid);
+            _dependenciesAsReadonly = null;
         }
 
         /// <summary>
-        /// Set the requested project configuration.
+        /// Set the requested project configuration. 
         /// </summary>
         internal void SetProjectConfiguration(string configurationName, ProjectConfigurationInSolution configuration)
         {
             _projectConfigurations[configurationName] = configuration;
+            _projectConfigurationsReadOnly = null;
         }
 
         /// <summary>
@@ -315,14 +288,12 @@ namespace Ionide.ProjInfo.Sln.Construction
             try
             {
                 // Read project thru a XmlReader with proper setting to avoid DTD processing
-                XmlReaderSettings xrSettings = new XmlReaderSettings();
-                xrSettings.DtdProcessing = DtdProcessing.Ignore;
+                var xrSettings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore };
+                var projectDocument = new XmlDocument();
 
-                XmlDocument projectDocument = new XmlDocument();
-
-                using (XmlReader xmlReader = XmlReader.Create(this.AbsolutePath, xrSettings))
+                using (XmlReader xmlReader = XmlReader.Create(AbsolutePath, xrSettings))
                 {
-                    // Load the project file and get the first node
+                    // Load the project file and get the first node    
                     projectDocument.Load(xmlReader);
                 }
 
@@ -339,10 +310,32 @@ namespace Ionide.ProjInfo.Sln.Construction
                     }
                 }
 
-                if (mainProjectElement != null && mainProjectElement.LocalName == "Project")
+                if (mainProjectElement?.LocalName == "Project")
                 {
-                    _canBeMSBuildProjectFile = true;
-                    return _canBeMSBuildProjectFile;
+                    // MSBuild supports project files with an empty (supported in Visual Studio 2017) or the default MSBuild
+                    // namespace.
+                    bool emptyNamespace = string.IsNullOrEmpty(mainProjectElement.NamespaceURI);
+                    bool defaultNamespace = String.Equals(mainProjectElement.NamespaceURI,
+                                                "http://schemas.microsoft.com/developer/msbuild/2003",
+                                                StringComparison.OrdinalIgnoreCase);
+                    bool projectElementInvalid = ElementContainsInvalidNamespaceDefitions(mainProjectElement);
+
+                    // If the MSBuild namespace is declared, it is very likely an MSBuild project that should be built.
+                    if (defaultNamespace)
+                    {
+                        _canBeMSBuildProjectFile = true;
+                        return _canBeMSBuildProjectFile;
+                    }
+
+                    // This is a bit of a special case, but an rptproj file will contain a Project with no schema that is
+                    // not an MSBuild file. It will however have ToolsVersion="2.0" which is not supported with an empty
+                    // schema. This is not a great solution, but it should cover the customer reported issue. See:
+                    // https://github.com/dotnet/msbuild/issues/2064
+                    if (emptyNamespace && !projectElementInvalid && mainProjectElement.GetAttribute("ToolsVersion") != "2.0")
+                    {
+                        _canBeMSBuildProjectFile = true;
+                        return _canBeMSBuildProjectFile;
+                    }
                 }
             }
             // catch all sorts of exceptions - if we encounter any problems here, we just assume the project file is not
@@ -379,17 +372,21 @@ namespace Ionide.ProjInfo.Sln.Construction
             return _canBeMSBuildProjectFile;
         }
 
+        ///<summary>
+        ///</summary>
+        public IReadOnlyList<string> FolderFiles => _files;
+
         /// <summary>
-        /// Find the unique name for this project, e.g. SolutionFolder\SubSolutionFolder\ProjectName
+        /// Find the unique name for this project, e.g. SolutionFolder\SubSolutionFolder\Project_Name
         /// </summary>
         internal string GetUniqueProjectName()
         {
             if (_uniqueProjectName == null)
             {
                 // EtpSubProject and Venus projects have names that are already unique.  No need to prepend the SLN folder.
-                if ((this.ProjectType == SolutionProjectType.WebProject) || (this.ProjectType == SolutionProjectType.EtpSubProject))
+                if ((ProjectType == SolutionProjectType.WebProject) || (ProjectType == SolutionProjectType.EtpSubProject))
                 {
-                    _uniqueProjectName = CleanseProjectName(this.ProjectName);
+                    _uniqueProjectName = CleanseProjectName(ProjectName);
                 }
                 else
                 {
@@ -399,20 +396,19 @@ namespace Ionide.ProjInfo.Sln.Construction
                     // and tack on trailing backslash.
                     string uniqueName = String.Empty;
 
-                    if (this.ParentProjectGuid != null)
+                    if (ParentProjectGuid != null)
                     {
-                        ProjectInSolution proj;
-                        if (!this.ParentSolution.ProjectsByGuid.TryGetValue(this.ParentProjectGuid, out proj))
+                        if (!ParentSolution.ProjectsByGuid.TryGetValue(ParentProjectGuid, out ProjectInSolution proj))
                         {
                             ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile(proj != null, "SubCategoryForSolutionParsingErrors",
-                                new BuildEventFileInfo(_parentSolution.FullPath), "SolutionParseNestedProjectError");
+                                new BuildEventFileInfo(ParentSolution.FullPath), "SolutionParseNestedProjectErrorWithNameAndGuid", ProjectName, ProjectGuid, ParentProjectGuid);
                         }
 
                         uniqueName = proj.GetUniqueProjectName() + "\\";
                     }
 
                     // Now tack on our own project name, and cache it in the ProjectInSolution object for future quick access.
-                    _uniqueProjectName = CleanseProjectName(uniqueName + this.ProjectName);
+                    _uniqueProjectName = CleanseProjectName(uniqueName + ProjectName);
                 }
             }
 
@@ -420,31 +416,70 @@ namespace Ionide.ProjInfo.Sln.Construction
         }
 
         /// <summary>
+        /// Gets the original project name with the parent project as it is declared in the solution file, e.g. SolutionFolder\SubSolutionFolder\Project.Name
+        /// </summary>
+        internal string GetOriginalProjectName()
+        {
+            if (_originalProjectName == null)
+            {
+                // EtpSubProject and Venus projects have names that are already unique.  No need to prepend the SLN folder.
+                if ((ProjectType == SolutionProjectType.WebProject) || (ProjectType == SolutionProjectType.EtpSubProject))
+                {
+                    _originalProjectName = ProjectName;
+                }
+                else
+                {
+                    // This is "normal" project, which in this context means anything non-Venus and non-EtpSubProject.
+
+                    // If this project has a parent SLN folder, first get the full project name for the SLN folder,
+                    // and tack on trailing backslash.
+                    string projectName = String.Empty;
+
+                    if (ParentProjectGuid != null)
+                    {
+                        if (!ParentSolution.ProjectsByGuid.TryGetValue(ParentProjectGuid, out ProjectInSolution parent))
+                        {
+                            ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile(parent != null, "SubCategoryForSolutionParsingErrors",
+                                new BuildEventFileInfo(ParentSolution.FullPath), "SolutionParseNestedProjectErrorWithNameAndGuid", ProjectName, ProjectGuid, ParentProjectGuid);
+                        }
+
+                        projectName = parent.GetOriginalProjectName() + "\\";
+                    }
+
+                    // Now tack on our own project name, and cache it in the ProjectInSolution object for future quick access.
+                    _originalProjectName = projectName + ProjectName;
+                }
+            }
+
+            return _originalProjectName;
+        }
+
+        internal string GetProjectGuidWithoutCurlyBrackets()
+        {
+            if (string.IsNullOrEmpty(ProjectGuid))
+            {
+                return null;
+            }
+
+            return ProjectGuid.Trim(new char[] { '{', '}' });
+        }
+
+        /// <summary>
         /// Changes the unique name of the project.
         /// </summary>
         internal void UpdateUniqueProjectName(string newUniqueName)
         {
-            ErrorUtilities.VerifyThrowArgumentLength(newUniqueName, "newUniqueName");
+            ErrorUtilities.VerifyThrowArgumentLength(newUniqueName, nameof(newUniqueName));
 
             _uniqueProjectName = newUniqueName;
         }
-
-#if FULL_SLN_PARSER
-        /// <summary>
-        /// Add the folder file.
-        /// </summary>
-        internal void AddFolderFile(string relativeFilePath)
-        {
-            _folderFiles.Add(relativeFilePath);
-        }
-#endif
 
         /// <summary>
         /// Cleanse the project name, by replacing characters like '@', '$' with '_'
         /// </summary>
         /// <param name="projectName">The name to be cleansed</param>
         /// <returns>string</returns>
-        static private string CleanseProjectName(string projectName)
+        private static string CleanseProjectName(string projectName)
         {
             ErrorUtilities.VerifyThrow(projectName != null, "Null strings not allowed.");
 
@@ -457,9 +492,9 @@ namespace Ionide.ProjInfo.Sln.Construction
             }
 
             // This is where we're going to work on the final string to return to the caller.
-            StringBuilder cleanProjectName = new StringBuilder(projectName);
+            var cleanProjectName = new StringBuilder(projectName);
 
-            // Replace each unclean character with a clean one
+            // Replace each unclean character with a clean one            
             foreach (char uncleanChar in s_charsToCleanse)
             {
                 cleanProjectName.Replace(uncleanChar, cleanCharacter);
@@ -474,13 +509,13 @@ namespace Ionide.ProjInfo.Sln.Construction
         /// </summary>
         /// <param name="uniqueProjectName">The unique name for the project</param>
         /// <returns>string</returns>
-        static internal string DisambiguateProjectTargetName(string uniqueProjectName)
+        internal static string DisambiguateProjectTargetName(string uniqueProjectName)
         {
             // Test our unique project name against those names that collide with Solution
             // entry point targets
             foreach (string projectName in projectNamesToDisambiguate)
             {
-                if (String.Compare(uniqueProjectName, projectName, StringComparison.OrdinalIgnoreCase) == 0)
+                if (String.Equals(uniqueProjectName, projectName, StringComparison.OrdinalIgnoreCase))
                 {
                     // Prepend "Solution:" so that the collision is resolved, but the
                     // log of the solution project still looks reasonable.
@@ -489,6 +524,25 @@ namespace Ionide.ProjInfo.Sln.Construction
             }
 
             return uniqueProjectName;
+        }
+
+        /// <summary>
+        /// Check a Project element for known invalid namespace definitions.
+        /// </summary>
+        /// <param name="mainProjectElement">Project XML Element</param>
+        /// <returns>True if the element contains known invalid namespace definitions</returns>
+        private static bool ElementContainsInvalidNamespaceDefitions(XmlElement mainProjectElement)
+        {
+            if (mainProjectElement.HasAttributes)
+            {
+                // Data warehouse projects (.dwproj) will contain a Project element but are invalid MSBuild. Check attributes
+                // on Project for signs that this is a .dwproj file. If there are, it's not a valid MSBuild file.
+                return mainProjectElement.Attributes.OfType<XmlAttribute>().Any(a =>
+                    a.Name.Equals("xmlns:dwd", StringComparison.OrdinalIgnoreCase) ||
+                    a.Name.StartsWith("xmlns:dd", StringComparison.OrdinalIgnoreCase));
+            }
+
+            return false;
         }
 
         #endregion
