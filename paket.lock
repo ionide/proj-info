@@ -52,6 +52,7 @@ NUGET
       FSharp.Core (>= 4.7.2)
       System.Reactive (>= 5.0)
     FSharp.Core (6.0.1)
+    Ionide.KeepAChangelog.Tasks (0.1.2) - copy_local: true
     MedallionShell (1.5.1)
       NETStandard.Library (>= 1.6)
       System.Diagnostics.Process (>= 4.1)
@@ -581,7 +582,7 @@ NUGET
       System.Drawing.Common (>= 5.0)
 GITHUB
   remote: TheAngryByrd/FsLibLog
-    src/FsLibLog/FsLibLog.fs (e9272a8f7783f6863f5e7b2e1ccdd92004993c6a)
+    src/FsLibLog/FsLibLog.fs (a21347ab09d76059da324cb3e6f3e3e6a93f4ac2)
 GROUP Build
 STORAGE: NONE
 RESTRICTION: == netstandard2.0

@@ -7,12 +7,9 @@
 
 open Fake.Core
 open Fake.DotNet
-open Fake.Tools
 open Fake.IO
-open Fake.IO.FileSystemOperators
 open Fake.IO.Globbing.Operators
 open Fake.Core.TargetOperators
-open Fake.Api
 
 // --------------------------------------------------------------------------------------
 // Information about the project to be used at NuGet and in AssemblyInfo files
@@ -39,31 +36,6 @@ let nugetDir = "./out/"
 
 
 System.Environment.CurrentDirectory <- __SOURCE_DIRECTORY__
-let changelogFilename = "CHANGELOG.md"
-let changelog = Changelog.load changelogFilename
-let latestEntry = changelog.LatestEntry
-
-// Helper function to remove blank lines
-let isEmptyChange =
-    function
-    | Changelog.Change.Added s
-    | Changelog.Change.Changed s
-    | Changelog.Change.Deprecated s
-    | Changelog.Change.Fixed s
-    | Changelog.Change.Removed s
-    | Changelog.Change.Security s
-    | Changelog.Change.Custom (_, s) -> String.isNullOrWhiteSpace s.CleanedText
-
-let nugetVersion = latestEntry.NuGetVersion
-
-let packageReleaseNotes =
-    sprintf "%s/blob/v%s/CHANGELOG.md" gitUrl latestEntry.NuGetVersion
-
-let releaseNotes =
-    latestEntry.Changes
-    |> List.filter (isEmptyChange >> not)
-    |> List.map (fun c -> " * " + c.ToString())
-    |> String.concat "\n"
 
 // --------------------------------------------------------------------------------------
 // Helpers
@@ -126,14 +98,12 @@ Target.create
     "Pack"
     (fun _ ->
         let properties =
-            [ ("Version", nugetVersion)
-              ("Authors", authors)
+            [ ("Authors", authors)
               ("PackageProjectUrl", gitUrl)
               ("PackageTags", tags)
               ("RepositoryType", "git")
               ("RepositoryUrl", gitUrl)
               ("PackageLicenseExpression", "MIT")
-              ("PackageReleaseNotes", packageReleaseNotes)
               ("PackageDescription", summary)
               ("EnableSourceLink", "true") ]
 

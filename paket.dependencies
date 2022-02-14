@@ -11,6 +11,7 @@ nuget Argu
 
 # copy_local: true because this is a build-time dependency only
 nuget Dotnet.ReproducibleBuilds copy_local: true
+nuget Ionide.KeepAChangelog.Tasks copy_local:true
 
 nuget Expecto
 nuget Expecto.Diff
