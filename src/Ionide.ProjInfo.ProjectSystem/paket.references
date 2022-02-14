@@ -2,4 +2,5 @@ FSharp.Core
 FSharp.Compiler.Service
 Newtonsoft.Json
 Dotnet.ReproducibleBuilds
+Ionide.KeepAChangelog.Tasks
 Fsharp.Control.Reactive
