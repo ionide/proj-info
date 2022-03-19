@@ -8,7 +8,7 @@
             "name": "Launch Tool 5.0 graph resolver",
             "type": "coreclr",
             "request": "launch",
-            "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net5.0/Ionide.ProjInfo.Tool.dll",
+            "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net6.0/Ionide.ProjInfo.Tool.dll",
             "args": [
                 "--project",
                 "<your project>",
@@ -23,7 +23,7 @@
             "name": "Launch Tool 5.0 normal resolver",
             "type": "coreclr",
             "request": "launch",
-            "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net5.0/Ionide.ProjInfo.Tool.dll",
+            "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net6.0/Ionide.ProjInfo.Tool.dll",
             "args": [
                 "--project",
                 "<your project>",
@@ -43,7 +43,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/test/Ionide.ProjInfo.Tests/bin/Debug/net5.0/Ionide.ProjInfo.Tests.dll",
+            "program": "${workspaceFolder}/test/Ionide.ProjInfo.Tests/bin/Debug/net6.0/Ionide.ProjInfo.Tests.dll",
             "args": [],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,

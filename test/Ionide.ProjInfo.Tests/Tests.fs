@@ -663,7 +663,7 @@ let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
         let rec allP2P (po: FSharpProjectOptions) =
             [ for reference in po.ReferencedProjects do
                   let opts = internalGetProjectOptions reference |> Option.get
-                  yield reference.FileName, opts
+                  yield reference.OutputFile, opts
                   yield! allP2P opts ]
 
         let expectP2PKeyIsTargetPath (pos: Map<string, ProjectOptions>) fcsPo =
@@ -724,7 +724,7 @@ let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath ->
         let rec allP2P (po: FSharpProjectOptions) =
             [ for reference in po.ReferencedProjects do
                   let opts = internalGetProjectOptions reference |> Option.get
-                  yield reference.FileName, opts
+                  yield reference.OutputFile, opts
                   yield! allP2P opts ]
 
         let expectP2PKeyIsTargetPath (pos: Map<string, ProjectOptions>) fcsPo =
@@ -748,9 +748,9 @@ let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath ->
 
         let fcsPo = FCS.mapToFSharpProjectOptions parsed.Head parsed
         let hasCSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l1.dll")
-        let hasCSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.FileName.EndsWith "l1.dll")
+        let hasCSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.OutputFile.EndsWith "l1.dll")
         let hasFSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l2.dll")
-        let hasFSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.FileName.EndsWith "l2.dll")
+        let hasFSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.OutputFile.EndsWith "l2.dll")
         Expect.equal hasCSharpRef true "Should have direct dll reference to C# reference"
         Expect.equal hasCSharpProjectRef false "Should NOT have project reference to C# reference"
         Expect.equal hasFSharpRef true "Should have direct dll reference to F# reference"
