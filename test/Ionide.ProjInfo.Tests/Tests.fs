@@ -878,6 +878,25 @@ module ExpectProjectSystemNotification =
     let watchNotifications logger controller =
         NotificationWatcher(controller, logNotification logger)
 
+let testLoadProject toolsPath =
+    testCase
+    |> withLog (sprintf "can use getProjectInfo") (fun logger fs ->
+        let testDir = inDir fs "getProjectInfo"
+        copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
+
+        let projPath = testDir / (``sample2 NetSdk library``.ProjectFile)
+
+        dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
+
+        let projResult = ProjectLoader.getProjectInfo projPath [] BinaryLogGeneration.Off []
+
+        match projResult with 
+        | Result.Ok proj -> 
+          Expect.equal proj.ProjectFileName projPath "project file names"
+        | Result.Error err -> failwith $"{err}"
+
+    )
+
 let testProjectSystem toolsPath workspaceLoader workspaceFactory =
     testCase
     |> withLog (sprintf "can load sample2 with Project System - %s" workspaceLoader) (fun logger fs ->
@@ -1050,6 +1069,10 @@ let tests toolsPath =
           testProjectSystemOnChange toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           debugTets toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           debugTets toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
+
+          //loadProject test
+          testLoadProject toolsPath
+
           //Binlog test
           testSample2WithBinLog toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           testSample2WithBinLog toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
