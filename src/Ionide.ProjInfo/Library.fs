@@ -219,6 +219,7 @@ module ProjectLoader =
 
     [<RequireQualifiedAccess>]
     type ProjectLoadingStatus =
+        private
         | Success of LoadedProject
         | Error of string
 
