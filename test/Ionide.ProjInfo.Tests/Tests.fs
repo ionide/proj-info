@@ -128,7 +128,7 @@ module ExpectNotification =
                 notifications.Add(arg)
                 log arg)
 
-        member __.Notifications = notifications |> List.ofSeq
+        member _.Notifications = notifications |> List.ofSeq
 
     let logNotification (logger: Logger) arg =
         logger.debug (eventX "notified: {notification}'" >> setField "notification" arg)
@@ -682,27 +682,27 @@ let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
         loader.Notifications.Add (function
             | WorkspaceProjectState.Loaded (po, knownProjects, _) -> pos <- Map.add po.ProjectFileName po pos)
 
-    let fcsPo = FCS.mapToFSharpProjectOptions parsed.Head parsed
+        let fcsPo = FCS.mapToFSharpProjectOptions parsed.Head parsed
 
-    let po = parsed |> expectFind projPath "first is a lib"
+        let po = parsed |> expectFind projPath "first is a lib"
 
-    Expect.equal fcsPo.LoadTime po.LoadTime "load time"
+        Expect.equal fcsPo.LoadTime po.LoadTime "load time"
 
-    Expect.equal fcsPo.ReferencedProjects.Length ``sample2 NetSdk library``.ProjectReferences.Length "refs"
+        Expect.equal fcsPo.ReferencedProjects.Length ``sample2 NetSdk library``.ProjectReferences.Length "refs"
 
-    //TODO check fullpaths
-    Expect.equal fcsPo.SourceFiles (po.SourceFiles |> Array.ofList) "check sources"
+        //TODO check fullpaths
+        Expect.equal fcsPo.SourceFiles (po.SourceFiles |> Array.ofList) "check sources"
 
-    expectP2PKeyIsTargetPath pos fcsPo
+        expectP2PKeyIsTargetPath pos fcsPo
 
-    let fcs = createFCS ()
-    let result = fcs.ParseAndCheckProject(fcsPo) |> Async.RunSynchronously
+        let fcs = createFCS ()
+        let result = fcs.ParseAndCheckProject(fcsPo) |> Async.RunSynchronously
 
-    Expect.isEmpty result.Diagnostics (sprintf "no errors but was: %A" result.Diagnostics)
+        Expect.isEmpty result.Diagnostics (sprintf "no errors but was: %A" result.Diagnostics)
 
-    let uses = result.GetAllUsesOfAllSymbols()
+        let uses = result.GetAllUsesOfAllSymbols()
 
-    Expect.isNonEmpty uses "all symbols usages"
+        Expect.isNonEmpty uses "all symbols usages"
 
     )
 
@@ -744,15 +744,15 @@ let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath ->
         loader.Notifications.Add (function
             | WorkspaceProjectState.Loaded (po, knownProjects, _) -> pos <- Map.add po.ProjectFileName po pos)
 
-    let fcsPo = FCS.mapToFSharpProjectOptions parsed.Head parsed
-    let hasCSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l1.dll")
-    let hasCSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.OutputFile.EndsWith "l1.dll")
-    let hasFSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l2.dll")
-    let hasFSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.OutputFile.EndsWith "l2.dll")
-    Expect.equal hasCSharpRef true "Should have direct dll reference to C# reference"
-    Expect.equal hasCSharpProjectRef false "Should NOT have project reference to C# reference"
-    Expect.equal hasFSharpRef true "Should have direct dll reference to F# reference"
-    Expect.equal hasFSharpProjectRef true "Should have project reference to F# reference"
+        let fcsPo = FCS.mapToFSharpProjectOptions parsed.Head parsed
+        let hasCSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l1.dll")
+        let hasCSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.OutputFile.EndsWith "l1.dll")
+        let hasFSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l2.dll")
+        let hasFSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.OutputFile.EndsWith "l2.dll")
+        Expect.equal hasCSharpRef true "Should have direct dll reference to C# reference"
+        Expect.equal hasCSharpProjectRef false "Should NOT have project reference to C# reference"
+        Expect.equal hasFSharpRef true "Should have direct dll reference to F# reference"
+        Expect.equal hasFSharpProjectRef true "Should have project reference to F# reference"
 
     )
 
@@ -868,7 +868,7 @@ module ExpectProjectSystemNotification =
                 notifications.Add(arg)
                 log arg)
 
-        member __.Notifications = notifications |> List.ofSeq
+        member _.Notifications = notifications |> List.ofSeq
 
     let logNotification (logger: Logger) arg =
         logger.debug (eventX "notified: {notification}'" >> setField "notification" arg)
@@ -888,9 +888,8 @@ let testLoadProject toolsPath =
 
         let projResult = ProjectLoader.getProjectInfo projPath [] BinaryLogGeneration.Off []
 
-        match projResult with 
-        | Result.Ok proj -> 
-          Expect.equal proj.ProjectFileName projPath "project file names"
+        match projResult with
+        | Result.Ok proj -> Expect.equal proj.ProjectFileName projPath "project file names"
         | Result.Error err -> failwith $"{err}"
 
     )

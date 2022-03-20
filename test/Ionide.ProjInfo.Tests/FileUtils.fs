@@ -101,19 +101,19 @@ let touch (logger: Logger) path =
 type FileUtils(logger: Logger) =
     let mutable currentDirectory = Environment.CurrentDirectory
 
-    member __.cd dir =
+    member _.cd dir =
         logger.debug (eventX "cd '{directory}'" >> setField "directory" dir)
         currentDirectory <- dir
 
-    member __.rm_rf = rm_rf logger
-    member __.mkdir_p = mkdir_p logger
-    member __.cp = cp logger
-    member __.cp_r = cp_r logger
-    member __.shellExecRun = shellExecRun logger currentDirectory
-    member __.shellExecRunNET = shellExecRunNET logger currentDirectory
-    member __.createFile = createFile logger
-    member __.unzip = unzip logger
-    member __.readFile = readFile logger
-    member __.touch = touch logger
+    member _.rm_rf = rm_rf logger
+    member _.mkdir_p = mkdir_p logger
+    member _.cp = cp logger
+    member _.cp_r = cp_r logger
+    member _.shellExecRun = shellExecRun logger currentDirectory
+    member _.shellExecRunNET = shellExecRunNET logger currentDirectory
+    member _.createFile = createFile logger
+    member _.unzip = unzip logger
+    member _.readFile = readFile logger
+    member _.touch = touch logger
 
 let writeLines (lines: string list) (stream: StreamWriter) = lines |> List.iter stream.WriteLine
