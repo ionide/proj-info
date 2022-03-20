@@ -73,11 +73,8 @@ let createFCS () =
     checker
 
 let sleepABit () =
-    // we wait a bit longer on macos in CI due to apparent slowness
-    if System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX) then
-        System.Threading.Thread.Sleep 5000
-    else
-        System.Threading.Thread.Sleep 3000
+    // CI has apparent occasional slowness
+    System.Threading.Thread.Sleep 5000
 
 [<AutoOpen>]
 module ExpectNotification =
@@ -634,8 +631,7 @@ let testProjectNotFound toolsPath workspaceLoader (workspaceFactory: ToolsPath -
 
         Expect.equal parsed.Length 0 "no project loaded"
 
-        Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(wrongPath, (GetProjectOptionsErrors.ProjectNotFound(wrongPath)))) "check error type"
-    )
+        Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(wrongPath, (GetProjectOptionsErrors.ProjectNotFound(wrongPath)))) "check error type")
 
 let internalGetProjectOptions =
     fun (r: FSharpReferencedProject) ->
@@ -683,31 +679,32 @@ let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
         let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
         let mutable pos = Map.empty
 
-        loader.Notifications.Add (function | WorkspaceProjectState.Loaded (po, knownProjects, _) -> pos <- Map.add po.ProjectFileName po pos)
+        loader.Notifications.Add (function
+            | WorkspaceProjectState.Loaded (po, knownProjects, _) -> pos <- Map.add po.ProjectFileName po pos)
 
-        let fcsPo = FCS.mapToFSharpProjectOptions parsed.Head parsed
+    let fcsPo = FCS.mapToFSharpProjectOptions parsed.Head parsed
 
-        let po = parsed |> expectFind projPath "first is a lib"
+    let po = parsed |> expectFind projPath "first is a lib"
 
-        Expect.equal fcsPo.LoadTime po.LoadTime "load time"
+    Expect.equal fcsPo.LoadTime po.LoadTime "load time"
 
-        Expect.equal fcsPo.ReferencedProjects.Length ``sample2 NetSdk library``.ProjectReferences.Length "refs"
+    Expect.equal fcsPo.ReferencedProjects.Length ``sample2 NetSdk library``.ProjectReferences.Length "refs"
 
-        //TODO check fullpaths
-        Expect.equal fcsPo.SourceFiles (po.SourceFiles |> Array.ofList) "check sources"
+    //TODO check fullpaths
+    Expect.equal fcsPo.SourceFiles (po.SourceFiles |> Array.ofList) "check sources"
 
-        expectP2PKeyIsTargetPath pos fcsPo
+    expectP2PKeyIsTargetPath pos fcsPo
 
-        let fcs = createFCS ()
-        let result = fcs.ParseAndCheckProject(fcsPo) |> Async.RunSynchronously
+    let fcs = createFCS ()
+    let result = fcs.ParseAndCheckProject(fcsPo) |> Async.RunSynchronously
 
-        Expect.isEmpty result.Diagnostics (sprintf "no errors but was: %A" result.Diagnostics)
+    Expect.isEmpty result.Diagnostics (sprintf "no errors but was: %A" result.Diagnostics)
 
-        let uses = result.GetAllUsesOfAllSymbols()
+    let uses = result.GetAllUsesOfAllSymbols()
 
-        Expect.isNonEmpty uses "all symbols usages"
+    Expect.isNonEmpty uses "all symbols usages"
 
-        )
+    )
 
 let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
@@ -733,7 +730,7 @@ let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath ->
                 Expect.equal tar dpoPo.TargetPath (sprintf "p2p key is TargetPath, fsc projet options was '%A'" fcsPO)
 
         let testDir = inDir fs "load_sample_fsc"
-        copyDirFromAssets fs  ``sample3 Netsdk projs``.ProjDir testDir
+        copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
 
         let projPath = testDir / (``sample3 Netsdk projs``.ProjectFile)
 
@@ -744,19 +741,20 @@ let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath ->
         let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
         let mutable pos = Map.empty
 
-        loader.Notifications.Add (function | WorkspaceProjectState.Loaded (po, knownProjects, _) -> pos <- Map.add po.ProjectFileName po pos)
+        loader.Notifications.Add (function
+            | WorkspaceProjectState.Loaded (po, knownProjects, _) -> pos <- Map.add po.ProjectFileName po pos)
 
-        let fcsPo = FCS.mapToFSharpProjectOptions parsed.Head parsed
-        let hasCSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l1.dll")
-        let hasCSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.OutputFile.EndsWith "l1.dll")
-        let hasFSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l2.dll")
-        let hasFSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.OutputFile.EndsWith "l2.dll")
-        Expect.equal hasCSharpRef true "Should have direct dll reference to C# reference"
-        Expect.equal hasCSharpProjectRef false "Should NOT have project reference to C# reference"
-        Expect.equal hasFSharpRef true "Should have direct dll reference to F# reference"
-        Expect.equal hasFSharpProjectRef true "Should have project reference to F# reference"
+    let fcsPo = FCS.mapToFSharpProjectOptions parsed.Head parsed
+    let hasCSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l1.dll")
+    let hasCSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.OutputFile.EndsWith "l1.dll")
+    let hasFSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l2.dll")
+    let hasFSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.OutputFile.EndsWith "l2.dll")
+    Expect.equal hasCSharpRef true "Should have direct dll reference to C# reference"
+    Expect.equal hasCSharpProjectRef false "Should NOT have project reference to C# reference"
+    Expect.equal hasFSharpRef true "Should have direct dll reference to F# reference"
+    Expect.equal hasFSharpProjectRef true "Should have project reference to F# reference"
 
-        )
+    )
 
 let testSample2WithBinLog toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
@@ -910,9 +908,9 @@ let testProjectSystem toolsPath workspaceLoader workspaceFactory =
 
         use controller = new ProjectSystem.ProjectController(toolsPath, workspaceFactory)
         let watcher = watchNotifications logger controller
-        controller.LoadProject(projPath)
+        let result = controller.LoadProject(projPath) |> Async.RunSynchronously
 
-        sleepABit ()
+        Expect.isTrue result "load succeeds"
 
         let parsed = controller.ProjectOptions |> Seq.toList |> List.map (snd)
         let fcsPo = parsed.Head
@@ -950,10 +948,8 @@ let testProjectSystemOnChange toolsPath workspaceLoader workspaceFactory =
 
         use controller = new ProjectSystem.ProjectController(toolsPath, workspaceFactory)
         let watcher = watchNotifications logger controller
-        controller.LoadProject(projPath)
-
-        sleepABit ()
-
+        let result = controller.LoadProject(projPath) |> Async.RunSynchronously
+        Expect.isTrue result "load succeeds"
 
         [ workspace false
           loading "n1.fsproj"

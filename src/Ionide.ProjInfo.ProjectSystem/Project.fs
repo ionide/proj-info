@@ -107,9 +107,9 @@ type internal ProjectPersistentCache(projectFile: string) =
 
             loop ()
 
-    member __.SaveCache(lwt, resp) = agent.Post(Save(lwt, resp))
+    member _.SaveCache(lwt, resp) = agent.Post(Save(lwt, resp))
 
-    member __.LoadCache(lwt) =
+    member _.LoadCache(lwt) =
         agent.PostAndReply(fun ch -> Load(lwt, ch))
 
 type private ProjectMessage =
@@ -204,14 +204,14 @@ type internal Project(projectFile, onChange: string -> unit) =
 
     do propsfsw.EnableRaisingEvents <- true
 
-    member __.Response
+    member _.Response
         with get () = agent.PostAndReply GetResponse
         and set r = agent.Post(SetResponse r)
 
-    member __.FileName = fullPath
+    member _.FileName = fullPath
 
     interface IDisposable with
-        member __.Dispose() =
+        member _.Dispose() =
             propsfsw.Dispose()
             afsw.Dispose()
             fsw.Dispose()
