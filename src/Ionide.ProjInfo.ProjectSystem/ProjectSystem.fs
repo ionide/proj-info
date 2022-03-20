@@ -43,7 +43,6 @@ type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -
     let workspaceReady = Event<unit>()
     let notify = Event<ProjectResponse>()
 
-
     let deduplicateBy keySelector (obs: IObservable<'a>) =
         obs
         |> Observable.synchronize // deals with concurrency issues
@@ -61,7 +60,7 @@ type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -
             projs |> List.iter (fun (fileName, _) -> fileName |> ProjectResponse.ProjectChanged |> notify.Trigger)
 
             for (key, group) in projectGroups do
-                x.LoadWorkspace(group, key)
+                x.LoadWorkspace(group, key) |> ignore
 
         projectsChanged |> deduplicateBy fst |> Observable.subscribe loadProjects
 
@@ -69,29 +68,27 @@ type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -
     let updateState (response: ProjectCrackerCache) =
         let normalizeOptions (opts: FSharpProjectOptions) =
             { opts with
-                  SourceFiles =
+                SourceFiles =
                     opts.SourceFiles
                     |> Array.filter (FscArguments.isCompileFile)
                     |> Array.map (Path.GetFullPath)
                     |> Array.map (fun p -> (p.Chars 0).ToString().ToLower() + p.Substring(1))
-                  OtherOptions =
-                      opts.OtherOptions
-                      |> Array.map
-                          (fun n ->
-                              if FscArguments.isCompileFile (n) then
-                                  Path.GetFullPath n
-                              else
-                                  n) }
+                OtherOptions =
+                    opts.OtherOptions
+                    |> Array.map (fun n ->
+                        if FscArguments.isCompileFile (n) then
+                            Path.GetFullPath n
+                        else
+                            n) }
 
         for file in
             response.Items
-            |> List.choose
-                (function
+            |> List.choose (function
                 | ProjectViewerItem.Compile (p, _) -> Some p) do
             fileCheckOptions.[file] <- normalizeOptions response.Options
 
 
-    member private x.loadProjects (files: string list) (binaryLogs: BinaryLogGeneration) =
+    let loadProjects (files: string list) (binaryLogs: BinaryLogGeneration) =
         async {
             let onChange fn = projectsChanged.OnNext(fn, binaryLogs)
 
@@ -117,8 +114,7 @@ type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -
 
                     let responseFiles =
                         response.Items
-                        |> List.choose
-                            (function
+                        |> List.choose (function
                             | ProjectViewerItem.Compile (p, _) -> Some p)
 
                     let projInfo: ProjectResult =
@@ -134,8 +130,7 @@ type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -
                 | ProjectSystemState.LoadedOther (extraInfo, projectFiles, fromDpiCache) ->
                     let responseFiles =
                         projectFiles
-                        |> List.choose
-                            (function
+                        |> List.choose (function
                             | ProjectViewerItem.Compile (p, _) -> Some p)
 
                     let projInfo: ProjectResult =
@@ -177,75 +172,77 @@ type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -
             return true
         }
 
-    member private x.LoaderLoop =
-        MailboxProcessor.Start
-            (fun agent -> //If couldn't recive new event in 50 ms then just load previous one
-                let rec loop (previousStatus: (string list * BinaryLogGeneration) option) =
-                    async {
-                        match previousStatus with
+    let loaderLoop =
+        MailboxProcessor.Start (fun agent -> //If couldn't recive new event in 50 ms then just load previous one
+            let rec loop (previousStatus: (AsyncReplyChannel<bool> * string list * BinaryLogGeneration) option) =
+                async {
+                    match previousStatus with
 
-                        | Some (fn, gb) ->
-                            match! agent.TryReceive(50) with
-                            | None -> //If couldn't recive new event in 50 ms then just load previous one
-                                let! _ = x.loadProjects fn gb
-                                return! loop None
-                            | Some (fn2, gb2) when fn2 = fn -> //If recived same load request then wait again (in practice shouldn't happen more than 2 times)
-                                return! loop previousStatus
-                            | Some (fn2, gb2) -> //If recived some other project load previous one, and then wait with the new one
-                                let! _ = x.loadProjects fn gb
-                                return! loop (Some(fn2, gb2))
-                        | None ->
-                            let! (fn, gb) = agent.Receive()
-                            return! loop (Some(fn, gb))
-                    }
+                    | Some (chan, fn, gb) ->
+                        match! agent.TryReceive(50) with
+                        | None -> //If couldn't recive new event in 50 ms then just load previous one
+                            let! res = loadProjects fn gb
+                            chan.Reply res
+                            return! loop None
+                        | Some (chan2, fn2, gb2) when fn2 = fn -> //If recived same load request then wait again (in practice shouldn't happen more than 2 times)
+                            return! loop previousStatus
+                        | Some (chan2, fn2, gb2) -> //If recived some other project load previous one, and then wait with the new one
+                            let! res = loadProjects fn gb
+                            chan.Reply res
+                            return! loop (Some(chan2, fn2, gb2))
+                    | None ->
+                        let! (chan, fn, gb) = agent.Receive()
+                        return! loop (Some(chan, fn, gb))
+                }
 
-                loop None)
+            loop None)
 
     ///Event notifies that whole workspace has been loaded
-    member __.WorkspaceReady = workspaceReady.Publish
+    member _.WorkspaceReady = workspaceReady.Publish
 
     ///Event notifies about any loading events
-    member __.Notifications = notify.Publish
+    member _.Notifications = notify.Publish
 
-    member __.IsWorkspaceReady = isWorkspaceReady
+    member _.IsWorkspaceReady = isWorkspaceReady
 
     ///Try to get instance of `FSharpProjectOptions` for given `.fs` file
-    member __.GetProjectOptions(file: string) : FSharpProjectOptions option =
+    member _.GetProjectOptions(file: string) : FSharpProjectOptions option =
         let file = Utils.normalizePath file
         fileCheckOptions.TryFind file
 
-    member __.SetProjectOptions(file: string, opts: FSharpProjectOptions) =
+    member _.SetProjectOptions(file: string, opts: FSharpProjectOptions) =
         let file = Utils.normalizePath file
         fileCheckOptions.AddOrUpdate(file, (fun _ -> opts), (fun _ _ -> opts)) |> ignore
 
-    member __.RemoveProjectOptions(file) =
+    member _.RemoveProjectOptions(file) =
         let file = Utils.normalizePath file
         fileCheckOptions.TryRemove file |> ignore
 
     ///Try to get instance of `FSharpProjectOptions` for given `.fsproj` file
-    member __.GetProjectOptionsForFsproj(fsprojPath: string) : FSharpProjectOptions option =
+    member _.GetProjectOptionsForFsproj(fsprojPath: string) : FSharpProjectOptions option =
         fileCheckOptions.Values |> Seq.tryFind (fun n -> n.ProjectFileName = fsprojPath)
 
     ///Returns a sequance of all known path-to-`.fs` * `FSharpProjectOptions` pairs
-    member __.ProjectOptions = fileCheckOptions |> Seq.map (|KeyValue|)
+    member _.ProjectOptions = fileCheckOptions |> Seq.map (|KeyValue|)
 
     ///Loads a single project file
     member x.LoadProject(projectFileName: string, binaryLogs: BinaryLogGeneration) =
-        x.LoaderLoop.Post([ projectFileName ], binaryLogs)
+        loaderLoop.PostAndAsyncReply((fun chan -> chan, [ projectFileName ], binaryLogs))
 
     ///Loads a single project file
     member x.LoadProject(projectFileName: string) =
         x.LoadProject(projectFileName, BinaryLogGeneration.Off)
 
     ///Loads a set of project files
-    member x.LoadWorkspace(files: string list, binaryLogs: BinaryLogGeneration) = x.LoaderLoop.Post(files, binaryLogs)
+    member x.LoadWorkspace(files: string list, binaryLogs: BinaryLogGeneration) =
+        loaderLoop.PostAndAsyncReply((fun chan -> chan, files, binaryLogs))
 
     ///Loads a set of project files
     member x.LoadWorkspace(files: string list) =
         x.LoadWorkspace(files, BinaryLogGeneration.Off)
 
     ///Finds a list of potential workspaces (solution files/lists of projects) in given dir
-    member __.PeekWorkspace(dir: string, deep: int, excludedDirs: string list) =
+    member _.PeekWorkspace(dir: string, deep: int, excludedDirs: string list) =
         WorkspacePeek.peek dir deep excludedDirs
 
     interface IDisposable with
