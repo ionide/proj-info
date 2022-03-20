@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ProjectController.LoadProject now returns an Async bool to indicate eventual completion
 - Fix heisen test https://github.com/ionide/proj-info/issues/136
+- Multiple agents being created by ProjectSystem
 
 ## [0.56.0] - 2022-03-19
 
