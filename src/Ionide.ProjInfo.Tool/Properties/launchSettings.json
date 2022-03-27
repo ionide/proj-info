@@ -1,0 +1,11 @@
+{
+    "$schema": "https://raw.githubusercontent.com/SchemaStore/schemastore/master/src/schemas/json/launchsettings.json",
+    "profiles": {
+        "tool": {
+            "commandName": "Program",
+            "environmentVariables": {
+                "FARTS": "HELL YEAH"
+            }
+        }
+    }
+}
