@@ -133,12 +133,11 @@ module LegacyFrameworkDiscovery =
             // example: C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe
             let msbuildExe =
                 SdkDiscovery.execDotnet vsWhereDir vsWhereExe [ "-find"; "MSBuild\**\Bin\MSBuild.exe" ]
-                |> Seq.last
-                |> FileInfo
-            if msbuildExe.Exists then
-                msbuildExe |> Some
-            else
-                None
+                |> Seq.tryHead
+                |> Option.map FileInfo
+            match msbuildExe with
+            | Some exe when exe.Exists -> Some exe
+            | _ -> None
 
     let internal msbuildLibPath(msbuildDir: DirectoryInfo) =
         if isLinux then
@@ -219,7 +218,7 @@ module Init =
     let internal setupForLegacyFramework (msbuildPathDir: DirectoryInfo) =
         let msbuildLibPath = LegacyFrameworkDiscovery.msbuildLibPath msbuildPathDir
 
-        // gotta set some env variables so msbuild interop works        
+        // gotta set some env variables so msbuild interop works
         if LegacyFrameworkDiscovery.isUnix then
             Environment.SetEnvironmentVariable("MSBuildBinPath", "/usr/lib/mono/msbuild/Current/bin")
             Environment.SetEnvironmentVariable("FrameworkPathOverride", "/usr/lib/mono/4.5")
@@ -369,7 +368,7 @@ module ProjectLoader =
                 "_ComputeNonExistentFileProperty"
                 "CoreCompile" |]
         else
-            [|                      
+            [|
                 "ResolveAssemblyReferencesDesignTime"
                 "ResolveProjectReferencesDesignTime"
                 "ResolvePackageDependenciesDesignTime"
