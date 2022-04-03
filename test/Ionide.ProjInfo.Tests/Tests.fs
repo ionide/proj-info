@@ -1157,6 +1157,15 @@ let debugTests toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
 
     )
 
+let testProjectLoadBadData =
+    testCase |> withLog "Does not crash when loading malformed cache data" (fun logger fs ->
+        let testDir = inDir fs "sample_netsdk_bad_cache"
+        copyDirFromAssets fs ``sample NetSdk library with a bad FSAC cache``.ProjDir testDir
+        let projFile = Path.Combine(testDir, "n1", "n1.fsproj")
+        use proj = new ProjectSystem.Project(projFile, ignore)
+        Expect.isNone proj.Response "should have loaded, detected bad data, and defaulted to empty"
+    )
+
 let tests toolsPath =
     let testSample3WorkspaceLoaderExpected =
         [ ExpectNotification.loading "c1.fsproj"
@@ -1255,4 +1264,6 @@ let tests toolsPath =
               Expect.isNonEmpty sdks "should have found at least the currently-executing sdk"
           }
           testLegacyFrameworkProject toolsPath "can load legacy project file" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
-          testLegacyFrameworkMultiProject toolsPath "can load legacy multi project file" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props)) ]
+          testLegacyFrameworkMultiProject toolsPath "can load legacy multi project file" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
+          testProjectLoadBadData
+        ]

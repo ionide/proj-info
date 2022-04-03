@@ -20,5 +20,12 @@
     <ProjectReference Include="..\Ionide.ProjInfo.FCS\Ionide.ProjInfo.FCS.fsproj" />
     <ProjectReference Include="..\Ionide.ProjInfo.Sln\Ionide.ProjInfo.Sln.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- This lets us directly instanciate Projects in the tests -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Ionide.ProjInfo.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
