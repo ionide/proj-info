@@ -6,7 +6,8 @@ open FSharp.Compiler.CodeAnalysis
 open Newtonsoft.Json
 open Ionide.ProjInfo
 
-type internal ProjectCrackerCache =
+// need to expose this so that json.net can serialize it
+type ProjectCrackerCache =
     { Options: FSharpProjectOptions
       OutFile: string option
       References: string list

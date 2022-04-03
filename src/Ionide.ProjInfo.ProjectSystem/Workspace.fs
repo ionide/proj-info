@@ -53,7 +53,11 @@ let internal loadInBackground onLoaded (loader: IWorkspaceLoader) (projects: Pro
 
     for project in resProjects do
         match project.Response with
-        | Some res -> onLoaded (ProjectSystemState.Loaded(res.Options, res.ExtraInfo, res.Items, false))
+        | Some res ->
+            // if we have project data already then that means it was cached.
+            // fire a loading/loaded event pair so that outside observers get the correct loading experience
+            onLoaded (ProjectSystemState.Loading project.FileName )
+            onLoaded (ProjectSystemState.Loaded(res.Options, res.ExtraInfo, res.Items, true))
         | None -> () //Shouldn't happen
 
     otherProjects |> List.map (fun n -> n.FileName) |> getProjectOptions loader onLoaded binaryLogs
