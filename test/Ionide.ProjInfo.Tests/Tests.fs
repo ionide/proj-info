@@ -136,8 +136,9 @@ module ExpectNotification =
     let watchNotifications logger loader =
         NotificationWatcher(loader, logNotification logger)
 
+
 let testLegacyFrameworkProject toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPath * (string * string) list -> IWorkspaceLoader) =
-    testCase
+    ptestCase
     |> withLog (sprintf "can load legacy project - %s - isRelease is %b" workspaceLoader isRelease) (fun logger fs ->
 
         let testDir = inDir fs "a"
@@ -172,7 +173,7 @@ let testLegacyFrameworkProject toolsPath workspaceLoader isRelease (workspaceFac
         Expect.equal n1Parsed.SourceFiles expectedSources "check sources")
 
 let testLegacyFrameworkMultiProject toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPath * (string * string) list -> IWorkspaceLoader) =
-    testCase
+    ptestCase
     |> withLog (sprintf "can load legacy project - %s - isRelease is %b" workspaceLoader isRelease) (fun logger fs ->
 
         let testDir = inDir fs "load_sample7"
