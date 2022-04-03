@@ -1,0 +1,1 @@
+a simple library (.net sdk) targeting `netstandard2.0`

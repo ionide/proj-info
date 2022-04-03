@@ -82,13 +82,19 @@ type internal ProjectPersistentCache(projectFile: string) =
                                         let r = ctn.[1]
 
                                         try
-                                            let x = JsonConvert.DeserializeObject<ProjectCrackerCache> r
+                                            // older versions would write the {} literal in place of actual data, so we need to check for that
+                                            let x = Linq.JObject.Parse r
 
-                                            if isNull (box x) then
-                                                File.Delete cachePath //Remove cahce that can't be deserialized
+                                            if x.Count = 0 || isNull x then
+                                                File.Delete cachePath //Remove cache that can't be deserialized
                                                 None
                                             else
-                                                Some x
+                                                let deserialized = JsonConvert.DeserializeObject<ProjectCrackerCache> r
+
+                                                if isNull (box deserialized) then
+                                                    None
+                                                else
+                                                    Some deserialized
                                         with
                                         | _ ->
                                             File.Delete cachePath
