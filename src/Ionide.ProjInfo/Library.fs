@@ -134,7 +134,7 @@ module LegacyFrameworkDiscovery =
                 // example: C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe
 
                 if not vsWhereExe.Exists then
-                    failwith $"\"{vsWhereExe}\" does not exist. It is a expected to be present when resolving the MsBuild for legacy projects."
+                    failwith $"\"{vsWhereExe}\" does not exist. It is a expected to be present in '%ProgramFilesX86/Microsoft Visual Studio/Installer' when resolving the MsBuild for legacy projects."
                 
                 let msbuildExe =
                     SdkDiscovery.execDotnet vsWhereDir vsWhereExe [ "-find"; "MSBuild\**\Bin\MSBuild.exe" ]
