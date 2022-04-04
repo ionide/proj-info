@@ -118,26 +118,32 @@ module LegacyFrameworkDiscovery =
     let isUnix = isLinux || isMac
 
     let internal msbuildBinary =
-        if isLinux then
-            "/usr/bin/msbuild" |> FileInfo |> Some
-        elif isMac then
-            "/Library/Frameworks/Mono.framework/Versions/Current/Commands/msbuild" |> FileInfo |> Some
-        else
-            // taken from https://github.com/microsoft/vswhere
-            // vswhere.exe is guranteed to be at the following location. refer to https://github.com/Microsoft/vswhere/issues/162
-            let vsWhereDir =
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Microsoft Visual Studio", "Installer")
-                |> DirectoryInfo
+        lazy (
+            if isLinux then
+                "/usr/bin/msbuild" |> FileInfo |> Some
+            elif isMac then
+                "/Library/Frameworks/Mono.framework/Versions/Current/Commands/msbuild" |> FileInfo |> Some
+            else
+                // taken from https://github.com/microsoft/vswhere
+                // vswhere.exe is guranteed to be at the following location. refer to https://github.com/Microsoft/vswhere/issues/162
+                let vsWhereDir =
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Microsoft Visual Studio", "Installer")
+                    |> DirectoryInfo
 
-            let vsWhereExe = Path.Combine(vsWhereDir.FullName, "vswhere.exe") |> FileInfo
-            // example: C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe
-            let msbuildExe =
-                SdkDiscovery.execDotnet vsWhereDir vsWhereExe [ "-find"; "MSBuild\**\Bin\MSBuild.exe" ]
-                |> Seq.tryHead
-                |> Option.map FileInfo
-            match msbuildExe with
-            | Some exe when exe.Exists -> Some exe
-            | _ -> None
+                let vsWhereExe = Path.Combine(vsWhereDir.FullName, "vswhere.exe") |> FileInfo
+                // example: C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe
+
+                if not vsWhereExe.Exists then
+                    failwith $"\"{vsWhereExe}\" does not exist. It is a expected to be present when resolving the MsBuild for legacy projects."
+                
+                let msbuildExe =
+                    SdkDiscovery.execDotnet vsWhereDir vsWhereExe [ "-find"; "MSBuild\**\Bin\MSBuild.exe" ]
+                    |> Seq.tryHead
+                    |> Option.map FileInfo
+                match msbuildExe with
+                | Some exe when exe.Exists -> Some exe
+                | _ -> None
+        )
 
     let internal msbuildLibPath(msbuildDir: DirectoryInfo) =
         if isLinux then
@@ -377,7 +383,7 @@ module ProjectLoader =
                 "CoreCompile" |]
 
     let setLegacyMsbuildProperties isOldStyleProjFile =
-        match LegacyFrameworkDiscovery.msbuildBinary with
+        match LegacyFrameworkDiscovery.msbuildBinary.Value with
         | Some file ->
             let msbuildBinaryDir = file.Directory
             Init.setupForLegacyFramework msbuildBinaryDir
