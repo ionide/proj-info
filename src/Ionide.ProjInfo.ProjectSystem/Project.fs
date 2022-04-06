@@ -85,7 +85,7 @@ type internal ProjectPersistentCache(projectFile: string) =
                                             // older versions would write the {} literal in place of actual data, so we need to check for that
                                             let x = Linq.JObject.Parse r
 
-                                            if x.Count = 0 || isNull x then
+                                            if isNull x || x.Count = 0 then
                                                 File.Delete cachePath //Remove cache that can't be deserialized
                                                 None
                                             else
