@@ -777,19 +777,12 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
                 bm.EndBuild()
 
-                let rec walkResults (known: String Set) (results: ProjectGraphNode seq) =
-                    seq {
-                        for nodeKey in results do
-                            if known |> Set.contains nodeKey.ProjectInstance.FullPath |> not then
-                                yield nodeKey
-                                let cache = Set.add nodeKey.ProjectInstance.FullPath known
-                                yield! walkResults cache nodeKey.ProjectReferences
-                            else
-                                yield! walkResults known nodeKey.ProjectReferences
-                    }
-
-                let resultsByNode = walkResults Set.empty (result.ResultsByNode |> Seq.map (fun kvp -> kvp.Key)) |> Seq.cache
-                let buildProjs = resultsByNode |> Seq.map (fun p -> p.ProjectInstance.FullPath) |> Seq.toList
+                let buildProjs =
+                    result.ResultsByNode.Keys
+                    |> Seq.collect (fun (pgn: ProjectGraphNode) ->
+                        seq { yield pgn.ProjectInstance
+                              yield! Seq.map (fun (pr:ProjectGraphNode) -> pr.ProjectInstance) pgn.ProjectReferences })
+                    |> Seq.toList
 
                 logger.info (
                     Log.setMessage "{overallCode}, projects built {count} {projects} "
@@ -800,11 +793,11 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                 )
 
                 let projects =
-                    resultsByNode
-                    |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
-                    |> Seq.map (fun p ->
+                    buildProjs
+                    |> List.distinctBy (fun (p:ProjectInstance) -> p.FullPath)
+                    |> Seq.map (fun (p:ProjectInstance) ->
 
-                        p.ProjectInstance.FullPath, ProjectLoader.getLoadedProjectInfo p.ProjectInstance.FullPath customProperties (ProjectLoader.LoadedProject p.ProjectInstance))
+                        p.FullPath, ProjectLoader.getLoadedProjectInfo p.FullPath customProperties (ProjectLoader.LoadedProject p))
 
                     |> Seq.choose (fun (projectPath, projectOptionResult) ->
                         match projectOptionResult with
