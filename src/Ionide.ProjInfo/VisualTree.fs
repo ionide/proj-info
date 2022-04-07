@@ -13,9 +13,10 @@ module VisualTree =
     let getDirEnsureTrailingSlash (projPath: string) =
         let dir = Path.GetDirectoryName(projPath)
 
-        if dir.EndsWith(Path.DirectorySeparatorChar.ToString())
-        then dir
-        else dir + Path.DirectorySeparatorChar.ToString()
+        if dir.EndsWith(Path.DirectorySeparatorChar.ToString()) then
+            dir
+        else
+            dir + Path.DirectorySeparatorChar.ToString()
 
     let relativePathOf fromPath toPath =
         let fromUri = Uri(fromPath)

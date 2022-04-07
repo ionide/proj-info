@@ -11,9 +11,10 @@ module internal Utils =
     let inline (</>) path1 path2 = combinePaths path1 path2
 
     let chooseByPrefix (prefix: string) (s: string) =
-        if s.StartsWith(prefix)
-        then Some(s.Substring(prefix.Length))
-        else None
+        if s.StartsWith(prefix) then
+            Some(s.Substring(prefix.Length))
+        else
+            None
 
     let normalizeDirSeparators (path: string) =
         match Path.DirectorySeparatorChar with
@@ -38,7 +39,7 @@ module internal Utils =
     module Async =
         /// Transforms an Async value using the specified function.
         [<CompiledName("Map")>]
-        let map (mapping: 'a -> 'b) (value: Async<'a>): Async<'b> =
+        let map (mapping: 'a -> 'b) (value: Async<'a>) : Async<'b> =
             async {
                 // Get the input value.
                 let! x = value
