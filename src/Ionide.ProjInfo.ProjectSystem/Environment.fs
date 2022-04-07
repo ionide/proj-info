@@ -78,7 +78,8 @@ module Environment =
 
         vsRoots |> List.map pattern
 
-    let private fsharpInstallationPath = sideBySideFSharpInstallationPaths @ legacyFSharpInstallationPaths |> List.tryFind Directory.Exists
+    let private fsharpInstallationPath =
+        sideBySideFSharpInstallationPaths @ legacyFSharpInstallationPaths |> List.tryFind Directory.Exists
 
     let fsi =
         // on netcore on non-windows we just deflect to fsharpi as usual
@@ -121,14 +122,13 @@ module Environment =
             (let fromEnv =
                 Environment.GetEnvironmentVariable "DOTNET_ROOT"
                 |> Option.ofObj
-                |> Option.bind
-                    (fun d ->
-                        let di = DirectoryInfo d
+                |> Option.bind (fun d ->
+                    let di = DirectoryInfo d
 
-                        if di.Exists then
-                            Some di
-                        else
-                            None)
+                    if di.Exists then
+                        Some di
+                    else
+                        None)
 
              defaultArg fromEnv FSIRefs.defaultDotNetSDKRoot)
 

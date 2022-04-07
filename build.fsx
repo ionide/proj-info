@@ -69,70 +69,90 @@ Target.create "ReplaceFsLibLogNamespaces"
           "FsLibLog\\.", "Ionide.ProjInfo.Logging" ]
 
     replacements
-    |> List.iter
-        (fun (``match``, replace) ->
-            (!! "paket-files/TheAngryByrd/FsLibLog/**/FsLibLog*.fs")
-            |> Shell.regexReplaceInFilesWithEncoding ``match`` replace System.Text.Encoding.UTF8)
+    |> List.iter (fun (``match``, replace) ->
+        (!! "paket-files/TheAngryByrd/FsLibLog/**/FsLibLog*.fs")
+        |> Shell.regexReplaceInFilesWithEncoding ``match`` replace System.Text.Encoding.UTF8)
 
 Target.create "Build" (fun _ -> DotNet.build id "")
 
-Target.create
-    "Test"
-    (fun _ -> exec "dotnet" @"run --project .\test\Ionide.ProjInfo.Tests\Ionide.ProjInfo.Tests.fsproj" ".")
+Target.create "Test" (fun _ ->
+    exec "dotnet" @"run --project .\test\Ionide.ProjInfo.Tests\Ionide.ProjInfo.Tests.fsproj" ".")
 
-Target.create
-    "BuildRelease"
-    (fun _ ->
-        DotNet.build
-            (fun p ->
-                { p with
-                      Configuration = DotNet.BuildConfiguration.Release
-                      OutputPath = Some buildDir })
-            "ionide-proj-info.sln")
+Target.create "BuildRelease" (fun _ ->
+    DotNet.build
+        (fun p ->
+            { p with
+                Configuration = DotNet.BuildConfiguration.Release
+                OutputPath = Some buildDir })
+        "ionide-proj-info.sln")
 
 // --------------------------------------------------------------------------------------
 // Release Targets
 // --------------------------------------------------------------------------------------
 
-Target.create
-    "Pack"
-    (fun _ ->
-        let properties =
-            [ ("Authors", authors)
-              ("PackageProjectUrl", gitUrl)
-              ("PackageTags", tags)
-              ("RepositoryType", "git")
-              ("RepositoryUrl", gitUrl)
-              ("PackageLicenseExpression", "MIT")
-              ("PackageDescription", summary)
-              ("EnableSourceLink", "true") ]
+Target.create "Pack" (fun _ ->
+    let properties =
+        [ ("Authors", authors)
+          ("PackageProjectUrl", gitUrl)
+          ("PackageTags", tags)
+          ("RepositoryType", "git")
+          ("RepositoryUrl", gitUrl)
+          ("PackageLicenseExpression", "MIT")
+          ("PackageDescription", summary)
+          ("EnableSourceLink", "true") ]
 
 
-        DotNet.pack
-            (fun p ->
-                { p with
-                      Configuration = DotNet.BuildConfiguration.Release
-                      OutputPath = Some nugetDir
-                      MSBuildParams =
-                          { p.MSBuildParams with
-                                Properties = properties } })
-            "ionide-proj-info.sln")
+    DotNet.pack
+        (fun p ->
+            { p with
+                Configuration = DotNet.BuildConfiguration.Release
+                OutputPath = Some nugetDir
+                MSBuildParams = { p.MSBuildParams with Properties = properties } })
+        "ionide-proj-info.sln")
 
-Target.create
-    "Push"
-    (fun _ ->
-        let key =
-            match getBuildParam "nuget-key" with
-            | s when not (isNullOrWhiteSpace s) -> s
-            | _ -> UserInput.getUserPassword "NuGet Key: "
+Target.create "Push" (fun _ ->
+    let key =
+        match getBuildParam "nuget-key" with
+        | s when not (isNullOrWhiteSpace s) -> s
+        | _ -> UserInput.getUserPassword "NuGet Key: "
 
-        Paket.push
-            (fun p ->
-                { p with
-                      WorkingDir = nugetDir
-                      ApiKey = key
-                      ToolType = ToolType.CreateLocalTool() }))
+    Paket.push (fun p ->
+        { p with
+            WorkingDir = nugetDir
+            ApiKey = key
+            ToolType = ToolType.CreateLocalTool() }))
 
+// --------------------------------------------------------------------------------------
+// Format targets
+// --------------------------------------------------------------------------------------
+let sourceFiles =
+    !! "src/**/*.fs" ++ "build.fsx"
+    -- "src/**/obj/**/*.fs"
+
+Target.create "CheckFormat" (fun _ ->
+    let result =
+        sourceFiles
+        |> Seq.map (sprintf "\"%s\"")
+        |> String.concat " "
+        |> sprintf "%s --check"
+        |> DotNet.exec id "fantomas"
+
+    if result.ExitCode = 0 then
+        Trace.log "No files need formatting"
+    elif result.ExitCode = 99 then
+        failwith "Some files need formatting, check output for more info"
+    else
+        Trace.logf "Errors while formatting: %A" result.Errors)
+
+Target.create "Format" (fun _ ->
+    let result =
+        sourceFiles
+        |> Seq.map (sprintf "\"%s\"")
+        |> String.concat " "
+        |> DotNet.exec id "fantomas"
+
+    if not result.OK then
+        printfn "Errors while formatting all files: %A" result.Messages)
 
 // --------------------------------------------------------------------------------------
 // Build order
@@ -143,6 +163,7 @@ Target.create "Release" DoNothing
 
 "Clean"
 ==> "ReplaceFsLibLogNamespaces"
+==> "CheckFormat"
 ==> "Build"
 ==> "Test"
 ==> "Default"

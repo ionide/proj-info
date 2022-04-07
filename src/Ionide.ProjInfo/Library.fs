@@ -118,34 +118,38 @@ module LegacyFrameworkDiscovery =
     let isUnix = isLinux || isMac
 
     let internal msbuildBinary =
-        lazy (
-            if isLinux then
-                "/usr/bin/msbuild" |> FileInfo |> Some
-            elif isMac then
-                "/Library/Frameworks/Mono.framework/Versions/Current/Commands/msbuild" |> FileInfo |> Some
-            else
-                // taken from https://github.com/microsoft/vswhere
-                // vswhere.exe is guranteed to be at the following location. refer to https://github.com/Microsoft/vswhere/issues/162
-                let vsWhereDir =
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Microsoft Visual Studio", "Installer")
-                    |> DirectoryInfo
+        lazy
+            (if isLinux then
+                 "/usr/bin/msbuild" |> FileInfo |> Some
+             elif isMac then
+                 "/Library/Frameworks/Mono.framework/Versions/Current/Commands/msbuild" |> FileInfo |> Some
+             else
+                 // taken from https://github.com/microsoft/vswhere
+                 // vswhere.exe is guranteed to be at the following location. refer to https://github.com/Microsoft/vswhere/issues/162
+                 let vsWhereDir =
+                     Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Microsoft Visual Studio", "Installer")
+                     |> DirectoryInfo
 
-                let vsWhereExe = Path.Combine(vsWhereDir.FullName, "vswhere.exe") |> FileInfo
-                // example: C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe
+                 let vsWhereExe = Path.Combine(vsWhereDir.FullName, "vswhere.exe") |> FileInfo
+                 // example: C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe
 
-                if not vsWhereExe.Exists then
-                    failwith $"\"{vsWhereExe}\" does not exist. It is a expected to be present in '<ProgramFilesX86>/Microsoft Visual Studio/Installer' when resolving the MsBuild for legacy projects."
-                
-                let msbuildExe =
-                    SdkDiscovery.execDotnet vsWhereDir vsWhereExe [ "-find"; "MSBuild\**\Bin\MSBuild.exe" ]
-                    |> Seq.tryHead
-                    |> Option.map FileInfo
-                match msbuildExe with
-                | Some exe when exe.Exists -> Some exe
-                | _ -> None
-        )
+                 if not vsWhereExe.Exists then
+                     failwith $"\"{vsWhereExe}\" does not exist. It is a expected to be present in '<ProgramFilesX86>/Microsoft Visual Studio/Installer' when resolving the MsBuild for legacy projects."
 
-    let internal msbuildLibPath(msbuildDir: DirectoryInfo) =
+                 let msbuildExe =
+                     SdkDiscovery.execDotnet
+                         vsWhereDir
+                         vsWhereExe
+                         [ "-find"
+                           "MSBuild\**\Bin\MSBuild.exe" ]
+                     |> Seq.tryHead
+                     |> Option.map FileInfo
+
+                 match msbuildExe with
+                 | Some exe when exe.Exists -> Some exe
+                 | _ -> None)
+
+    let internal msbuildLibPath (msbuildDir: DirectoryInfo) =
         if isLinux then
             "/usr/lib/mono/xbuild"
         elif isMac then
@@ -301,7 +305,14 @@ module ProjectLoader =
 
     let getTfm (path: string) readingProps isLegacyFrameworkProj =
         let pi = ProjectInstance(path, globalProperties = readingProps, toolsVersion = null)
-        let tfm = pi.GetPropertyValue (if isLegacyFrameworkProj then "TargetFrameworkVersion" else "TargetFramework")
+
+        let tfm =
+            pi.GetPropertyValue(
+                if isLegacyFrameworkProj then
+                    "TargetFrameworkVersion"
+                else
+                    "TargetFramework"
+            )
 
         if String.IsNullOrWhiteSpace tfm then
             let tfms = pi.GetPropertyValue "TargetFrameworks"
@@ -369,18 +380,16 @@ module ProjectLoader =
     /// </summary>
     let designTimeBuildTargets isLegacyFrameworkProjFile =
         if isLegacyFrameworkProjFile then
-            [|
-                "_GenerateCompileDependencyCache"
-                "_ComputeNonExistentFileProperty"
-                "CoreCompile" |]
+            [| "_GenerateCompileDependencyCache"
+               "_ComputeNonExistentFileProperty"
+               "CoreCompile" |]
         else
-            [|
-                "ResolveAssemblyReferencesDesignTime"
-                "ResolveProjectReferencesDesignTime"
-                "ResolvePackageDependenciesDesignTime"
-                "_GenerateCompileDependencyCache"
-                "_ComputeNonExistentFileProperty"
-                "CoreCompile" |]
+            [| "ResolveAssemblyReferencesDesignTime"
+               "ResolveProjectReferencesDesignTime"
+               "ResolvePackageDependenciesDesignTime"
+               "_GenerateCompileDependencyCache"
+               "_ComputeNonExistentFileProperty"
+               "CoreCompile" |]
 
     let setLegacyMsbuildProperties isOldStyleProjFile =
         match LegacyFrameworkDiscovery.msbuildBinary.Value with
@@ -394,8 +403,10 @@ module ProjectLoader =
             let isLegacyFrameworkProjFile =
                 if path.ToLower().EndsWith ".fsproj" && File.Exists path then
                     let legacyProjFormatXmlns = "xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\""
-                    let lines:seq<string> = File.ReadLines path
-                    (Seq.tryFind (fun (line: string) -> line.Contains legacyProjFormatXmlns) lines).IsSome
+                    let lines: seq<string> = File.ReadLines path
+
+                    (Seq.tryFind (fun (line: string) -> line.Contains legacyProjFormatXmlns) lines)
+                        .IsSome
                 else
                     false
 
@@ -533,9 +544,9 @@ module ProjectLoader =
 
           ProjectAssetsFile = msbuildPropString "ProjectAssetsFile" |> Option.defaultValue ""
           RestoreSuccess =
-              match msbuildPropString "TargetFrameworkVersion" with
-              | Some _ -> true
-              | None -> msbuildPropBool "RestoreSuccess" |> Option.defaultValue false
+            match msbuildPropString "TargetFrameworkVersion" with
+            | Some _ -> true
+            | None -> msbuildPropBool "RestoreSuccess" |> Option.defaultValue false
 
           Configurations = msbuildPropStringList "Configurations" |> Option.defaultValue []
           TargetFrameworks = msbuildPropStringList "TargetFrameworks" |> Option.defaultValue []

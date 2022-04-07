@@ -27,11 +27,10 @@ type TFM =
 let versionDirectoriesIn (baseDir: DirectoryInfo) =
     baseDir.EnumerateDirectories()
     |> Array.ofSeq // have to convert to array to get a sortWith that takes our custom comparison function
-    |> Array.choose
-        (fun dir ->
-            match Version.TryParse dir.Name with
-            | true, v -> Some v
-            | false, _ -> None)
+    |> Array.choose (fun dir ->
+        match Version.TryParse dir.Name with
+        | true, v -> Some v
+        | false, _ -> None)
     |> Array.sort
 
 /// path to the directory where .Net SDK versions are stored
@@ -50,6 +49,7 @@ let sdkVersions dotnetRoot =
 /// path to the .netcoreapp reference assembly storage location
 let netcoreAppPacksDir (dotnetRoot: DirectoryInfo) =
     Path.Combine(dotnetRoot.FullName, "packs/Microsoft.NETCore.App.Ref") |> DirectoryInfo
+
 /// path to the .netcoreapp implementation assembly storage location
 let netcoreAppDir (dotnetRoot: DirectoryInfo) =
     Path.Combine(dotnetRoot.FullName, "shared/Microsoft.NETCore.App") |> DirectoryInfo
@@ -103,12 +103,11 @@ let findRuntimeRefs packDir runtimeDir =
         // SUPER IMPORTANT: netstandard/netcore assembly resolution _must not_ contain mscorlib or else
         // its presence triggers old netfx fallbacks, which end up bringing assemblies that aren't part
         // of netcore.
-        |> Seq.choose
-            (fun r ->
-                if r.Extension.EndsWith "dll" && not (Path.GetFileNameWithoutExtension(r.Name) = "mscorlib") then
-                    Some r.FullName
-                else
-                    None)
+        |> Seq.choose (fun r ->
+            if r.Extension.EndsWith "dll" && not (Path.GetFileNameWithoutExtension(r.Name) = "mscorlib") then
+                Some r.FullName
+            else
+                None)
         |> Seq.toArray
     | None, None -> [||]
 
