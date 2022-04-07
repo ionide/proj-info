@@ -927,7 +927,10 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
                 | Ok project ->
                     try
                         cache.Add(p, project)
-                        let lst = project.ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
+                        let lst =
+                            project.ReferencedProjects
+                            |> Seq.choose (fun n -> if cache.ContainsKey n.ProjectFileName then None else Some n.ProjectFileName)
+                            |> Seq.toList
                         let info = Some project
                         lst, info
                     with
@@ -954,7 +957,10 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
                         if cache.ContainsKey p then
                             let project = cache.[p]
                             loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, getAllKnown (), true)) //TODO: Should it even notify here?
-                            let lst = project.ReferencedProjects |> Seq.map (fun n -> n.ProjectFileName) |> Seq.toList
+                            let lst =
+                                project.ReferencedProjects
+                                |> Seq.choose (fun n -> if cache.ContainsKey n.ProjectFileName then None else Some n.ProjectFileName)
+                                |> Seq.toList
                             lst, None
                         else
                             loadingNotification.Trigger(WorkspaceProjectState.Loading p)
