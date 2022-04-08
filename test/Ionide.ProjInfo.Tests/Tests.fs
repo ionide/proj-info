@@ -826,6 +826,10 @@ let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath ->
         copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
 
         let projPath = testDir / (``sample3 Netsdk projs``.ProjectFile)
+        
+        // Build csproj, so it should be referenced as FSharpReferencedProject.PortableExecutable
+        let csproj = testDir / ``sample3 Netsdk projs``.ProjectReferences.[0].ProjectFile
+        dotnet fs [ "build"; csproj ] |> checkExitCodeZero
 
         dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
@@ -843,7 +847,7 @@ let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath ->
         let hasFSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l2.dll")
         let hasFSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.OutputFile.EndsWith "l2.dll")
         Expect.equal hasCSharpRef true "Should have direct dll reference to C# reference"
-        Expect.equal hasCSharpProjectRef false "Should NOT have project reference to C# reference"
+        Expect.equal hasCSharpProjectRef true "Should have project reference to C# reference"
         Expect.equal hasFSharpRef true "Should have direct dll reference to F# reference"
         Expect.equal hasFSharpProjectRef true "Should have project reference to F# reference"
     )

@@ -1,5 +1,7 @@
 ﻿namespace Ionide.ProjInfo
 
+open System
+open System.IO
 open Ionide.ProjInfo.Types
 open FSharp.Compiler.CodeAnalysis
 
@@ -13,12 +15,20 @@ module FCS =
             projectOptions.ReferencedProjects
             |> List.toArray
             |> Array.choose (fun d ->
+                let knownProject = allKnownProjects |> Seq.tryFind (fun n -> n.ProjectFileName = d.ProjectFileName)
+
+                let isDotnetProject (knownProject: ProjectOptions option) =
+                    match knownProject with
+                    | Some p -> (p.ProjectFileName.EndsWith(".csproj") || p.ProjectFileName.EndsWith(".vbproj")) && File.Exists p.TargetPath
+                    | None -> false
+
                 if d.ProjectFileName.EndsWith ".fsproj" then
-                    allKnownProjects
-                    |> Seq.tryFind (fun n -> n.ProjectFileName = d.ProjectFileName)
+                    knownProject
                     |> Option.map (fun p -> FSharpReferencedProject.CreateFSharp(p.TargetPath, mapToFSharpProjectOptions p allKnownProjects))
+                elif isDotnetProject knownProject then
+                    knownProject
+                    |> Option.map (fun p -> FSharpReferencedProject.CreatePortableExecutable(p.TargetPath, (fun () -> DateTime.Now), (fun _ -> None)))
                 else
-                    // TODO: map other project types to references here
                     None)
           IsIncompleteTypeCheckEnvironment = false
           UseScriptResolutionRules = false
