@@ -10,6 +10,8 @@ type Args =
     | Project of path: string
     | Solution of path: string
     | Graph
+    | Fcs
+    | Serialize
     interface IArgParserTemplate with
         member x.Usage =
             match x with
@@ -17,6 +19,8 @@ type Args =
             | Project (path) -> "Analyze a single project at {path}"
             | Solution (path) -> "Analyze a solution of projects at {path}"
             | Graph -> "Use the graph loader"
+            | Fcs -> "Map project to FSharpProjectOptions"
+            | Serialize -> "Serialize the project to JSON"
 
 let parser =
     Argu.ArgumentParser.Create("proj", "analyze msbuild projects", errorHandler = ProcessExiter(), checkStructure = true)
@@ -68,11 +72,25 @@ let main argv =
                 | None -> Seq.empty
 
         let projects = projects |> List.ofSeq
+        let shouldSerialize = args.Contains Serialize
 
         match projects with
         | [] ->
             failwith "Couldn't parse any projects"
             exit 1
         | projects ->
-            printfn "%A" projects
+            if args.Contains Fcs then
+                let projects = projects |> List.map (fun p -> Ionide.ProjInfo.FCS.mapToFSharpProjectOptions p projects)
+
+                if shouldSerialize then
+                    projects |> Newtonsoft.Json.JsonConvert.SerializeObject |> printfn "%s"
+                else
+                    printfn "%A" projects
+
+            else if shouldSerialize then
+                projects |> Newtonsoft.Json.JsonConvert.SerializeObject |> printfn "%s"
+            else
+                printfn "%A" projects
+
+
             exit 0
