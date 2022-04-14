@@ -24,7 +24,7 @@ jobs:
         if: runner.os == 'Linux'
         run: ./install_mono_from_microsoft_deb_packages.sh && which msbuild
       - name: Run build
-        run: dotnet fake build -t Pack
+        run: dotnet run --project build -- -t Pack
       - name: Upload NuGet packages
         uses: actions/upload-artifact@v2
         with:
