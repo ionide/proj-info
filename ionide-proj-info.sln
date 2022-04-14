@@ -19,6 +19,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Ionide.ProjInfo.ProjectSyst
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Ionide.ProjInfo.Tool", "src\Ionide.ProjInfo.Tool\Ionide.ProjInfo.Tool.fsproj", "{70299F84-2326-4814-9D13-44766E7EEAFC}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "build", "build\build.fsproj", "{85BDA2A8-06C8-4C5A-9F2D-9844F07E3589}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -104,6 +106,18 @@ Global
 		{70299F84-2326-4814-9D13-44766E7EEAFC}.Release|x64.Build.0 = Release|Any CPU
 		{70299F84-2326-4814-9D13-44766E7EEAFC}.Release|x86.ActiveCfg = Release|Any CPU
 		{70299F84-2326-4814-9D13-44766E7EEAFC}.Release|x86.Build.0 = Release|Any CPU
+		{85BDA2A8-06C8-4C5A-9F2D-9844F07E3589}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{85BDA2A8-06C8-4C5A-9F2D-9844F07E3589}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{85BDA2A8-06C8-4C5A-9F2D-9844F07E3589}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{85BDA2A8-06C8-4C5A-9F2D-9844F07E3589}.Debug|x64.Build.0 = Debug|Any CPU
+		{85BDA2A8-06C8-4C5A-9F2D-9844F07E3589}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{85BDA2A8-06C8-4C5A-9F2D-9844F07E3589}.Debug|x86.Build.0 = Debug|Any CPU
+		{85BDA2A8-06C8-4C5A-9F2D-9844F07E3589}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{85BDA2A8-06C8-4C5A-9F2D-9844F07E3589}.Release|Any CPU.Build.0 = Release|Any CPU
+		{85BDA2A8-06C8-4C5A-9F2D-9844F07E3589}.Release|x64.ActiveCfg = Release|Any CPU
+		{85BDA2A8-06C8-4C5A-9F2D-9844F07E3589}.Release|x64.Build.0 = Release|Any CPU
+		{85BDA2A8-06C8-4C5A-9F2D-9844F07E3589}.Release|x86.ActiveCfg = Release|Any CPU
+		{85BDA2A8-06C8-4C5A-9F2D-9844F07E3589}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{B86D70F6-12F9-42E7-8A04-2C21FC91DF9C} = {0EF20E50-D076-480D-BC88-951E5AC8643E}

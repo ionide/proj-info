@@ -2,8 +2,8 @@
 
 1. Clone repo.
 2. Install local tools with `dotnet tool restore`
-3. Run tests with `dotnet fake build -t Test`
-4. Create packages with `dotnet fake build -t Pack`
+3. Run tests with `dotnet run --project .\build\ -- -t Test`
+4. Create packages with `dotnet run --project .\build\ -- -t Pack`
 
 ## Release
 

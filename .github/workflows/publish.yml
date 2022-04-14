@@ -24,7 +24,7 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
       - name: Run build
-        run: dotnet fake build -t Pack
+        run: dotnet run --project .\build\ -- -t Pack
       - name: Get Changelog Entry
         id: changelog_reader
         uses: mindsers/changelog-reader-action@v1.1.0
@@ -51,6 +51,6 @@ jobs:
           overwrite: true
           file_glob: true
       - name: Publish to NuGet
-        run: dotnet fake build -t Push
+        run: dotnet run --project .\build\ -- -t Push
         env:
           nuget-key: ${{ secrets.PROJ_INFO_NUGET_TOKEN }}
