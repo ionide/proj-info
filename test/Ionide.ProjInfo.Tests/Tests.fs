@@ -1158,8 +1158,22 @@ let debugTests toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
         let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
 
         printfn "%A" parsed
-
     )
+
+let expensiveTests toolsPath (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
+    ptest "can load project that uses workloads" {
+        // this one requires a lot of setup that I didn't want to check in because it's huge.
+        // before you can run this test you need to have
+        // * installed the android workload: `dotnet workload install android`
+        // * installed the android sdk. This seems to mostly be done from VS or Android Studio
+        // then you can actually crack this project
+        let projPath = Path.Combine(__SOURCE_DIRECTORY__, "..", "examples", "sample-workload", "sample-workload.csproj")
+        let loader = workspaceFactory toolsPath
+        let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+        let projInfo = parsed[0]
+        let references = projInfo.OtherOptions |> Seq.filter (fun opt -> opt.StartsWith "-r:")
+        Expect.exists references (fun r -> r.Contains "packs" && r.Contains "Microsoft.Android.") "Should have found a reference to android dlls in the packs directory"
+    }
 
 let testProjectLoadBadData =
     testCase |> withLog "Does not crash when loading malformed cache data" (fun logger fs ->
@@ -1270,4 +1284,5 @@ let tests toolsPath =
           testLegacyFrameworkProject toolsPath "can load legacy project file" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
           testLegacyFrameworkMultiProject toolsPath "can load legacy multi project file" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
           testProjectLoadBadData
+          expensiveTests toolsPath WorkspaceLoader.Create
         ]

@@ -211,8 +211,6 @@ module Init =
         Environment.SetEnvironmentVariable("MSBUILD_EXE_PATH", msbuild)
         Environment.SetEnvironmentVariable("MSBuildExtensionsPath", ensureTrailer sdkRoot.FullName)
         Environment.SetEnvironmentVariable("MSBuildSDKsPath", Path.Combine(sdkRoot.FullName, "Sdks"))
-        // .net 6 sdk includes workload stuff and this breaks for some reason
-        Environment.SetEnvironmentVariable("MSBuildEnableWorkloadResolver", "false")
 
         match System.Environment.GetEnvironmentVariable "DOTNET_HOST_PATH" with
         | null
@@ -791,8 +789,10 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                 let buildProjs =
                     result.ResultsByNode.Keys
                     |> Seq.collect (fun (pgn: ProjectGraphNode) ->
-                        seq { yield pgn.ProjectInstance
-                              yield! Seq.map (fun (pr:ProjectGraphNode) -> pr.ProjectInstance) pgn.ProjectReferences })
+                        seq {
+                            yield pgn.ProjectInstance
+                            yield! Seq.map (fun (pr: ProjectGraphNode) -> pr.ProjectInstance) pgn.ProjectReferences
+                        })
                     |> Seq.toList
 
                 logger.info (
@@ -805,8 +805,8 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
                 let projects =
                     buildProjs
-                    |> List.distinctBy (fun (p:ProjectInstance) -> p.FullPath)
-                    |> Seq.map (fun (p:ProjectInstance) ->
+                    |> List.distinctBy (fun (p: ProjectInstance) -> p.FullPath)
+                    |> Seq.map (fun (p: ProjectInstance) ->
 
                         p.FullPath, ProjectLoader.getLoadedProjectInfo p.FullPath customProperties (ProjectLoader.LoadedProject p))
 

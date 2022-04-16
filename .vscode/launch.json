@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch Tool 5.0 graph resolver",
+            "name": "Launch Tool 6.0 graph resolver",
             "type": "coreclr",
             "request": "launch",
             "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net6.0/Ionide.ProjInfo.Tool.dll",
@@ -20,7 +20,7 @@
             "justMyCode": true,
         },
         {
-            "name": "Launch Tool 5.0 normal resolver",
+            "name": "Launch Tool 6.0 normal resolver",
             "type": "coreclr",
             "request": "launch",
             "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net6.0/Ionide.ProjInfo.Tool.dll",
