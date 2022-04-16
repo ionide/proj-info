@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.59.0] - 2022-04-16
+
+### Added
+
+* [Support JSON output for the proj-info tool](https://github.com/ionide/proj-info/pull/150)
+* [Support C#/VB project dll references in FCS APIs](https://github.com/ionide/proj-info/pull/148) (Thanks @nojaf!)
+* [Support for projects that use references from .NET Workloads](https://github.com/ionide/proj-info/pull/152)
+
+### Fixed
+
+* [Potential NullRef in the project system](https://github.com/ionide/proj-info/pull/143) (Thanks @knocte!)
+
+### Changed
+
+* [Perf improvement on translating project data for Graph Workspaces](https://github.com/ionide/proj-info/pull/144) (Thanks @nojaf!)
+
 ## [0.58.2] - 2022-04-04
 
 ### Fixed
