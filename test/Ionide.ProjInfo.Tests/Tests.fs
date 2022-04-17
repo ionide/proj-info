@@ -1,17 +1,19 @@
 module Tests
 
-open Expecto
-open FileUtils
-open Medallion.Shell
-open System.IO
-open Expecto.Logging
 open DotnetProjInfo.TestAssets
-open Ionide.ProjInfo
-open System.Collections.Generic
-open Ionide.ProjInfo.Types
-open Ionide.ProjInfo
+open Expecto
+open Expecto.Logging
 open Expecto.Logging.Message
+open FileUtils
 open FSharp.Compiler.CodeAnalysis
+open Ionide.ProjInfo
+open Ionide.ProjInfo
+open Ionide.ProjInfo.Types
+open Medallion.Shell
+open System
+open System.Collections.Generic
+open System.IO
+open System.Threading
 
 #nowarn "25"
 
@@ -727,10 +729,22 @@ let testProjectNotFound toolsPath workspaceLoader (workspaceFactory: ToolsPath -
 
         Expect.equal (watcher.Notifications |> List.item 1) (WorkspaceProjectState.Failed(wrongPath, (GetProjectOptionsErrors.ProjectNotFound(wrongPath)))) "check error type")
 
+let internalGetCSharpReferenceInfo =
+    fun (r: FSharpReferencedProject) ->
+        let rCase, fields =
+            FSharp.Reflection.FSharpValue.GetUnionFields(r, typeof<FSharpReferencedProject>, System.Reflection.BindingFlags.Public ||| System.Reflection.BindingFlags.NonPublic ||| System.Reflection.BindingFlags.Instance)
+        if rCase.Name = "PEReference" then
+            let path: string = fields[0] :?> _
+            let getStamp: unit -> DateTime = fields[1] :?> _
+            let reader = fields[2]
+            Some (path, getStamp, reader)
+        else
+            None
+
 let internalGetProjectOptions =
     fun (r: FSharpReferencedProject) ->
         let rCase, fields =
-            FSharp.Reflection.FSharpValue.GetUnionFields(r, typeof<FSharpReferencedProject>, System.Reflection.BindingFlags.NonPublic ||| System.Reflection.BindingFlags.Instance)
+            FSharp.Reflection.FSharpValue.GetUnionFields(r, typeof<FSharpReferencedProject>, System.Reflection.BindingFlags.Public ||| System.Reflection.BindingFlags.NonPublic ||| System.Reflection.BindingFlags.Instance)
 
         if rCase.Name = "FSharpReference" then
             let projOptions: FSharpProjectOptions = rCase.GetFields().[1].GetValue(box r) :?> _
@@ -826,7 +840,7 @@ let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath ->
         copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
 
         let projPath = testDir / (``sample3 Netsdk projs``.ProjectFile)
-        
+
         // Build csproj, so it should be referenced as FSharpReferencedProject.PortableExecutable
         let csproj = testDir / ``sample3 Netsdk projs``.ProjectReferences.[0].ProjectFile
         dotnet fs [ "build"; csproj ] |> checkExitCodeZero
@@ -1175,6 +1189,27 @@ let expensiveTests toolsPath (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
         Expect.exists references (fun r -> r.Contains "packs" && r.Contains "Microsoft.Android.") "Should have found a reference to android dlls in the packs directory"
     }
 
+let csharpLibTest toolsPath (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
+    testCase |> withLog "can load project that has a csharp project reference" (fun logger fs ->
+        let projPath = Path.Combine(__SOURCE_DIRECTORY__, "..", "examples", "sample-referenced-csharp-project", "fsharp-exe", "fsharp-exe.fsproj")
+        // need to build the projects first so that there's something to latch on to
+        dotnet fs ["build"; projPath] |> checkExitCodeZero
+
+        let loader = workspaceFactory toolsPath
+        let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+        Expect.hasLength parsed 2 "Should have loaded the F# exe and the C# lib"
+        let fsharpProject = parsed[0]
+        let mapped = FCS.mapToFSharpProjectOptions fsharpProject parsed
+        let referencedProjects = mapped.ReferencedProjects
+        Expect.hasLength referencedProjects 1 "Should have a reference to the C# lib"
+        match internalGetCSharpReferenceInfo referencedProjects[0] with
+        | Some (path, getStamp, reader) ->
+            let fileName = System.IO.Path.GetFileName path
+            Expect.equal fileName "csharp-lib.dll" "Should have found the C# lib"
+        | None ->
+            failwith "Should have found a C# reference"
+    )
+
 let testProjectLoadBadData =
     testCase |> withLog "Does not crash when loading malformed cache data" (fun logger fs ->
         let testDir = inDir fs "sample_netsdk_bad_cache"
@@ -1285,4 +1320,5 @@ let tests toolsPath =
           testLegacyFrameworkMultiProject toolsPath "can load legacy multi project file" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
           testProjectLoadBadData
           expensiveTests toolsPath WorkspaceLoader.Create
+          csharpLibTest toolsPath WorkspaceLoader.Create
         ]

@@ -6,6 +6,18 @@ open Ionide.ProjInfo.Types
 open FSharp.Compiler.CodeAnalysis
 
 module FCS =
+    let private loadFromDotnetDll (p: ProjectOptions) =
+        /// because only a successful compilation will be written to a DLL, we can rely on
+        /// the file metadata for things like write times
+        let projectFile = FileInfo p.TargetPath
+
+        let getStamp () = projectFile.LastWriteTimeUtc
+
+        let getStream (ctok: System.Threading.CancellationToken) =
+            projectFile.OpenRead() :> Stream |> Some
+
+        FSharpReferencedProject.CreatePortableExecutable(p.TargetPath, getStamp, getStream)
+
     let rec mapToFSharpProjectOptions (projectOptions: ProjectOptions) (allKnownProjects: ProjectOptions seq) : FSharpProjectOptions =
         { ProjectId = None
           ProjectFileName = projectOptions.ProjectFileName
@@ -26,8 +38,7 @@ module FCS =
                     knownProject
                     |> Option.map (fun p -> FSharpReferencedProject.CreateFSharp(p.TargetPath, mapToFSharpProjectOptions p allKnownProjects))
                 elif isDotnetProject knownProject then
-                    knownProject
-                    |> Option.map (fun p -> FSharpReferencedProject.CreatePortableExecutable(p.TargetPath, (fun () -> DateTime.Now), (fun _ -> None)))
+                    knownProject |> Option.map loadFromDotnetDll
                 else
                     None)
           IsIncompleteTypeCheckEnvironment = false
