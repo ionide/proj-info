@@ -920,25 +920,25 @@ let testFCSmapManyProjCheckCaching =
         
         let fcsOptions = FCS.mapManyOptions projectsInLayers
             
-        let rec findDistinctProjectOptions (project : FSharpProjectOptions) =
+        let rec findProjectOptionsTransitively (project : FSharpProjectOptions) =
             project.ReferencedProjects
             |> Array.toList
             |> List.collect (fun reference ->
                 reference
                 |> internalGetProjectOptions
-                |> Option.map findDistinctProjectOptions
+                |> Option.map findProjectOptionsTransitively
                 |> Option.defaultValue [] 
             )
             |> List.append [project]
                 
-        let findDistinctProjectOptionsMany (projects : FSharpProjectOptions seq) =
+        let findDistinctProjectOptionsTransitively (projects : FSharpProjectOptions seq) =
             projects
-            |> Seq.collect findDistinctProjectOptions
-            |> Seq.toArray
+            |> Seq.collect findProjectOptionsTransitively
+            |> countDistinctObjectsByReference
             
-        let distinctOptions = findDistinctProjectOptionsMany fcsOptions
+        let distinctOptionsCount = findDistinctProjectOptionsTransitively fcsOptions
         
-        Expect.equal distinctOptions.Length projectsInLayers.Length "Mapping should reuse instances of FSharpProjectOptions and only create one per project"
+        Expect.equal distinctOptionsCount projectsInLayers.Length "Mapping should reuse instances of FSharpProjectOptions and only create one per project"
     )
 
 let testSample2WithBinLog toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
@@ -948,7 +948,7 @@ let testSample2WithBinLog toolsPath workspaceLoader (workspaceFactory: ToolsPath
 
         let projPath = testDir / (``sample2 NetSdk library``.ProjectFile)
         let projDir = Path.GetDirectoryName projPath
-
+ 
         dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
         let loader = workspaceFactory toolsPath
