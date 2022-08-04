@@ -824,17 +824,11 @@ let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath ->
                   | Some opts -> yield! allFCSProjects opts
                   | None -> () ]
 
-
         let rec allP2P (po: FSharpProjectOptions) =
             [ for reference in po.ReferencedProjects do
                   let opts = internalGetProjectOptions reference |> Option.get
                   yield reference.OutputFile, opts
                   yield! allP2P opts ]
-
-        let expectP2PKeyIsTargetPath (pos: Map<string, ProjectOptions>) fcsPo =
-            for (tar, fcsPO) in allP2P fcsPo do
-                let dpoPo = pos |> Map.find fcsPo.ProjectFileName
-                Expect.equal tar dpoPo.TargetPath (sprintf "p2p key is TargetPath, fsc projet options was '%A'" fcsPO)
 
         let testDir = inDir fs "load_sample_fsc"
         copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
@@ -864,6 +858,87 @@ let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath ->
         Expect.equal hasCSharpProjectRef true "Should have project reference to C# reference"
         Expect.equal hasFSharpRef true "Should have direct dll reference to F# reference"
         Expect.equal hasFSharpProjectRef true "Should have project reference to F# reference"
+    )
+
+let countDistinctObjectsByReference<'a> (items : 'a seq) =
+    let set = HashSet(items |> Seq.map (fun i -> i :> obj), ReferenceEqualityComparer.Instance)
+    set.Count
+
+let testFCSmapManyProjCheckCaching =
+    testCase |> withLog "When creating FCS options, caches them" (fun _ _ ->
+
+        let sdkInfo = ProjectLoader.getSdkInfo []
+        
+        let template : ProjectOptions =
+            { ProjectId = None
+              ProjectFileName = "Template"
+              TargetFramework = "TF"
+              SourceFiles = []
+              OtherOptions = []
+              ReferencedProjects = []
+              PackageReferences = []
+              LoadTime = DateTime.MinValue
+              TargetPath = "TP"
+              ProjectOutputType = ProjectOutputType.Library
+              ProjectSdkInfo = sdkInfo
+              Items = []
+              CustomProperties = [] }
+            
+        let makeReference (options : ProjectOptions) =
+            { RelativePath = options.ProjectFileName
+              ProjectFileName = options.ProjectFileName
+              TargetFramework = options.TargetFramework }
+            
+        let makeProject (name : string) (referencedProjects : ProjectOptions list) =
+            { template with
+                ProjectFileName = name
+                ReferencedProjects = referencedProjects |> List.map makeReference }
+            
+        let projectsInLayers =
+            let layerCount = 4
+            let layerSize = 2
+            let layers =
+                [1..layerCount]
+                |> List.map (fun layer ->
+                    [1..layerSize]
+                    |> List.map (fun item -> makeProject $"layer{layer}_{item}.fsproj" [])
+                )
+            let first = layers[0]
+            let rest =
+                layers
+                |> List.pairwise
+                |> List.map (fun (previous, next) ->
+                    next
+                    |> List.map (fun p ->
+                        { p with
+                            ReferencedProjects = previous |> List.map makeReference }
+                    )
+                )
+            let layers = first :: rest
+            
+            layers |> List.concat
+        
+        let fcsOptions = FCS.mapManyOptions projectsInLayers
+            
+        let rec findDistinctProjectOptions (project : FSharpProjectOptions) =
+            project.ReferencedProjects
+            |> Array.toList
+            |> List.collect (fun reference ->
+                reference
+                |> internalGetProjectOptions
+                |> Option.map findDistinctProjectOptions
+                |> Option.defaultValue [] 
+            )
+            |> List.append [project]
+                
+        let findDistinctProjectOptionsMany (projects : FSharpProjectOptions seq) =
+            projects
+            |> Seq.collect findDistinctProjectOptions
+            |> Seq.toArray
+            
+        let distinctOptions = findDistinctProjectOptionsMany fcsOptions
+        
+        Expect.equal distinctOptions.Length projectsInLayers.Length "Mapping should reuse instances of FSharpProjectOptions and only create one per project"
     )
 
 let testSample2WithBinLog toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
@@ -1289,6 +1364,7 @@ let tests toolsPath =
           //FCS multi-project tests
           testFCSmapManyProj toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           testFCSmapManyProj toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
+          testFCSmapManyProjCheckCaching
           //ProjectSystem tests
           testProjectSystem toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           testProjectSystem toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
