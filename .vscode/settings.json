@@ -8,5 +8,8 @@
         "test/examples",
         "packages"
     ],
-    "editor.formatOnSave": true
+    "editor.formatOnSave": false,
+    "FSharp.inlayHints.enabled": false,
+    "editor.inlayHints.enabled": "offUnlessPressed",
+    "FSharp.inlayHints.parameterNames": false
 }

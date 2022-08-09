@@ -86,7 +86,7 @@ let init args =
         DotNet.pack
             (fun p ->
                 { p with
-                    Configuration = DotNet.BuildConfiguration.Release
+                    Configuration = DotNet.BuildConfiguration.Debug
                     OutputPath = Some nugetDir
                     MSBuildParams = { p.MSBuildParams with Properties = properties } })
             "ionide-proj-info.sln")
@@ -127,7 +127,15 @@ let init args =
 
     Target.create "Release" DoNothing
 
-    let dependencies = "Clean" ==> "ReplaceFsLibLogNamespaces" ==> "CheckFormat" ==> "Build" ==> "Test" ==> "Default" ==> "Pack"
+    // let dependencies = 
+    //     "Clean" 
+    //         ==>  "ReplaceFsLibLogNamespaces" 
+    //         ==> "CheckFormat"
+    //         ==> "Build" 
+    //         // ==> "Test" 
+    //         ==> "Default" 
+    //         ==> 
+    //         "Pack"
     ()
 
 [<EntryPoint>]

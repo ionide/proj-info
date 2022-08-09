@@ -48,6 +48,25 @@
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
             "console": "internalConsole"
-        }
-    ]
-}
+        },
+        {
+            "name": ".NET Core Attach to running process",
+            "type": "coreclr",
+            "request": "attach",
+            "processId": "${command:pickProcess}",
+            "justMyCode": false,
+            "enableStepFiltering": false,
+            "symbolOptions": {
+                "searchPaths": [
+                    "http://srv.symbolsource.org/pdb/Public",
+                    "http://srv.symbolsource.org/pdb/MyGet"
+                ],
+                "searchMicrosoftSymbolServer": true
+            },
+            "sourceLinkOptions": {
+                "*": {
+                    "enabled": true
+                }
+            }
+        ]
+    }

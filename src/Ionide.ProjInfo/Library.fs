@@ -12,6 +12,31 @@ open Microsoft.Build.Graph
 open System.Diagnostics
 open System.Runtime.InteropServices
 
+// search tags: debug, debugger, attach
+module Debugging =
+    open  Ionide.ProjInfo.Logging
+    open  Ionide.ProjInfo.Logging.Types
+    let waitForDebuggerAttached (programName) =
+#if DEBUG
+        let logger =LogProvider.getLoggerByName "Ionide.ProjInfo.Debugging"
+        if not (System.Diagnostics.Debugger.IsAttached) then
+            let message = sprintf "Please attach a debugger for %s, PID: %d" programName (System.Diagnostics.Process.GetCurrentProcess().Id)
+            printfn "%s" message
+            logger.debug (Log.setMessage (message))
+
+        while not (System.Diagnostics.Debugger.IsAttached) do
+            System.Threading.Thread.Sleep(100)
+#else
+        ()
+#endif
+    let waitForDebuggerAttachedAndBreak (programName) =
+#if DEBUG
+        waitForDebuggerAttached programName
+        System.Diagnostics.Debugger.Break()
+#else
+        ()
+#endif
+
 /// functions for .net sdk probing
 module SdkDiscovery =
 
@@ -728,38 +753,50 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
         let globalProperties = ProjectLoader.getGlobalProps projectPath tfm globalProperties
         ProjectInstance(projectPath, globalProperties, toolsVersion = null, projectCollection = projectCollection)
 
+    let projectGraphSln (path: string) =
+    
+        let pg = ProjectGraph(path, ProjectCollection.GlobalProjectCollection, projectInstanceFactory)
+
+        pg.ProjectNodes
+        |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
+        |> Seq.map (fun p -> p.ProjectInstance.FullPath)
+        |> Seq.iter (fun p -> loadingNotification.Trigger(WorkspaceProjectState.Loading p))
+
+        pg
+    let tryProjectGraphSln (path : string) = (handleProjectGraphFailures <| fun () -> projectGraphSln path)
+
     let projectGraphProjs (paths: string seq) =
 
         handleProjectGraphFailures
         <| fun () ->
-            paths |> Seq.iter (fun p -> loadingNotification.Trigger(WorkspaceProjectState.Loading p))
+            match paths |> List.ofSeq with
+            | [ x ] when x.EndsWith(".sln") -> projectGraphSln x
+            | paths ->
+                let graph =
 
-            let graph =
-                match paths |> List.ofSeq with
-                | [ x ] -> ProjectGraph(x, projectCollection = ProjectCollection.GlobalProjectCollection, projectInstanceFactory = projectInstanceFactory)
-                | xs ->
                     let entryPoints = paths |> Seq.map ProjectGraphEntryPoint |> List.ofSeq
-                    ProjectGraph(entryPoints, projectCollection = ProjectCollection.GlobalProjectCollection, projectInstanceFactory = projectInstanceFactory)
 
-            graph
+                    let graph =
+                        ProjectGraph(entryPoints, projectCollection = ProjectCollection.GlobalProjectCollection, projectInstanceFactory = projectInstanceFactory)
+                    graph
+                    // graph.ProjectNodes
+                    // |> Seq.map (fun p -> ProjectGraphEntryPoint p.ProjectInstance.FullPath)
+                    // |> fun nodes -> ProjectGraph(nodes, projectCollection = ProjectCollection.GlobalProjectCollection, projectInstanceFactory = projectInstanceFactory)
+                // Debugging.waitForDebuggerAttached "proj-info"
+                graph.EntryPointNodes
+                // |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
+                |> Seq.map (fun p -> p.ProjectInstance.FullPath)
+                |> Seq.iter (fun p -> loadingNotification.Trigger(WorkspaceProjectState.Loading p))
 
-    let projectGraphSln (path: string) =
-        handleProjectGraphFailures
-        <| fun () ->
-            let pg = ProjectGraph(path, ProjectCollection.GlobalProjectCollection, projectInstanceFactory)
+                graph
 
-            pg.ProjectNodesTopologicallySorted
-            |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
-            |> Seq.map (fun p -> p.ProjectInstance.FullPath)
-            |> Seq.iter (fun p -> loadingNotification.Trigger(WorkspaceProjectState.Loading p))
-
-            pg
+    
 
     let loadProjects (projects: ProjectGraph, customProperties: string list, binaryLogs: BinaryLogGeneration) =
         try
             lock WorkspaceLoaderViaProjectGraph.locker
             <| fun () ->
-                let allKnown = projects.ProjectNodesTopologicallySorted |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
+                let allKnown = projects.ProjectNodes |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
 
                 let allKnownNames = allKnown |> Seq.map (fun p -> p.ProjectInstance.FullPath) |> Seq.toList
 
@@ -768,7 +805,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                     >> Log.addContextDestructured "count" (allKnownNames |> Seq.length)
                     >> Log.addContextDestructured "projects" (allKnownNames)
                 )
-
+            
                 let gbr =
                     GraphBuildRequestData(projects, ProjectLoader.designTimeBuildTargets false, null, BuildRequestDataFlags.ReplaceExistingProjectInstance)
 
@@ -789,26 +826,26 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                     |> Seq.collect (fun (pgn: ProjectGraphNode) ->
                         seq {
                             yield pgn.ProjectInstance
-                            yield! Seq.map (fun (pr: ProjectGraphNode) -> pr.ProjectInstance) pgn.ProjectReferences
+                            // yield! Seq.map (fun (pr: ProjectGraphNode) -> pr.ProjectInstance) pgn.ProjectReferences
                         })
-                    |> Seq.toList
+                    |> Seq.toArray
 
                 logger.info (
                     Log.setMessage "{overallCode}, projects built {count} {projects} "
                     >> Log.addContextDestructured "count" (buildProjs |> Seq.length)
-                    >> Log.addContextDestructured "projects" (buildProjs)
+                    // >> Log.addContextDestructured "projects" (buildProjs)
                     >> Log.addContextDestructured "overallCode" result.OverallResult
                     >> Log.addExn result.Exception
                 )
 
                 let projects =
                     buildProjs
-                    |> List.distinctBy (fun (p: ProjectInstance) -> p.FullPath)
-                    |> Seq.map (fun (p: ProjectInstance) ->
+                    // |> List.distinctBy (fun (p: ProjectInstance) -> p.FullPath)
+                    |> Array.Parallel.map (fun (p: ProjectInstance) ->
 
                         p.FullPath, ProjectLoader.getLoadedProjectInfo p.FullPath customProperties (ProjectLoader.LoadedProject p))
 
-                    |> Seq.choose (fun (projectPath, projectOptionResult) ->
+                    |> Array.Parallel.choose (fun (projectPath, projectOptionResult) ->
                         match projectOptionResult with
                         | Ok projectOptions ->
 
@@ -818,7 +855,10 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                             loadingNotification.Trigger(WorkspaceProjectState.Failed(projectPath, GenericError(projectPath, e)))
                             None)
 
-                let allProjectOptions = projects |> Seq.toList
+                let allProjectOptions =
+                    projects
+                    |> Seq.toList
+
 
                 allProjectOptions
                 |> Seq.iter (fun po ->
@@ -832,7 +872,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
             logger.error (Log.setMessage "Failed loading" >> Log.addExn e)
 
-            projects.ProjectNodesTopologicallySorted
+            projects.ProjectNodes
             |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
             |> Seq.iter (fun p ->
 
@@ -885,7 +925,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
 
     member this.LoadSln(sln: string, customProperties: string list, binaryLogs) =
-        projectGraphSln sln
+        tryProjectGraphSln sln
         |> Option.map (fun pg -> loadProjects (pg, customProperties, binaryLogs))
         |> Option.defaultValue Seq.empty
 

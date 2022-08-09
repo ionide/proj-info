@@ -300,10 +300,17 @@ let testSample3 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
 
         expected |> expectNotifications (watcher.Notifications)
 
+        let findLoadedNotification  (project : string) (notifications : WorkspaceProjectState list) =
+            notifications
+            |> List.find(fun n ->
+                match n with 
+                | WorkspaceProjectState.Loaded(loadedProject , _, _) when loadedProject.ProjectFileName.EndsWith(project) -> true
+                | _ -> false
+            )
 
-        let [ _; _; WorkspaceProjectState.Loaded (l1Loaded, _, _); _; WorkspaceProjectState.Loaded (l2Loaded, _, _); WorkspaceProjectState.Loaded (c1Loaded, _, _) ] =
-            watcher.Notifications
-
+        let (WorkspaceProjectState.Loaded (l1Loaded, _, _)) = watcher.Notifications |> findLoadedNotification "l1.csproj"
+        let (WorkspaceProjectState.Loaded (l2Loaded, _, _)) = watcher.Notifications |> findLoadedNotification "l2.fsproj"
+        let (WorkspaceProjectState.Loaded (c1Loaded, _, _)) = watcher.Notifications |> findLoadedNotification "c1.fsproj"
 
 
         let l1Parsed = parsed |> expectFind l1 "the C# lib"
@@ -339,7 +346,8 @@ let testSample3 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
 
         Expect.equal l1Parsed l1Loaded "l1 notificaton and parsed should be the same"
         Expect.equal l2Parsed l2Loaded "l2 notificaton and parsed should be the same"
-        Expect.equal c1Parsed c1Loaded "c1 notificaton and parsed should be the same")
+        Expect.equal c1Parsed c1Loaded "c1 notificaton and parsed should be the same"
+        )
 
 let testSample4 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
@@ -733,19 +741,32 @@ let testProjectNotFound toolsPath workspaceLoader (workspaceFactory: ToolsPath -
 let internalGetCSharpReferenceInfo =
     fun (r: FSharpReferencedProject) ->
         let rCase, fields =
-            FSharp.Reflection.FSharpValue.GetUnionFields(r, typeof<FSharpReferencedProject>, System.Reflection.BindingFlags.Public ||| System.Reflection.BindingFlags.NonPublic ||| System.Reflection.BindingFlags.Instance)
+            FSharp.Reflection.FSharpValue.GetUnionFields(
+                r,
+                typeof<FSharpReferencedProject>,
+                System.Reflection.BindingFlags.Public
+                ||| System.Reflection.BindingFlags.NonPublic
+                ||| System.Reflection.BindingFlags.Instance
+            )
+
         if rCase.Name = "PEReference" then
             let path: string = fields[0] :?> _
             let getStamp: unit -> DateTime = fields[1] :?> _
             let reader = fields[2]
-            Some (path, getStamp, reader)
+            Some(path, getStamp, reader)
         else
             None
 
 let internalGetProjectOptions =
     fun (r: FSharpReferencedProject) ->
         let rCase, fields =
-            FSharp.Reflection.FSharpValue.GetUnionFields(r, typeof<FSharpReferencedProject>, System.Reflection.BindingFlags.Public ||| System.Reflection.BindingFlags.NonPublic ||| System.Reflection.BindingFlags.Instance)
+            FSharp.Reflection.FSharpValue.GetUnionFields(
+                r,
+                typeof<FSharpReferencedProject>,
+                System.Reflection.BindingFlags.Public
+                ||| System.Reflection.BindingFlags.NonPublic
+                ||| System.Reflection.BindingFlags.Instance
+            )
 
         if rCase.Name = "FSharpReference" then
             let projOptions: FSharpProjectOptions = rCase.GetFields().[1].GetValue(box r) :?> _
@@ -813,10 +834,11 @@ let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
 
         Expect.isNonEmpty uses "all symbols usages"
 
-        )
+    )
 
 let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
-    testCase |> withLog (sprintf "can load sample3 with FCS - %s" workspaceLoader) (fun logger fs ->
+    testCase
+    |> withLog (sprintf "can load sample3 with FCS - %s" workspaceLoader) (fun logger fs ->
 
         let rec allFCSProjects (po: FSharpProjectOptions) =
             [ yield po
@@ -837,7 +859,11 @@ let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath ->
         let projPath = testDir / (``sample3 Netsdk projs``.ProjectFile)
 
         // Build csproj, so it should be referenced as FSharpReferencedProject.PortableExecutable
-        let csproj = testDir / ``sample3 Netsdk projs``.ProjectReferences.[0].ProjectFile
+        let csproj =
+            testDir
+            / ``sample3 Netsdk projs``.ProjectReferences.[0]
+                .ProjectFile
+
         dotnet fs [ "build"; csproj ] |> checkExitCodeZero
 
         dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
@@ -849,8 +875,8 @@ let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath ->
 
         loader.Notifications.Add (function
             | WorkspaceProjectState.Loaded (po, knownProjects, _) -> pos <- Map.add po.ProjectFileName po pos)
-
-        let fcsPo = FCS.mapToFSharpProjectOptions parsed.Head parsed
+        // Debugging.waitForDebuggerAttached "proj-info-tests"
+        let fcsPo = FCS.mapToFSharpProjectOptions (parsed |> Seq.find(fun x -> x.ProjectFileName.EndsWith((``sample3 Netsdk projs``.ProjectFile)))) parsed
         let hasCSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l1.dll")
         let hasCSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.OutputFile.EndsWith "l1.dll")
         let hasFSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l2.dll")
@@ -861,89 +887,9 @@ let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath ->
         Expect.equal hasFSharpProjectRef true "Should have project reference to F# reference"
     )
 
-let countDistinctObjectsByReference<'a> (items : 'a seq) =
-    let set = HashSet(items |> Seq.map (fun i -> i :> obj), ReferenceEqualityComparer.Instance)
-    set.Count
-
-let testFCSmapManyProjCheckCaching =
-    testCase |> withLog "When creating FCS options, caches them" (fun _ _ ->
-
-        let sdkInfo = ProjectLoader.getSdkInfo []
-        
-        let template : ProjectOptions =
-            { ProjectId = None
-              ProjectFileName = "Template"
-              TargetFramework = "TF"
-              SourceFiles = []
-              OtherOptions = []
-              ReferencedProjects = []
-              PackageReferences = []
-              LoadTime = DateTime.MinValue
-              TargetPath = "TP"
-              ProjectOutputType = ProjectOutputType.Library
-              ProjectSdkInfo = sdkInfo
-              Items = []
-              CustomProperties = [] }
-            
-        let makeReference (options : ProjectOptions) =
-            { RelativePath = options.ProjectFileName
-              ProjectFileName = options.ProjectFileName
-              TargetFramework = options.TargetFramework }
-            
-        let makeProject (name : string) (referencedProjects : ProjectOptions list) =
-            { template with
-                ProjectFileName = name
-                ReferencedProjects = referencedProjects |> List.map makeReference }
-            
-        let projectsInLayers =
-            let layerCount = 4
-            let layerSize = 2
-            let layers =
-                [1..layerCount]
-                |> List.map (fun layer ->
-                    [1..layerSize]
-                    |> List.map (fun item -> makeProject $"layer{layer}_{item}.fsproj" [])
-                )
-            let first = layers[0]
-            let rest =
-                layers
-                |> List.pairwise
-                |> List.map (fun (previous, next) ->
-                    next
-                    |> List.map (fun p ->
-                        { p with
-                            ReferencedProjects = previous |> List.map makeReference }
-                    )
-                )
-            let layers = first :: rest
-            
-            layers |> List.concat
-        
-        let fcsOptions = FCS.mapManyOptions projectsInLayers
-            
-        let rec findProjectOptionsTransitively (project : FSharpProjectOptions) =
-            project.ReferencedProjects
-            |> Array.toList
-            |> List.collect (fun reference ->
-                reference
-                |> internalGetProjectOptions
-                |> Option.map findProjectOptionsTransitively
-                |> Option.defaultValue [] 
-            )
-            |> List.append [project]
-                
-        let findDistinctProjectOptionsTransitively (projects : FSharpProjectOptions seq) =
-            projects
-            |> Seq.collect findProjectOptionsTransitively
-            |> countDistinctObjectsByReference
-            
-        let distinctOptionsCount = findDistinctProjectOptionsTransitively fcsOptions
-        
-        Expect.equal distinctOptionsCount projectsInLayers.Length "Mapping should reuse instances of FSharpProjectOptions and only create one per project"
-    )
-
 let testSample2WithBinLog toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
-    testCase |> withLog (sprintf "can load sample2 with bin log - %s" workspaceLoader) (fun logger fs ->
+    testCase
+    |> withLog (sprintf "can load sample2 with bin log - %s" workspaceLoader) (fun logger fs ->
         let testDir = inDir fs "load_sample2_bin_log"
         copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
 
@@ -1125,8 +1071,7 @@ let testProjectSystem toolsPath workspaceLoader workspaceFactory =
 
         let uses = result.GetAllUsesOfAllSymbols()
 
-        Expect.isNonEmpty uses "all symbols usages"
-    )
+        Expect.isNonEmpty uses "all symbols usages")
 
 let testProjectSystemCacheLoad toolsPath workspaceLoader workspaceFactory =
     testCase
@@ -1241,13 +1186,24 @@ let debugTests toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
     ptestCase
     |> withLog (sprintf "debug - %s" workspaceLoader) (fun logger fs ->
 
-        let projPath = @"D:\Programowanie\Projekty\Ionide\dotnet-proj-info\src\Ionide.ProjInfo.Sln\Ionide.ProjInfo.Sln.csproj"
+        let projPath = @"C:\Users\JimmyByrd\Documents\Repositories\public\TheAngryByrd\FsToolkit.ErrorHandling\FsToolkit.ErrorHandling.sln"
 
         let loader = workspaceFactory toolsPath
 
         let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
 
-        printfn "%A" parsed
+        printfn $"{workspaceLoader} -> %A{parsed}" )
+
+let compareLoaders (loader1 : IWorkspaceLoader) (loader2 : IWorkspaceLoader) = 
+    ptestCase 
+    |> withLog(sprintf "Compare Loaders") (fun logger fs ->
+        let projPath = @"C:\Users\JimmyByrd\Documents\Repositories\public\TheAngryByrd\FsToolkit.ErrorHandling\FsToolkit.ErrorHandling.sln"
+        
+        Debugging.waitForDebuggerAttached "proj-info.compareLoaders"
+        let parsed1 = loader1.LoadProjects [projPath] |> Seq.toList
+        let parsed2 = loader2.LoadProjects [projPath] |> Seq.toList
+
+        Expect.equal parsed2 parsed1 "??"
     )
 
 let expensiveTests toolsPath (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
@@ -1266,10 +1222,12 @@ let expensiveTests toolsPath (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     }
 
 let csharpLibTest toolsPath (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
-    testCase |> withLog "can load project that has a csharp project reference" (fun logger fs ->
-        let projPath = Path.Combine(__SOURCE_DIRECTORY__, "..", "examples", "sample-referenced-csharp-project", "fsharp-exe", "fsharp-exe.fsproj")
+    testCase
+    |> withLog "can load project that has a csharp project reference" (fun logger fs ->
+        let projPath =
+            Path.Combine(__SOURCE_DIRECTORY__, "..", "examples", "sample-referenced-csharp-project", "fsharp-exe", "fsharp-exe.fsproj")
         // need to build the projects first so that there's something to latch on to
-        dotnet fs ["build"; projPath] |> checkExitCodeZero
+        dotnet fs [ "build"; projPath ] |> checkExitCodeZero
 
         let loader = workspaceFactory toolsPath
         let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
@@ -1278,22 +1236,21 @@ let csharpLibTest toolsPath (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
         let mapped = FCS.mapToFSharpProjectOptions fsharpProject parsed
         let referencedProjects = mapped.ReferencedProjects
         Expect.hasLength referencedProjects 1 "Should have a reference to the C# lib"
+
         match internalGetCSharpReferenceInfo referencedProjects[0] with
         | Some (path, getStamp, reader) ->
             let fileName = System.IO.Path.GetFileName path
             Expect.equal fileName "csharp-lib.dll" "Should have found the C# lib"
-        | None ->
-            failwith "Should have found a C# reference"
-    )
+        | None -> failwith "Should have found a C# reference")
 
 let testProjectLoadBadData =
-    testCase |> withLog "Does not crash when loading malformed cache data" (fun logger fs ->
+    testCase
+    |> withLog "Does not crash when loading malformed cache data" (fun logger fs ->
         let testDir = inDir fs "sample_netsdk_bad_cache"
         copyDirFromAssets fs ``sample NetSdk library with a bad FSAC cache``.ProjDir testDir
         let projFile = Path.Combine(testDir, "n1", "n1.fsproj")
         use proj = new ProjectSystem.Project(projFile, ignore)
-        Expect.isNone proj.Response "should have loaded, detected bad data, and defaulted to empty"
-    )
+        Expect.isNone proj.Response "should have loaded, detected bad data, and defaulted to empty")
 
 let tests toolsPath =
     let testSample3WorkspaceLoaderExpected =
@@ -1306,7 +1263,11 @@ let tests toolsPath =
 
     let testSample3GraphExpected =
         [ ExpectNotification.loading "c1.fsproj"
-          ExpectNotification.loaded "c1.fsproj" ]
+          ExpectNotification.loading "l1.csproj"
+          ExpectNotification.loaded "l1.csproj"
+          ExpectNotification.loading "l2.fsproj"
+          ExpectNotification.loaded "l2.fsproj"
+          ExpectNotification.loaded "c1.fsproj"  ]
 
     let testSlnExpected =
         [ ExpectNotification.loading "c1.fsproj"
@@ -1334,7 +1295,7 @@ let tests toolsPath =
           testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" false (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))
           testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" true (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))
           testSample3 toolsPath "WorkspaceLoader" WorkspaceLoader.Create testSample3WorkspaceLoaderExpected //- Sample 3 having issues, was also marked pending on old test suite
-          //   testSample3 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create testSample3GraphExpected //- Sample 3 having issues, was also marked pending on old test suite
+          testSample3 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create testSample3GraphExpected //- Sample 3 having issues, was also marked pending on old test suite
           testSample4 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           testSample4 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           testSample5 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
@@ -1343,13 +1304,13 @@ let tests toolsPath =
           testSample9 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           //Sln tests
           testLoadSln toolsPath "WorkspaceLoader" WorkspaceLoader.Create testSlnExpected
-          //   testLoadSln toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create testSlnGraphExpected // Having issues on CI
+          testLoadSln toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create testSlnGraphExpected // Having issues on CI
           testParseSln toolsPath
           //Render tests
           testRender2 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           testRender2 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           testRender3 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
-          //   testRender3 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create //- Sample 3 having issues, was also marked pending on old test suite
+          testRender3 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create //- Sample 3 having issues, was also marked pending on old test suite
           testRender4 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           testRender4 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           testRender5 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
@@ -1373,8 +1334,9 @@ let tests toolsPath =
           testProjectSystemOnChange toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           debugTests toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           debugTests toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
+          compareLoaders (WorkspaceLoader.Create toolsPath) (WorkspaceLoaderViaProjectGraph.Create toolsPath)
           testProjectSystemCacheLoad toolsPath "WorkspaceLoader" WorkspaceLoader.Create
-
+ 
           //loadProject test
           testLoadProject toolsPath
 
@@ -1397,5 +1359,4 @@ let tests toolsPath =
           testLegacyFrameworkMultiProject toolsPath "can load legacy multi project file" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
           testProjectLoadBadData
           expensiveTests toolsPath WorkspaceLoader.Create
-          csharpLibTest toolsPath WorkspaceLoader.Create
-        ]
+          csharpLibTest toolsPath WorkspaceLoader.Create ]
