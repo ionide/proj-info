@@ -3,9 +3,11 @@ namespace Ionide.ProjInfo.ProjectSystem
 open System
 open System.IO
 open Ionide.ProjInfo
+open Ionide.ProjInfo.Logging
 
 module WorkspacePeek =
 
+    let rec logger = LogProvider.getLoggerByQuotation <@ logger @>
 
     [<RequireQualifiedAccess>]
     type Interesting =
@@ -72,7 +74,21 @@ module WorkspacePeek =
                 | UsefulFile.Slnf ->
                     match InspectSln.tryParseSln f.FullName with
                     | Ok (p, d) -> Some(Choice1Of3(p, d))
-                    | _ -> None
+                    | Error e ->
+                        let addInfo l =
+                            match e with
+                            | :? Ionide.ProjInfo.Sln.Exceptions.InvalidProjectFileException as ipfe -> Log.addContextDestructured "data" ipfe l
+
+                            | _ -> l
+
+                        logger.warn (
+                            Log.setMessage "Failed to load file: {filePath} : {data}"
+                            >> Log.addContext "filePath" f.FullName
+                            >> addInfo
+                            >> Log.addExn e
+                        )
+
+                        None
                 | UsefulFile.Fsx -> Some(Choice2Of3(f.FullName))
                 | UsefulFile.FsProj -> Some(Choice3Of3(f.FullName))
 
