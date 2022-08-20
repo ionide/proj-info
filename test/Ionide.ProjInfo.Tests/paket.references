@@ -7,6 +7,7 @@ FSharp.Compiler.Service
 Microsoft.Build.Framework copy_local: false
 Microsoft.Build.Utilities.Core copy_local: false
 Microsoft.Build.Tasks.Core copy_local: false
+Nuget.Frameworks copy_local: false
 YoloDev.Expecto.TestSdk
 Microsoft.NET.Test.Sdk
 GithubActionsTestLogger

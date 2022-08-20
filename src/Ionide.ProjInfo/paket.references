@@ -1,5 +1,6 @@
 Microsoft.Build copy_local: false
 Microsoft.Build.Framework copy_local: false
+Nuget.Frameworks copy_local: false
 FSharp.Core
 Dotnet.ReproducibleBuilds
 Ionide.KeepAChangelog.Tasks
