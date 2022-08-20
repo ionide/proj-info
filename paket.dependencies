@@ -8,30 +8,32 @@ framework: net6.0
 nuget FSharp.Core
 nuget FSharp.Compiler.Service ~> 41.0
 nuget Argu
+nuget MedallionShell ~> 1.5.0
+nuget Newtonsoft.Json
+nuget Fsharp.Control.Reactive
+nuget SemanticVersioning
 
 # copy_local: true because this is a build-time dependency only
 nuget Dotnet.ReproducibleBuilds copy_local: true
-nuget Ionide.KeepAChangelog.Tasks copy_local:true
-
-nuget Expecto
-nuget Expecto.Diff
-nuget Expecto.TestResults
-nuget MedallionShell ~> 1.5.0
+nuget Ionide.KeepAChangelog.Tasks copy_local: true
 
 # copy_local: false excludes runtime assets (desired for msbuild)
 nuget Microsoft.Build copy_local: false
 nuget Microsoft.Build.Framework copy_local: false
 nuget Microsoft.Build.Utilities.Core copy_local: false
 nuget Microsoft.Build.Tasks.Core copy_local: false
-nuget Newtonsoft.Json
-nuget Fsharp.Control.Reactive
-nuget SemanticVersioning
 
-github TheAngryByrd/FsLibLog src/FsLibLog/FsLibLog.fs
+# github TheAngryByrd/FsLibLog src/FsLibLog/FsLibLog.fs
 
+# test dependencies
+nuget Expecto
+nuget Expecto.Diff
+nuget Expecto.TestResults
 nuget YoloDev.Expecto.TestSdk
-nuget Microsoft.NET.Test.Sdk 17.2
-nuget Nuget.Frameworks 6.2 copy_local: false
+nuget Microsoft.NET.Test.Sdk 17.3
+nuget Microsoft.TestPlatform.TestHost 17.3
+nuget Microsoft.TestPlatform.ObjectModel 17.3
+nuget Nuget.Frameworks 6.3
 nuget GithubActionsTestLogger
 
 // [ FAKE GROUP ]

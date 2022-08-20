@@ -98,9 +98,9 @@ NUGET
     Microsoft.NET.StringTools (1.0) - copy_local: false
       System.Memory (>= 4.5.4)
       System.Runtime.CompilerServices.Unsafe (>= 5.0)
-    Microsoft.NET.Test.Sdk (17.2)
-      Microsoft.CodeCoverage (>= 17.2)
-      Microsoft.TestPlatform.TestHost (>= 17.2)
+    Microsoft.NET.Test.Sdk (17.3)
+      Microsoft.CodeCoverage (>= 17.3)
+      Microsoft.TestPlatform.TestHost (>= 17.3)
     Microsoft.NETCore.Platforms (6.0.2)
     Microsoft.NETCore.Targets (5.0)
     Microsoft.SourceLink.AzureRepos.Git (1.1.1) - copy_local: true
@@ -134,7 +134,7 @@ NUGET
     NETStandard.Library (2.0.3)
       Microsoft.NETCore.Platforms (>= 1.1)
     Newtonsoft.Json (13.0.1)
-    NuGet.Frameworks (6.2) - copy_local: false
+    NuGet.Frameworks (6.3)
     runtime.debian.8-x64.runtime.native.System.Security.Cryptography.OpenSsl (4.3.3)
     runtime.debian.9-x64.runtime.native.System.Security.Cryptography.OpenSsl (4.3.3)
     runtime.fedora.23-x64.runtime.native.System.Security.Cryptography.OpenSsl (4.3.3)
@@ -601,9 +601,7 @@ NUGET
       Expecto (>= 9.0 < 10.0)
       FSharp.Core (>= 4.6.2)
       System.Collections.Immutable (>= 6.0)
-GITHUB
-  remote: TheAngryByrd/FsLibLog
-    src/FsLibLog/FsLibLog.fs (599e765db64ba5bcde23a589f427453c52fdb132)
+
 GROUP Build
 STORAGE: NONE
 RESTRICTION: == net6.0
