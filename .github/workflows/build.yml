@@ -7,6 +7,8 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
+        dotnet-version: ["", "6.0.x", "7.0.x"]
+        # these entries will mesh with the above combinations
         include:
           # just use what's in the repo
           - global-json-file: "global.json"
@@ -36,6 +38,11 @@ jobs:
           dotnet-version: ${{ matrix.dotnet-version }}
           global-json-file: ${{ matrix.global-json-file }}
           include-prerelease: ${{ matrix.include-prerelease }}
+
+      # because we've set up the .NET SDK environment how we want it now, we can remove the global.json file
+      # just run raw dotnet calls
+      - name: Remove global.json
+        run: rm global.json
 
       - name: Restore tools
         run: dotnet tool restore
