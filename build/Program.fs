@@ -68,7 +68,12 @@ let init args =
 
     Target.create "Build" (fun _ -> DotNet.build id "")
 
-    Target.create "Test" (fun _ -> exec "dotnet" @"test --logger GitHubActions" @".\test\Ionide.ProjInfo.Tests")
+    Target.create "Test" (fun _ ->
+        let doTests (topts: DotNet.TestOptions) =
+            { topts with
+                Logger = Some "GitHubActions" }
+        DotNet.test doTests "test\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj"
+    )
 
 
     Target.create "Pack" (fun _ ->
