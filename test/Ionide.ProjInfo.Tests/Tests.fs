@@ -597,7 +597,8 @@ let testRender3 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
 
         let loader = workspaceFactory toolsPath
 
-        let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+        let projDir = Path.GetDirectoryName projPath
+        let parsed = loader.LoadProjects([ projPath ], [], BinaryLogGeneration.Within(DirectoryInfo projDir)) |> Seq.toList
 
         let l1Parsed = parsed |> expectFind l1 "the C# lib"
 
