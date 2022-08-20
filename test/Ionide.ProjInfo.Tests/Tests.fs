@@ -1295,7 +1295,9 @@ let testProjectLoadBadData =
         Expect.isNone proj.Response "should have loaded, detected bad data, and defaulted to empty"
     )
 
-let tests toolsPath =
+[<Tests>]
+let tests =
+    let toolsPath = Init.init (IO.DirectoryInfo Environment.CurrentDirectory) None
     let testSample3WorkspaceLoaderExpected =
         [ ExpectNotification.loading "c1.fsproj"
           ExpectNotification.loading "l1.csproj"

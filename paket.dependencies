@@ -29,6 +29,9 @@ nuget SemanticVersioning
 
 github TheAngryByrd/FsLibLog src/FsLibLog/FsLibLog.fs
 
+nuget YoloDev.Expecto.TestSdk
+nuget Microsoft.NET.Test.Sdk
+nuget GithubActionsTestLogger
 // [ FAKE GROUP ]
 group Build
   source https://api.nuget.org/v3/index.json
