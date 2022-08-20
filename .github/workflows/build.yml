@@ -30,7 +30,7 @@ jobs:
             continue-on-error: true
       fail-fast: false # we have timing issues on some OS, so we want them all to run
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     name: Build on ${{matrix.os}} for ${{ matrix.label }}
 
