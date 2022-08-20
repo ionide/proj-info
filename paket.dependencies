@@ -30,8 +30,10 @@ nuget SemanticVersioning
 github TheAngryByrd/FsLibLog src/FsLibLog/FsLibLog.fs
 
 nuget YoloDev.Expecto.TestSdk
-nuget Microsoft.NET.Test.Sdk
+nuget Microsoft.NET.Test.Sdk 17.2
+nuget Nuget.Frameworks 6.2 copy_local: false
 nuget GithubActionsTestLogger
+
 // [ FAKE GROUP ]
 group Build
   source https://api.nuget.org/v3/index.json
