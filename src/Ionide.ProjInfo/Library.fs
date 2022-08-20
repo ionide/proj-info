@@ -352,13 +352,11 @@ module ProjectLoader =
                "DefineExplicitDefaults", "true"
                "BuildProjectReferences", "false"
                "UseCommonOutputDirectory", "false"
+               "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__") // Required by the Clean Target
                if tfm.IsSome then
                    "TargetFramework", tfm.Value
-               if path.EndsWith ".csproj" then
-                   "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__")
                "DotnetProjInfo", "true"
                yield! globalProperties ]
-
 
     ///<summary>
     /// These are a list of build targets that are run during a design-time build (mostly).
