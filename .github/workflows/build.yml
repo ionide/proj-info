@@ -56,7 +56,7 @@ jobs:
       - name: Run build and test
         run: dotnet run --project build -- -t Pack
         env:
-          TestPreview: ${{ matrix.build_net7 }}
+          BuildNet7: ${{ matrix.build_net7 }}
 
       - name: Upload NuGet packages
         uses: actions/upload-artifact@v2
