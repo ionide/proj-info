@@ -849,8 +849,10 @@ let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath ->
 
         loader.Notifications.Add (function
             | WorkspaceProjectState.Loaded (po, knownProjects, _) -> pos <- Map.add po.ProjectFileName po pos)
-
-        let fcsPo = FCS.mapToFSharpProjectOptions parsed.Head parsed
+        let parsedC1 = parsed |> Seq.find(fun x ->
+            x.ProjectFileName.EndsWith(``sample3 Netsdk projs``.ProjectFile)
+        )
+        let fcsPo = FCS.mapToFSharpProjectOptions parsedC1 parsed
         let hasCSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l1.dll")
         let hasCSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.OutputFile.EndsWith "l1.dll")
         let hasFSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l2.dll")
@@ -1241,13 +1243,21 @@ let debugTests toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
     ptestCase
     |> withLog (sprintf "debug - %s" workspaceLoader) (fun logger fs ->
 
-        let projPath = @"D:\Programowanie\Projekty\Ionide\dotnet-proj-info\src\Ionide.ProjInfo.Sln\Ionide.ProjInfo.Sln.csproj"
-
         let loader = workspaceFactory toolsPath
 
-        let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+        // let projPath = @"D:\Programowanie\Projekty\Ionide\dotnet-proj-info\src\Ionide.ProjInfo.Sln\Ionide.ProjInfo.Sln.csproj"
+        // let parsedProjs = loader.LoadProjects [ projPath ] |> Seq.toList
 
-        printfn "%A" parsed
+        // printfn "%A" parsedProjs
+
+        let slnPath = @"C:\Users\JimmyByrd\Documents\Repositories\public\TheAngryByrd\FsToolkit.ErrorHandling\FsToolkit.ErrorHandling.sln"
+        let parsedProjs = loader.LoadSln slnPath |> Seq.toList
+
+        // printfn "%A" parsedProjs
+        parsedProjs
+        |> Seq.iter(fun p ->
+            Expect.isGreaterThan p.SourceFiles.Length 0 $"{p.ProjectFileName} Should have SourceFiles"
+        )
     )
 
 let expensiveTests toolsPath (workspaceFactory: ToolsPath -> IWorkspaceLoader) =

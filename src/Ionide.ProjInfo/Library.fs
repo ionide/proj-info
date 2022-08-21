@@ -736,7 +736,15 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
             let graph =
                 match paths |> List.ofSeq with
-                | [ x ] -> ProjectGraph(x, projectCollection = ProjectCollection.GlobalProjectCollection, projectInstanceFactory = projectInstanceFactory)
+                | [ x ] ->
+                    let g =
+                        ProjectGraph(x, projectCollection = ProjectCollection.GlobalProjectCollection, projectInstanceFactory = projectInstanceFactory)
+                    // When giving ProjectGraph a singular project, g.EntryPointNodes only contains that project.
+                    // To get it to build the Graph with all the dependencies we need to look at all the ProjectNodes
+                    // and tell the graph to use all as potentially an entrypoint
+                    let nodes = g.ProjectNodes |> Seq.map (fun pn -> ProjectGraphEntryPoint pn.ProjectInstance.FullPath)
+                    ProjectGraph(nodes, projectCollection = ProjectCollection.GlobalProjectCollection, projectInstanceFactory = projectInstanceFactory)
+
                 | xs ->
                     let entryPoints = paths |> Seq.map ProjectGraphEntryPoint |> List.ofSeq
                     ProjectGraph(entryPoints, projectCollection = ProjectCollection.GlobalProjectCollection, projectInstanceFactory = projectInstanceFactory)
@@ -786,27 +794,19 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
                 let buildProjs =
                     result.ResultsByNode.Keys
-                    |> Seq.collect (fun (pgn: ProjectGraphNode) ->
-                        seq {
-                            yield pgn.ProjectInstance
-                            yield! Seq.map (fun (pr: ProjectGraphNode) -> pr.ProjectInstance) pgn.ProjectReferences
-                        })
+                    |> Seq.collect (fun (pgn: ProjectGraphNode) -> seq { yield pgn.ProjectInstance })
                     |> Seq.toList
 
                 logger.info (
                     Log.setMessage "{overallCode}, projects built {count} {projects} "
                     >> Log.addContextDestructured "count" (buildProjs |> Seq.length)
-                    >> Log.addContextDestructured "projects" (buildProjs)
                     >> Log.addContextDestructured "overallCode" result.OverallResult
                     >> Log.addExn result.Exception
                 )
 
                 let projects =
                     buildProjs
-                    |> List.distinctBy (fun (p: ProjectInstance) -> p.FullPath)
-                    |> Seq.map (fun (p: ProjectInstance) ->
-
-                        p.FullPath, ProjectLoader.getLoadedProjectInfo p.FullPath customProperties (ProjectLoader.LoadedProject p))
+                    |> Seq.map (fun p -> p.FullPath, ProjectLoader.getLoadedProjectInfo p.FullPath customProperties (ProjectLoader.LoadedProject p))
 
                     |> Seq.choose (fun (projectPath, projectOptionResult) ->
                         match projectOptionResult with
