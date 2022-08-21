@@ -1,6 +1,6 @@
 source https://api.nuget.org/v3/index.json
 # this is the FCS nightly feed, re-enable at your own risk!
-source https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3/index.json
+# source https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3/index.json
 
 storage: none
 framework: net6.0, net7.0

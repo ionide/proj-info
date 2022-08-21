@@ -61,7 +61,7 @@ jobs:
         run: dotnet tool restore
 
       - name: Run build and test
-        run: dotnet run --project build -- -t Pack
+        run: dotnet run --project build
         env:
           BuildNet7: ${{ matrix.build_net7 }}
 
@@ -69,4 +69,4 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: packages
-          path: out/
+          path: src/**/*.nupkg
