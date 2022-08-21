@@ -3,31 +3,28 @@ source https://api.nuget.org/v3/index.json
 source https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3/index.json
 
 storage: none
-framework: net6.0
+framework: net6.0, net7.0
 
-nuget FSharp.Core
+nuget FSharp.Core 6.0.3
 nuget FSharp.Compiler.Service ~> 41.0
 nuget Argu
+nuget Newtonsoft.Json
+nuget Fsharp.Control.Reactive
+nuget SemanticVersioning
 
 # copy_local: true because this is a build-time dependency only
 nuget Dotnet.ReproducibleBuilds copy_local: true
 nuget Ionide.KeepAChangelog.Tasks copy_local:true
 
+nuget Microsoft.Build 17.2 copy_local: false
+nuget Microsoft.Build.Framework 17.2 copy_local: false
+nuget Microsoft.Build.Utilities.Core 17.2 copy_local: false
+nuget Microsoft.Build.Tasks.Core 17.2 copy_local: false
+
 nuget Expecto
 nuget Expecto.Diff
 nuget Expecto.TestResults
-nuget MedallionShell ~> 1.5.0
-
-# copy_local: false excludes runtime assets (desired for msbuild)
-nuget Microsoft.Build copy_local: false
-nuget Microsoft.Build.Framework copy_local: false
-nuget Microsoft.Build.Utilities.Core copy_local: false
-nuget Microsoft.Build.Tasks.Core copy_local: false
-nuget Newtonsoft.Json
-nuget Fsharp.Control.Reactive
-nuget SemanticVersioning
-
-github TheAngryByrd/FsLibLog src/FsLibLog/FsLibLog.fs
+nuget MedallionShell
 
 // [ FAKE GROUP ]
 group Build

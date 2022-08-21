@@ -92,7 +92,7 @@ let readFile (logger: Logger) path =
     logger.debug (eventX "reading file '{path}'" >> setField "path" path)
     File.OpenRead(path)
 
-let touch (logger: Logger) path =
+let touch (logger: Logger) (path: string) =
     logger.debug (eventX "touch '{path}'" >> setField "path" path)
     //TODO create if not exists
     //TODO works if already in

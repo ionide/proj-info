@@ -1,13 +1,14 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net6.0</TargetFrameworks>
+    <TargetFrameworks>net6.0;net7.0</TargetFrameworks>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\paket-files\TheAngryByrd\FsLibLog\src\FsLibLog\FsLibLog.fs">
       <Paket>True</Paket>
       <Link>paket-files/FsLibLog.fs</Link>
     </Compile>
+    <Compile Include="FsLibLog.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Utils.fs" />
     <Compile Include="VisualTree.fs" />

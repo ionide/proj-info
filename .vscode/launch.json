@@ -42,12 +42,42 @@
             "name": "Ionide.ProjInfo.Tests",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "build",
-            "program": "${workspaceFolder}/test/Ionide.ProjInfo.Tests/bin/Debug/net6.0/Ionide.ProjInfo.Tests.dll",
-            "args": [],
+            // "preLaunchTask": "build",
+            "program": "${workspaceFolder}/test/Ionide.ProjInfo.Tests/bin/Debug/${input:tfm}/Ionide.ProjInfo.Tests.dll",
+            "args": [
+                "--filter",
+                "Main tests.${input:testName} - ${input:loader}"
+            ],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
             "console": "internalConsole"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "tfm",
+            "description": "The TFM of the test to run",
+            "options": [
+                "net6.0",
+                "net7.0"
+            ],
+            "default": "net7.0",
+            "type": "pickString"
+        },
+        {
+            "id": "loader",
+            "description": "The loader to use for the test",
+            "options": [
+                "WorkspaceLoader",
+                "WorkspaceLoaderForGraph"
+            ],
+            "default": "WorkspaceLoader",
+            "type": "pickString"
+        },
+        {
+            "id": "testName",
+            "description": "the name of the test as provided to `testCase`",
+            "type": "promptString"
         }
     ]
 }

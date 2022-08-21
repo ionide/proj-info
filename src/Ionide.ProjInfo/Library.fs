@@ -427,8 +427,6 @@ module ProjectLoader =
 
             let build = pi.Build(designTimeBuildTargets isLegacyFrameworkProjFile, loggers)
 
-            let t = sw.ToString()
-
             if build then
                 ProjectLoadingStatus.Success(LoadedProject pi)
             else
