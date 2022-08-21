@@ -852,6 +852,7 @@ let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath ->
         let parsedC1 = parsed |> Seq.find(fun x ->
             x.ProjectFileName.EndsWith(``sample3 Netsdk projs``.ProjectFile)
         )
+        logger.info (Message.eventX "Has the following parsed projects: {map}" >> Message.setField "map" pos)
         let fcsPo = FCS.mapToFSharpProjectOptions parsedC1 parsed
         let references = fcsPo.OtherOptions |> Seq.choose (fun r -> if r.StartsWith "-r:" then System.IO.Path.GetFileName(r.[3..]) |> Some else None)
         let projectReferences = fcsPo.ReferencedProjects |> Seq.map (fun r -> r.OutputFile |> System.IO.Path.GetFileName)
