@@ -71,7 +71,7 @@ let init args =
                         ApiKey = Some key
                         Source = Some "https://api.nuget.org/v3/index.json" } }
 
-        packages () |> Seq.iter (fun pkg -> DotNet.nugetPush id pkg))
+        packages () |> Seq.iter (fun pkg -> DotNet.nugetPush pushPkg pkg))
 
     let sourceFiles = !! "src/**/*.fs" ++ "build.fsx" -- "src/**/obj/**/*.fs"
 
