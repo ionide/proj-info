@@ -60,7 +60,7 @@ let init args =
     Target.create "Build" (fun _ -> DotNet.build id "")
 
     let testTFM tfm =
-        exec "dotnet" $"run --framework {tfm} --project .\\test\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj" "."
+        exec "dotnet" $"run --no-build --framework {tfm} --project .\\test\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj" "."
         |> ignore
 
     Target.create "Test" DoNothing
@@ -68,8 +68,8 @@ let init args =
     Target.create "Test:net6.0" (fun _ -> testTFM "net6.0")
     Target.create "Test:net7.0" (fun _ -> testTFM "net7.0")
 
-    "Test:net6.0" =?> ("Test", not testNet7)
-    "Test:net7.0" =?> ("Test", testNet7)
+    "Build" ?=> "Test:net6.0" =?> ("Test", not testNet7)
+    "Build" ?=> "Test:net7.0" =?> ("Test", testNet7)
 
     Target.create "Pack" (fun _ ->
         DotNet.pack
