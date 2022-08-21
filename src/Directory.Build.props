@@ -12,5 +12,6 @@
         <PackageTags>MSBuild; dotnet; SDK; FsProj;</PackageTags>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageDescription>MSBuild evaluation, fsproj file loading, and project system for F# tooling</PackageDescription>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     </PropertyGroup>
 </Project>

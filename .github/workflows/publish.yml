@@ -24,7 +24,9 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
       - name: Run build
-        run: dotnet run --project build -- -t Pack
+        run: dotnet run --project build
+        env:
+          BuildNet7: true
       - name: Get Changelog Entry
         id: changelog_reader
         uses: mindsers/changelog-reader-action@v1.1.0
@@ -46,7 +48,7 @@ jobs:
         uses: svenstaro/upload-release-action@v1-release
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: out/*.nupkg
+          file: src/**/*.nupkg
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
