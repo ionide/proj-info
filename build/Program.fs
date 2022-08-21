@@ -5,17 +5,6 @@ open Fake.IO.Globbing.Operators
 open Fake.Core.TargetOperators
 
 // --------------------------------------------------------------------------------------
-// Information about the project to be used at NuGet and in AssemblyInfo files
-// --------------------------------------------------------------------------------------
-
-let summary = "MsBuild evaluation, fsproj file loading, and project system for F# tooling"
-
-let gitOwner = "ionide"
-let gitName = "proj-info"
-let gitHome = "https://github.com/" + gitOwner
-let gitUrl = gitHome + "/" + gitName
-
-// --------------------------------------------------------------------------------------
 // Build variables
 // --------------------------------------------------------------------------------------
 
