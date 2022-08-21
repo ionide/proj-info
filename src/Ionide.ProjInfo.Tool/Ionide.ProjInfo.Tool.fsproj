@@ -2,7 +2,8 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFrameworks>net6.0;net7.0</TargetFrameworks>
+        <TargetFrameworks>net6.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(TestPreviews)' == 'true'">$(TargetFrameworks);net7.0</TargetFrameworks>
         <PackAsTool>true</PackAsTool>
         <ToolCommandName>proj-info</ToolCommandName>
     </PropertyGroup>
