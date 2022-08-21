@@ -15,7 +15,7 @@ let main argv =
 
     Tests.runTestsWithArgs
         { defaultConfig with
-              printer = TestPrinters.summaryPrinter defaultConfig.printer
-              verbosity = LogLevel.Info }
+            printer = TestPrinters.summaryPrinter defaultConfig.printer
+            verbosity = LogLevel.Verbose }
         argv
         (Tests.tests toolsPath)

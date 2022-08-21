@@ -5,6 +5,7 @@
         <TargetFramework>net6.0</TargetFramework>
         <PackAsTool>true</PackAsTool>
         <ToolCommandName>proj-info</ToolCommandName>
+        <RollForward>LatestMajor</RollForward>
     </PropertyGroup>
 
     <ItemGroup>

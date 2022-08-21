@@ -11,6 +11,8 @@ open Types
 open Microsoft.Build.Graph
 open System.Diagnostics
 open System.Runtime.InteropServices
+open Ionide.ProjInfo.Logging
+open Patterns
 
 /// functions for .net sdk probing
 module SdkDiscovery =
@@ -427,8 +429,6 @@ module ProjectLoader =
 
             let build = pi.Build(designTimeBuildTargets isLegacyFrameworkProjFile, loggers)
 
-            let t = sw.ToString()
-
             if build then
                 ProjectLoadingStatus.Success(LoadedProject pi)
             else
@@ -697,8 +697,6 @@ type IWorkspaceLoader =
     [<CLIEvent>]
     abstract Notifications: IEvent<WorkspaceProjectState>
 
-open Ionide.ProjInfo.Logging
-
 module WorkspaceLoaderViaProjectGraph =
     let locker = obj ()
 
@@ -714,7 +712,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
         try
             f () |> Some
         with
-        | :? Microsoft.Build.Exceptions.InvalidProjectFileException as e ->
+        | InvalidProjectException e ->
             let p = e.ProjectFile
             loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
             None
@@ -737,7 +735,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
             let graph =
                 match paths |> List.ofSeq with
                 | [ x ] ->
-                    let g =
+                    let g: ProjectGraph =
                         ProjectGraph(x, projectCollection = ProjectCollection.GlobalProjectCollection, projectInstanceFactory = projectInstanceFactory)
                     // When giving ProjectGraph a singular project, g.EntryPointNodes only contains that project.
                     // To get it to build the Graph with all the dependencies we need to look at all the ProjectNodes

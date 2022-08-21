@@ -4,4 +4,3 @@ FSharp.Core
 Dotnet.ReproducibleBuilds
 Ionide.KeepAChangelog.Tasks
 SemanticVersioning
-File: FsLibLog.fs
