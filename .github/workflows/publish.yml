@@ -14,7 +14,9 @@ jobs:
       - name: Setup .NET Core
         uses: actions/setup-dotnet@v2
         with:
-          dotnet-version: 7.0.x
+          dotnet-version: |
+            6.0.x
+            7.0.x
           include-prerelease: true
       # since we're packaging for net7 now...
       - name: remove global.json
