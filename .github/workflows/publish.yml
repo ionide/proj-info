@@ -7,18 +7,18 @@ on:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        os: [windows-latest]
-        dotnet: [6.0.x]
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v3
       - name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v2
         with:
-          dotnet-version: ${{ matrix.dotnet }}
+          dotnet-version: 7.0.x
+          include-prerelease: true
+      # since we're packaging for net7 now...
+      - name: remove global.json
+        run: rm global.json
       - name: Restore tools
         run: dotnet tool restore
       - name: Restore dependencies
