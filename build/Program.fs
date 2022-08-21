@@ -10,11 +10,8 @@ open Fake.Core.TargetOperators
 
 let summary = "MsBuild evaluation, fsproj file loading, and project system for F# tooling"
 
-let authors = "enricosada; Krzysztof-Cieslak;"
-let tags = "msbuild;dotnet;sdk;fsproj"
-
 let gitOwner = "ionide"
-let gitName = "dotnet-proj-info"
+let gitName = "proj-info"
 let gitHome = "https://github.com/" + gitOwner
 let gitUrl = gitHome + "/" + gitName
 
@@ -55,40 +52,16 @@ let init args =
 
     Target.create "Clean" (fun _ -> Shell.cleanDirs [ nugetDir ])
 
-    Target.create "ReplaceFsLibLogNamespaces"
-    <| fun _ ->
-        let replacements =
-            [ "FsLibLog\\n", "Ionide.ProjInfo.Logging\n"
-              "FsLibLog\\.", "Ionide.ProjInfo.Logging" ]
-
-        replacements
-        |> List.iter (fun (``match``, replace) ->
-            (!! "paket-files/TheAngryByrd/FsLibLog/**/FsLibLog*.fs")
-            |> Shell.regexReplaceInFilesWithEncoding ``match`` replace System.Text.Encoding.UTF8)
-
     Target.create "Build" (fun _ -> DotNet.build id "")
 
     Target.create "Test" (fun _ -> exec "dotnet" @"run --project .\test\Ionide.ProjInfo.Tests\Ionide.ProjInfo.Tests.fsproj" ".")
 
-
     Target.create "Pack" (fun _ ->
-        let properties =
-            [ ("Authors", authors)
-              ("PackageProjectUrl", gitUrl)
-              ("PackageTags", tags)
-              ("RepositoryType", "git")
-              ("RepositoryUrl", gitUrl)
-              ("PackageLicenseExpression", "MIT")
-              ("PackageDescription", summary)
-              ("EnableSourceLink", "true") ]
-
-
         DotNet.pack
             (fun p ->
                 { p with
                     Configuration = DotNet.BuildConfiguration.Release
-                    OutputPath = Some nugetDir
-                    MSBuildParams = { p.MSBuildParams with Properties = properties } })
+                    OutputPath = Some nugetDir })
             "ionide-proj-info.sln")
 
     Target.create "Push" (fun _ ->
@@ -127,7 +100,7 @@ let init args =
 
     Target.create "Release" DoNothing
 
-    let dependencies = "Clean" ==> "ReplaceFsLibLogNamespaces" ==> "CheckFormat" ==> "Build" ==> "Test" ==> "Default" ==> "Pack"
+    let dependencies = "Clean" ==> "CheckFormat" ==> "Build" ==> "Test" ==> "Default" ==> "Pack"
     ()
 
 [<EntryPoint>]
