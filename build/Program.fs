@@ -61,6 +61,7 @@ let init args =
 
     let testTFM tfm =
         exec "dotnet" $"run --framework {tfm} --project .\\test\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj" "."
+        |> ignore
 
     Target.create "Test" DoNothing
 

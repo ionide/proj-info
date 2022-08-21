@@ -853,14 +853,12 @@ let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath ->
             x.ProjectFileName.EndsWith(``sample3 Netsdk projs``.ProjectFile)
         )
         let fcsPo = FCS.mapToFSharpProjectOptions parsedC1 parsed
-        let hasCSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l1.dll")
-        let hasCSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.OutputFile.EndsWith "l1.dll")
-        let hasFSharpRef = fcsPo.OtherOptions |> Seq.exists (fun opt -> opt.StartsWith "-r:" && opt.EndsWith "l2.dll")
-        let hasFSharpProjectRef = fcsPo.ReferencedProjects |> Seq.exists (fun ref -> ref.OutputFile.EndsWith "l2.dll")
-        Expect.equal hasCSharpRef true "Should have direct dll reference to C# reference"
-        Expect.equal hasCSharpProjectRef true "Should have project reference to C# reference"
-        Expect.equal hasFSharpRef true "Should have direct dll reference to F# reference"
-        Expect.equal hasFSharpProjectRef true "Should have project reference to F# reference"
+        let references = fcsPo.OtherOptions |> Seq.choose (fun r -> if r.StartsWith "-r:" then System.IO.Path.GetFileName(r.[3..]) |> Some else None)
+        let projectReferences = fcsPo.ReferencedProjects |> Seq.map (fun r -> r.OutputFile |> System.IO.Path.GetFileName)
+        Expect.contains references "l1.dll" "Should have direct dll reference to C# reference"
+        Expect.contains projectReferences "l1.dll" "Should have project reference to C# reference"
+        Expect.contains references "l2.dll" "Should have direct dll reference to F# reference"
+        Expect.contains projectReferences "l2.dll" "Should have project reference to F# reference"
     )
 
 let countDistinctObjectsByReference<'a> (items : 'a seq) =
