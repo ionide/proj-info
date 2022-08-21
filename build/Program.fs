@@ -4,12 +4,6 @@ open Fake.IO
 open Fake.IO.Globbing.Operators
 open Fake.Core.TargetOperators
 
-// --------------------------------------------------------------------------------------
-// Build variables
-// --------------------------------------------------------------------------------------
-
-let nugetDir = "./out/"
-
 System.Environment.CurrentDirectory <- (Path.combine __SOURCE_DIRECTORY__ "..")
 
 // --------------------------------------------------------------------------------------
@@ -44,7 +38,9 @@ let init args =
         | true, v -> v
         | _ -> false
 
-    Target.create "Clean" (fun _ -> Shell.cleanDirs [ nugetDir ])
+    let packages () = !! "src/**/*.nupkg"
+
+    Target.create "Clean" (fun _ -> packages () |> Seq.iter Shell.rm)
 
     Target.create "Build" (fun _ -> DotNet.build id "")
 
@@ -57,16 +53,10 @@ let init args =
     Target.create "Test:net6.0" (fun _ -> testTFM "net6.0")
     Target.create "Test:net7.0" (fun _ -> testTFM "net7.0")
 
-    "Build" ?=> "Test:net6.0" =?> ("Test", not testNet7)
-    "Build" ?=> "Test:net7.0" =?> ("Test", testNet7)
+    "Build" ?=> "Test:net6.0" =?> ("Test", not testNet7) |> ignore
+    "Build" ?=> "Test:net7.0" =?> ("Test", testNet7) |> ignore
 
-    Target.create "Pack" (fun _ ->
-        DotNet.pack
-            (fun p ->
-                { p with
-                    Configuration = DotNet.BuildConfiguration.Release
-                    OutputPath = Some nugetDir })
-            "ionide-proj-info.sln")
+    Target.create "ListPackages" (fun _ -> packages () |> Seq.iter (fun pkg -> printfn $"Found package at: {pkg}"))
 
     Target.create "Push" (fun _ ->
         let key =
@@ -74,12 +64,14 @@ let init args =
             | s when not (isNullOrWhiteSpace s) -> s
             | _ -> UserInput.getUserPassword "NuGet Key: "
 
-        Paket.push (fun p ->
-            { p with
-                WorkingDir = nugetDir
-                ApiKey = key
-                ToolType = ToolType.CreateLocalTool() }))
+        let pushPkg (opts: DotNet.NuGetPushOptions) =
+            { opts with
+                PushParams =
+                    { opts.PushParams with
+                        ApiKey = Some key
+                        Source = Some "https://api.nuget.org/v3/index.json" } }
 
+        packages () |> Seq.iter (fun pkg -> DotNet.nugetPush id pkg))
 
     let sourceFiles = !! "src/**/*.fs" ++ "build.fsx" -- "src/**/obj/**/*.fs"
 
@@ -104,8 +96,7 @@ let init args =
 
     Target.create "Release" DoNothing
 
-    let dependencies = "Clean" ==> "CheckFormat" ==> "Build" ==> "Test" ==> "Default" ==> "Pack"
-    ()
+    "Clean" ==> "CheckFormat" ==> "Build" ==> "Test" ==> "Default" |> ignore
 
 [<EntryPoint>]
 let main args =

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.60.0] - 2022-08-21
+
+### Added
+
+* [Logging for solution parsing failures](https://github.com/ionide/proj-info/pull/161) (Thanks @TheAngryByrd!)
+
+### Fixed
+
+* [Support running on 6.0.400 by always performing Clean builds](https://github.com/ionide/proj-info/pull/162) (Thanks @TheAngryByrd!)
+* [Graph builder works for more types of projects](https://github.com/ionide/proj-info/pull/165) (Thanks @TheAngryByrd!)
+* [.NET 7 previews support](https://github.com/ionide/proj-info/pull/167)
+
 ## [0.59.2] - 2022-08-04
 
 ### Changed
