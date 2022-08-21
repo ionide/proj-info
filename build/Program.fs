@@ -50,6 +50,11 @@ let DoNothing = ignore
 let init args =
     initializeContext args
 
+    let testNet7 =
+        match System.Environment.GetEnvironmentVariable("BuildNet7") |> bool.TryParse with
+        | true, v -> v
+        | _ -> false
+
     Target.create "Clean" (fun _ -> Shell.cleanDirs [ nugetDir ])
 
     Target.create "Build" (fun _ -> DotNet.build id "")
@@ -62,7 +67,8 @@ let init args =
     Target.create "Test:net6.0" (fun _ -> testTFM "net6.0")
     Target.create "Test:net7.0" (fun _ -> testTFM "net7.0")
 
-    "Test:net6.0" ==> "Test:net7.0" ==> "Test"
+    "Test:net6.0" =?> ("Test", not testNet7)
+    "Test:net7.0" =?> ("Test", testNet7)
 
     Target.create "Pack" (fun _ ->
         DotNet.pack
