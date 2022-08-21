@@ -200,3 +200,14 @@ module CscArguments =
         | Some "exe" -> ProjectOutputType.Exe
         | Some v -> ProjectOutputType.Custom v
         | None -> ProjectOutputType.Exe // default if arg is not passed to fsc
+
+module Patterns =
+    let rec (|InvalidProjectException|_|) (e: exn) =
+        match e with
+        | :? Microsoft.Build.Exceptions.InvalidProjectFileException as ex -> Some ex
+        | :? System.AggregateException as aex ->
+            if aex.InnerExceptions.Count = 1 then
+                (|InvalidProjectException|_|) aex.InnerException
+            else
+                None
+        | _ -> None

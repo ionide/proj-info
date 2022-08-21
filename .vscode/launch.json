@@ -69,7 +69,7 @@
             "description": "The loader to use for the test",
             "options": [
                 "WorkspaceLoader",
-                "WorkspaceLoaderForGraph"
+                "WorkspaceLoaderViaProjectGraph"
             ],
             "default": "WorkspaceLoader",
             "type": "pickString"

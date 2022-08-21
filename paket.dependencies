@@ -5,7 +5,7 @@ source https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3
 storage: none
 framework: net6.0, net7.0
 
-nuget FSharp.Core 6.0.3
+nuget FSharp.Core
 nuget FSharp.Compiler.Service ~> 41.0
 nuget Argu
 nuget Newtonsoft.Json
