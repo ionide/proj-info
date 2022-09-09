@@ -14,6 +14,8 @@ open System
 open System.Collections.Generic
 open System.IO
 open System.Threading
+open System.Xml.Linq
+open System.Linq
 
 #nowarn "25"
 
@@ -1274,6 +1276,29 @@ let expensiveTests toolsPath (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
         Expect.exists references (fun r -> r.Contains "packs" && r.Contains "Microsoft.Android.") "Should have found a reference to android dlls in the packs directory"
     }
 
+let addFileToProject (projPath : string) fileName =
+    let doc = XDocument.Load(projPath)
+    let df = doc.Root.Name.Namespace
+    doc.Root.Elements(df + "ItemGroup").ElementAt(0).Add(new XElement(df + "Compile", new XAttribute("Include", fileName)))
+    doc.Save(projPath)
+
+let loadProjfileFromDiskTests toolsPath  workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
+    testCase |> withLog $"can load project from disk everytime {workspaceLoader}" (fun logger fs ->
+
+        let loader = workspaceFactory toolsPath
+        let testDir = inDir fs "reload_sample2_from_disk"
+        copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
+
+        let projPath = testDir / (``sample2 NetSdk library``.ProjectFile)
+        dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
+        let result = loader.LoadProjects [projPath] |> Seq.head
+        Expect.equal result.SourceFiles.Length 2  "Should have 2 source file"
+        
+        "Foo.fs" |> addFileToProject projPath
+        let result = loader.LoadProjects [projPath] |> Seq.head
+        Expect.equal result.SourceFiles.Length  3 "Should have 3 source file"
+    )
+
 let csharpLibTest toolsPath (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase |> withLog "can load project that has a csharp project reference" (fun logger fs ->
         let projPath = Path.Combine(__SOURCE_DIRECTORY__, "..", "examples", "sample-referenced-csharp-project", "fsharp-exe", "fsharp-exe.fsproj")
@@ -1386,6 +1411,8 @@ let tests toolsPath =
 
           //loadProject test
           testLoadProject toolsPath
+          loadProjfileFromDiskTests toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+          loadProjfileFromDiskTests toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
 
           //Binlog test
           testSample2WithBinLog toolsPath "WorkspaceLoader" WorkspaceLoader.Create
