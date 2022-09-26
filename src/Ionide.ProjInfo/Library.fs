@@ -588,6 +588,7 @@ module ProjectLoader =
               ProjectOutputType = outputType
               ProjectSdkInfo = sdkInfo
               Items = compileItems
+              Properties = List.ofSeq props
               CustomProperties = List.ofSeq customProps }
 
 
@@ -616,6 +617,7 @@ module ProjectLoader =
               "RunCommand"
               "IsPublishable"
               "BaseIntermediateOutputPath"
+              "IntermediateOutputPath"
               "TargetPath"
               "IsCrossTargetingBuild"
               "TargetFrameworks" ]

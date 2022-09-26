@@ -60,6 +60,7 @@ module Types =
           ProjectOutputType: ProjectOutputType
           ProjectSdkInfo: ProjectSdkInfo
           Items: ProjectItem list
+          Properties: Property list
           CustomProperties: Property list }
 
     type CompileItem =
