@@ -385,6 +385,8 @@ module ProjectLoader =
             [| "ResolveAssemblyReferencesDesignTime"
                "ResolveProjectReferencesDesignTime"
                "ResolvePackageDependenciesDesignTime"
+               "ResolveFrameworkReferencesDesignTime"
+               "ResolveComReferencesDesignTime"
                "_GenerateCompileDependencyCache"
                "_ComputeNonExistentFileProperty"
                "CoreCompile" |]
