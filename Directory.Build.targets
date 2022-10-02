@@ -1,0 +1,8 @@
+<Project>
+    <!-- See https://github.com/dotnet/sourcelink/issues/572#issuecomment-1015841458
+         this ensures embedded files like assemblyinfo don't cause package validation warnings -->
+    <Target
+            Name="EnsureEmbeddedFilesOrdering"
+            BeforeTargets="BeforeCompile"
+            AfterTargets="GenerateAssemblyInfo"></Target>
+</Project>

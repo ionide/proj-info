@@ -1,0 +1,37 @@
+<Project>
+    <PropertyGroup>
+        <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
+        <DisableImplicitSystemValueTupleReference>true</DisableImplicitSystemValueTupleReference>
+    </PropertyGroup>
+
+    <ItemGroup Label="build deps">
+        <PackageReference
+                Include="Ionide.KeepAChangelog.Tasks"
+                Condition="'$(BuildingInsideVisualStudio)' != 'true'"
+                PrivateAssets="all" />
+        <PackageReference
+                Include="Dotnet.ReproducibleBuilds"
+                PrivateAssets="all" />
+    </ItemGroup>
+
+    <ItemGroup
+            Condition="'$(Language)' == 'F#'"
+            Label="F# deps">
+        <PackageReference Include="FSharp.Core" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(ReferenceMSBuild)' == 'true'">
+        <PackageReference
+                Include="Microsoft.Build"
+                PrivateAssets="all" />
+        <PackageReference
+                Include="Microsoft.Build.Framework"
+                PrivateAssets="all" />
+        <PackageReference
+                Include="Microsoft.Build.Utilities.Core"
+                PrivateAssets="all" />
+        <PackageReference
+                Include="Microsoft.Build.Tasks.Core"
+                PrivateAssets="all" />
+    </ItemGroup>
+</Project>
