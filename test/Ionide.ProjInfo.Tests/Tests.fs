@@ -886,6 +886,7 @@ let testFCSmapManyProjCheckCaching =
               ProjectOutputType = ProjectOutputType.Library
               ProjectSdkInfo = sdkInfo
               Items = []
+              Properties = []
               CustomProperties = [] }
             
         let makeReference (options : ProjectOptions) =
