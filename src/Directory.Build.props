@@ -21,6 +21,7 @@
     <ItemGroup Label="build deps">
         <PackageReference
                 Include="Ionide.KeepAChangelog.Tasks"
+                Condition="'$(BuildingInsideVisualStudio)' != 'true'"
                 PrivateAssets="all" />
         <PackageReference
                 Include="Dotnet.ReproducibleBuilds"
