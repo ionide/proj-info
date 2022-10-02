@@ -13,5 +13,29 @@
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageDescription>MSBuild evaluation, fsproj file loading, and project system for F# tooling</PackageDescription>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+
+        <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
+        <DisableImplicitSystemValueTupleReference>true</DisableImplicitSystemValueTupleReference>
     </PropertyGroup>
+
+    <ItemGroup Label="build deps">
+        <PackageReference
+                Include="Ionide.KeepAChangelog.Tasks"
+                PrivateAssets="all" />
+        <PackageReference
+                Include="Dotnet.ReproducibleBuilds"
+                PrivateAssets="all" />
+    </ItemGroup>
+
+    <ItemGroup
+            Condition="'$(Language)' == 'F#'"
+            Label="F# deps">
+        <PackageReference Include="FSharp.Core" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(ReferenceMSBuild)' == 'true'">
+        <PackageReference
+                Include="Microsoft.Build"
+                PrivateAssets="all" />
+    </ItemGroup>
 </Project>

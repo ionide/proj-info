@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFrameworks>net6.0</TargetFrameworks>
     <TargetFrameworks Condition="'$(BuildNet7)' == 'true'">$(TargetFrameworks);net7.0</TargetFrameworks>
+    <ReferenceMSBuild>true</ReferenceMSBuild>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="FsLibLog.fs" />
@@ -14,6 +15,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Ionide.ProjInfo.Sln\Ionide.ProjInfo.Sln.csproj" />
+    <PackageReference Include="SemanticVersioning" />
   </ItemGroup>
-  <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

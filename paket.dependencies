@@ -18,11 +18,6 @@ nuget Expecto.Diff
 nuget Expecto.TestResults
 nuget MedallionShell ~> 1.5.0
 
-# copy_local: false excludes runtime assets (desired for msbuild)
-nuget Microsoft.Build copy_local: false
-nuget Microsoft.Build.Framework copy_local: false
-nuget Microsoft.Build.Utilities.Core copy_local: false
-nuget Microsoft.Build.Tasks.Core copy_local: false
 nuget Newtonsoft.Json
 nuget Fsharp.Control.Reactive
 nuget SemanticVersioning

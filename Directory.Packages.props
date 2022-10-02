@@ -1,0 +1,21 @@
+<Project>
+    <PropertyGroup>
+      <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    </PropertyGroup>
+    <ItemGroup Label="Dependencies">
+        <PackageVersion Include="FSharp.Compiler.Service" Version="41.0.5" />
+        <PackageVersion Include="Argu" Version="6.1.1" />
+        <PackageVersion Include="FSharp.Core" Version="6.0.5" />
+        <PackageVersion Include="Expecto" Version="9.0.4" />
+        <PackageVersion Include="Expecto.Diff" Version="9.0.4" />
+        <PackageVersion Include="Expecto.TestResults" Version="8.13.2" />
+        <PackageVersion Include="MedallionShell" Version="1.6.2" />
+        <PackageVersion Include="Newtonsoft.Json" Version="13.0.1" />
+        <PackageVersion Include="FSharp.Control.Reactive" Version="5.0.5" />
+        <PackageVersion Include="SemanticVersioning" Version="2.0.2" />
+        <PackageVersion Include="Microsoft.Build" Version="17.2" />
+
+        <PackageVersion Include="Dotnet.ReproducibleBuilds" Version="1.1.1" />
+        <PackageVersion Include="Ionide.KeepAChangelog.Tasks" Version="0.1.8" />
+    </ItemGroup>
+</Project>
