@@ -25,6 +25,7 @@ type ProjectResponse =
     | ProjectError of projectFileName: string * errorDetails: GetProjectOptionsErrors
     | ProjectLoading of projectFileName: string
     | WorkspaceLoad of finished: bool
+
     member x.DebugPrint =
         match x with
         | Project (po, _) -> "Loaded: " + po.ProjectFileName
@@ -173,7 +174,7 @@ type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -
         }
 
     let loaderLoop =
-        MailboxProcessor.Start (fun agent -> //If couldn't recive new event in 50 ms then just load previous one
+        MailboxProcessor.Start(fun agent -> //If couldn't recive new event in 50 ms then just load previous one
             let rec loop (previousStatus: (AsyncReplyChannel<bool> * string list * BinaryLogGeneration) option) =
                 async {
                     match previousStatus with

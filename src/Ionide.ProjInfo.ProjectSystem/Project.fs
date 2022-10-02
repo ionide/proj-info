@@ -66,8 +66,7 @@ type internal ProjectPersistentCache(projectFile: string) =
                             let resp' = defaultArg r ""
                             let ctn = [| lwt.ToString(); resp' |]
                             File.WriteAllLines(cachePath, ctn)
-                        with
-                        | _ex ->
+                        with _ex ->
                             //TODO add trace
                             ()
 
@@ -95,16 +94,14 @@ type internal ProjectPersistentCache(projectFile: string) =
                                                     None
                                                 else
                                                     Some deserialized
-                                        with
-                                        | _ ->
+                                        with _ ->
                                             File.Delete cachePath
                                             None
                                     else
                                         None
                                 else
                                     None
-                            with
-                            | _ex ->
+                            with _ex ->
                                 //TODO add trace
                                 None
 

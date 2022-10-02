@@ -4,7 +4,7 @@ open Fake.IO
 open Fake.IO.Globbing.Operators
 open Fake.Core.TargetOperators
 
-System.Environment.CurrentDirectory <- (Path.combine __SOURCE_DIRECTORY__ "..")
+// System.Environment.CurrentDirectory <- (Path.combine __SOURCE_DIRECTORY__ "..")
 
 // --------------------------------------------------------------------------------------
 // Helpers

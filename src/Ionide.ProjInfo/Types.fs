@@ -81,6 +81,7 @@ module Types =
         | InvalidExtraProjectInfos of projFile: string * error: string
         | ReferencesNotLoaded of projFile: string * referenceErrors: seq<string * GetProjectOptionsErrors>
         | GenericError of projFile: string * string
+
         member x.ProjFile =
             match x with
             | ProjectNotRestored projFile

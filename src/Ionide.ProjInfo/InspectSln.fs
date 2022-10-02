@@ -82,8 +82,8 @@ module InspectSln =
 
         try
             Ok(slnFilePath, slnFilePath |> Sln.Construction.SolutionFile.Parse |> parseSln)
-        with
-        | ex -> Error ex
+        with ex ->
+            Error ex
 
     let loadingBuildOrder (data: SolutionData) =
 

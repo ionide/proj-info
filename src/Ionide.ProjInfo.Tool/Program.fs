@@ -12,6 +12,7 @@ type Args =
     | Graph
     | Fcs
     | Serialize
+
     interface IArgParserTemplate with
         member x.Usage =
             match x with
@@ -47,13 +48,7 @@ let main argv =
     let args = parser.ParseCommandLine(argv, raiseOnUsage = false)
 
     if args.TryGetResult Version <> None then
-        printfn
-            $"Ionide.ProjInfo.Tool, v%A{System
-                                            .Reflection
-                                            .Assembly
-                                            .GetExecutingAssembly()
-                                            .GetName()
-                                            .Version}"
+        printfn $"Ionide.ProjInfo.Tool, v%A{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version}"
 
         0
     else

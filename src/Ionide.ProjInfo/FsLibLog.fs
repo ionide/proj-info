@@ -34,6 +34,7 @@ module Types =
           Exception: exn option
           Parameters: obj list
           AdditionalNamedParameters: ((string * obj * bool) list) }
+
         static member StartLogLevel(logLevel: LogLevel) =
             { LogLevel = logLevel
               Message = None
@@ -345,10 +346,7 @@ module Types =
 
             let namedArgs = args |> Seq.map (fun (name, _, _, _) -> box $"{{{name}}}") |> Seq.toArray
 
-            messageFormat <-
-                messageFormat
-                    .Replace("{{", "{{{{")
-                    .Replace("}}", "}}}}")
+            messageFormat <- messageFormat.Replace("{{", "{{{{").Replace("}}", "}}}}")
             // Replace numbered args with named args from regex match
             messageFormat <- String.Format(messageFormat, args = namedArgs)
 
@@ -451,13 +449,7 @@ module Providers =
 
             ()
 
-            let pushPropertyMethod =
-                ndcContextType.GetMethod(
-                    "PushProperty",
-                    [| typedefof<string>
-                       typedefof<obj>
-                       typedefof<bool> |]
-                )
+            let pushPropertyMethod = ndcContextType.GetMethod("PushProperty", [| typedefof<string>; typedefof<obj>; typedefof<bool> |])
 
             let nameParam = Expression.Parameter(typedefof<string>, "name")
 
@@ -478,13 +470,7 @@ module Providers =
         let getForContextMethodCall () =
             let logManagerType = getLogManagerType ()
 
-            let method =
-                logManagerType.GetMethod(
-                    "ForContext",
-                    [| typedefof<string>
-                       typedefof<obj>
-                       typedefof<bool> |]
-                )
+            let method = logManagerType.GetMethod("ForContext", [| typedefof<string>; typedefof<obj>; typedefof<bool> |])
 
             let propertyNameParam = Expression.Parameter(typedefof<string>, "propertyName")
 
@@ -492,10 +478,7 @@ module Providers =
 
             let destructureObjectsParam = Expression.Parameter(typedefof<bool>, "destructureObjects")
 
-            let exrs: Expression [] =
-                [| propertyNameParam
-                   valueParam
-                   destructureObjectsParam |]
+            let exrs: Expression[] = [| propertyNameParam; valueParam; destructureObjectsParam |]
 
             let methodCall = Expression.Call(null, method, exrs)
 
@@ -508,10 +491,11 @@ module Providers =
 
         [<NoEquality; NoComparison>]
         type SerilogGateway =
-            { Write: obj -> obj -> string -> obj [] -> unit
-              WriteException: obj -> obj -> exn -> string -> obj [] -> unit
+            { Write: obj -> obj -> string -> obj[] -> unit
+              WriteException: obj -> obj -> exn -> string -> obj[] -> unit
               IsEnabled: obj -> obj -> bool
               TranslateLevel: LogLevel -> obj }
+
             static member Create() =
                 let logEventLevelType = Type.GetType("Serilog.Events.LogEventLevel, Serilog")
 
@@ -562,32 +546,20 @@ module Providers =
                         .Lambda<Func<obj, obj, bool>>(isEnabledMethodCall, instanceParam, levelParam)
                         .Compile()
 
-                let writeMethodInfo =
-                    loggerType.GetMethod(
-                        "Write",
-                        [| logEventLevelType
-                           typedefof<string>
-                           typedefof<obj []> |]
-                    )
+                let writeMethodInfo = loggerType.GetMethod("Write", [| logEventLevelType; typedefof<string>; typedefof<obj[]> |])
 
                 let messageParam = Expression.Parameter(typedefof<string>)
-                let propertyValuesParam = Expression.Parameter(typedefof<obj []>)
+                let propertyValuesParam = Expression.Parameter(typedefof<obj[]>)
 
                 let writeMethodExp = Expression.Call(instanceCast, writeMethodInfo, levelCast, messageParam, propertyValuesParam)
 
                 let expression =
-                    Expression.Lambda<Action<obj, obj, string, obj []>>(writeMethodExp, instanceParam, levelParam, messageParam, propertyValuesParam)
+                    Expression.Lambda<Action<obj, obj, string, obj[]>>(writeMethodExp, instanceParam, levelParam, messageParam, propertyValuesParam)
 
                 let write = expression.Compile()
 
                 let writeExceptionMethodInfo =
-                    loggerType.GetMethod(
-                        "Write",
-                        [| logEventLevelType
-                           typedefof<exn>
-                           typedefof<string>
-                           typedefof<obj []> |]
-                    )
+                    loggerType.GetMethod("Write", [| logEventLevelType; typedefof<exn>; typedefof<string>; typedefof<obj[]> |])
 
                 let exceptionParam = Expression.Parameter(typedefof<exn>)
 
@@ -596,7 +568,7 @@ module Providers =
 
                 let writeException =
                     Expression
-                        .Lambda<Action<obj, obj, exn, string, obj []>>(writeMethodExp, instanceParam, levelParam, exceptionParam, messageParam, propertyValuesParam)
+                        .Lambda<Action<obj, obj, exn, string, obj[]>>(writeMethodExp, instanceParam, levelParam, exceptionParam, messageParam, propertyValuesParam)
                         .Compile()
 
                 { Write = (fun logger level message formattedParmeters -> write.Invoke(logger, level, message, formattedParmeters))
@@ -662,6 +634,7 @@ module Providers =
         [<NoEquality; NoComparison>]
         type LoggerFactoryGateway =
             { CreateLogger: ILoggerFactory -> LoggerName -> ILogger }
+
             static member Create() =
                 let createLogger =
                     let factoryType = getLogFactoryType.Value
@@ -686,6 +659,7 @@ module Providers =
               IsEnabled: ILogger -> MicrosoftLogLevel -> bool
               TranslateLevel: LogLevel -> MicrosoftLogLevel
               BeginScope: ILogger -> obj -> IDisposable }
+
             static member Create() =
                 let loggerExtensions =
                     Type.GetType("Microsoft.Extensions.Logging.LoggerExtensions, Microsoft.Extensions.Logging.Abstractions")
@@ -786,10 +760,7 @@ module Providers =
                         | _ -> debugLevel
 
                 let beginScope =
-                    let beginScopeMethodInfo =
-                        loggerType
-                            .GetMethod("BeginScope")
-                            .MakeGenericMethod(typedefof<obj>)
+                    let beginScopeMethodInfo = loggerType.GetMethod("BeginScope").MakeGenericMethod(typedefof<obj>)
 
                     let stateParam = Expression.Parameter(typedefof<obj>)
                     let beginScopeMethodCall = Expression.Call(instanceCast, beginScopeMethodInfo, stateParam)

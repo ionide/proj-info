@@ -30,6 +30,7 @@ module internal Utils =
             file
 
     type ConcurrentDictionary<'key, 'value> with
+
         member x.TryFind key =
             match x.TryGetValue key with
             | true, value -> Some value

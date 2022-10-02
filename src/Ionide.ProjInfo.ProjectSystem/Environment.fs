@@ -27,8 +27,8 @@ module Environment =
     let runningOnMono =
         try
             not << isNull <| Type.GetType "Mono.Runtime"
-        with
-        | _ -> false
+        with _ ->
+            false
 
     let private environVar v = Environment.GetEnvironmentVariable v
 
@@ -49,11 +49,7 @@ module Environment =
 
     // Below code slightly modified from FAKE MSBuildHelper.fs
 
-    let private vsSkus =
-        [ "Community"
-          "Professional"
-          "Enterprise"
-          "BuildTools" ]
+    let private vsSkus = [ "Community"; "Professional"; "Enterprise"; "BuildTools" ]
 
     let private vsVersions = [ "2019"; "2017" ]
 
@@ -97,14 +93,7 @@ module Environment =
             fsharpInstallationPath |> Option.map (fun root -> root </> "fsc.exe")
 
     let fsharpCore =
-        let dir =
-            Path.GetDirectoryName(
-                System
-                    .Reflection
-                    .Assembly
-                    .GetExecutingAssembly()
-                    .Location
-            )
+        let dir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
 
         dir </> "FSharp.Core.dll"
 
@@ -139,7 +128,7 @@ module Environment =
     /// <param name="versions">the set of versions to compare</param>
     /// <param name="includePrereleases">if true, prerelease versions will be considered</param>
     /// <returns>the max value found in that range, if any</returns>
-    let maxVersionWithThreshold (range: Range option) (includePrereleases: bool) (versions: Version []) =
+    let maxVersionWithThreshold (range: Range option) (includePrereleases: bool) (versions: Version[]) =
         let filterer =
             match range with
             | Some r -> (fun v -> r.IsSatisfied(v, includePrerelease = includePrereleases))
