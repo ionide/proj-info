@@ -1,6 +1,8 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <FakeLibVersion>5.22</FakeLibVersion>
   </PropertyGroup>
   <ItemGroup Label="Dependencies">
     <PackageVersion
@@ -52,5 +54,44 @@
     <PackageVersion
         Include="Ionide.KeepAChangelog.Tasks"
         Version="0.1.8" />
+  </ItemGroup>
+
+  <ItemGroup Label="Build Script">
+    <PackageVersion
+        Include="Fake.Core.Target"
+        Version="$(FakeLibVersion)" />
+    <PackageVersion
+        Include="Fake.Core.Process"
+        Version="$(FakeLibVersion)" />
+    <PackageVersion
+        Include="Fake.DotNet.Cli"
+        Version="$(FakeLibVersion)" />
+    <PackageVersion
+        Include="Fake.Core.ReleaseNotes"
+        Version="$(FakeLibVersion)" />
+    <PackageVersion
+        Include="Fake.DotNet.AssemblyInfoFile"
+        Version="$(FakeLibVersion)" />
+    <PackageVersion
+        Include="Fake.DotNet.Paket"
+        Version="$(FakeLibVersion)" />
+    <PackageVersion
+        Include="Fake.Tools.Git"
+        Version="$(FakeLibVersion)" />
+    <PackageVersion
+        Include="Fake.Core.Environment"
+        Version="$(FakeLibVersion)" />
+    <PackageVersion
+        Include="Fake.Core.UserInput"
+        Version="$(FakeLibVersion)" />
+    <PackageVersion
+        Include="Fake.IO.FileSystem"
+        Version="$(FakeLibVersion)" />
+    <PackageVersion
+        Include="Fake.DotNet.MsBuild"
+        Version="$(FakeLibVersion)" />
+    <PackageVersion
+        Include="Fake.Api.GitHub"
+        Version="$(FakeLibVersion)" />
   </ItemGroup>
 </Project>

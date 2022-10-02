@@ -5,6 +5,7 @@
     <TargetFrameworks>net6.0</TargetFrameworks>
     <TargetFrameworks Condition="'$(BuildNet7)' == 'true'">$(TargetFrameworks);net7.0</TargetFrameworks>
     <IsPackable>false</IsPackable>
+    <ReferenceMSBuild>true</ReferenceMSBuild>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="FileUtils.fs" />
@@ -16,6 +17,11 @@
     <ProjectReference Include="..\..\src\Ionide.ProjInfo\Ionide.ProjInfo.fsproj" />
     <ProjectReference Include="..\..\src\Ionide.ProjInfo.FCS\Ionide.ProjInfo.FCS.fsproj" />
     <ProjectReference Include="..\..\src\Ionide.ProjInfo.ProjectSystem\Ionide.ProjInfo.ProjectSystem.fsproj" />
+    <PackageReference Include="Expecto" />
+    <PackageReference Include="Expecto.TestResults" />
+    <PackageReference Include="Expecto.Diff" />
+    <PackageReference Include="MedallionShell" />
+    <PackageReference Include="FSharp.Compiler.Service" />
   </ItemGroup>
-  <Import Project="..\..\.paket\Paket.Restore.targets" />
+
 </Project>
