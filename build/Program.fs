@@ -38,8 +38,8 @@ let init args =
         | true, v -> v
         | _ -> false
 
-    let ignoreTest =
-        match System.Environment.GetEnvironmentVariable("IgnoreTest") |> bool.TryParse with
+    let ignoreTests =
+        match System.Environment.GetEnvironmentVariable("IgnoreTests") |> bool.TryParse with
         | true, v -> v
         | _ -> false
 
@@ -58,11 +58,8 @@ let init args =
     Target.create "Test:net6.0" (fun _ -> testTFM "net6.0")
     Target.create "Test:net7.0" (fun _ -> testTFM "net7.0")
 
-    if not ignoreTest then
-        "Build" ?=> "Test:net6.0" =?> ("Test", not buildNet7) |> ignore
-
-    if not ignoreTest then
-        "Build" ?=> "Test:net7.0" =?> ("Test", buildNet7) |> ignore
+    "Build" =?> ("Test:net6.0", not buildNet7) =?> ("Test", not ignoreTests) |> ignore
+    "Build" =?> ("Test:net7.0", buildNet7) =?> ("Test", not ignoreTests) |> ignore
 
     Target.create "ListPackages" (fun _ -> packages () |> Seq.iter (fun pkg -> printfn $"Found package at: {pkg}"))
 
@@ -116,6 +113,7 @@ let main args =
         | _ -> Target.runOrDefaultWithArguments "Default"
 
         0
-    with e ->
+    with
+    | e ->
         printfn "%A" e
         1
