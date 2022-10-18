@@ -45,7 +45,23 @@ module WorkspacePeek =
             let scanDir (dirInfo: DirectoryInfo) =
                 let hasExt (ext: string) (s: FileInfo) = s.FullName.EndsWith(ext)
 
-                dirInfo.EnumerateFiles("*.*", SearchOption.TopDirectoryOnly)
+                let topLevelFiles =
+                    try
+                        dirInfo.EnumerateFiles("*.*", SearchOption.TopDirectoryOnly)
+                    with
+                    | :? UnauthorizedAccessException as ex ->
+                        logger.error (
+                            Log.setMessage "Unauthorized access error while reading files of {dir}"
+                            >> Log.addContextDestructured "dir" dirInfo.Name
+                            >> Log.addExn ex
+                        )
+
+                        Seq.empty
+                    | ex ->
+                        logger.error (Log.setMessage "Failed to read files of {dir}" >> Log.addContextDestructured "dir" dirInfo.Name >> Log.addExn ex)
+                        Seq.empty
+
+                topLevelFiles
                 |> Seq.choose (fun s ->
                     match s with
                     | x when x |> hasExt ".sln" -> Some(UsefulFile.Sln, x)
@@ -56,12 +72,33 @@ module WorkspacePeek =
                 |> Seq.toArray
 
             let dirs =
+                let getDirectories (dirInfo: DirectoryInfo) =
+                    try
+                        dirInfo.GetDirectories()
+                    with
+                    | :? UnauthorizedAccessException as ex ->
+                        logger.error (
+                            Log.setMessage "Unauthorized access error while reading sub directories of {dir}"
+                            >> Log.addContextDestructured "dir" dirInfo.Name
+                            >> Log.addExn ex
+                        )
+
+                        Array.empty
+                    | ex ->
+                        logger.error (
+                            Log.setMessage "Failed to read sub directories of {dir}"
+                            >> Log.addContextDestructured "dir" dirInfo.Name
+                            >> Log.addExn ex
+                        )
+
+                        Array.empty
+
                 let rec scanDirs (dirInfo: DirectoryInfo) lvl =
                     seq {
                         if lvl <= deep then
                             yield dirInfo
 
-                            for s in dirInfo.GetDirectories() do
+                            for s in getDirectories dirInfo do
                                 if not (ignored s.Name) then
                                     yield! scanDirs s (lvl + 1)
                     }
