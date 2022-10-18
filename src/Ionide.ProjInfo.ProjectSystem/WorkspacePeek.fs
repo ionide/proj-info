@@ -56,12 +56,33 @@ module WorkspacePeek =
                 |> Seq.toArray
 
             let dirs =
+                let getDirectories (dirInfo: DirectoryInfo) =
+                    try
+                        dirInfo.GetDirectories()
+                    with
+                    | :? UnauthorizedAccessException as ex ->
+                        logger.error (
+                            Log.setMessage "Unauthorized access error while reading sub directories of {dir}"
+                            >> Log.addContextDestructured "dir" dirInfo.Name
+                            >> Log.addExn ex
+                        )
+
+                        Array.empty
+                    | ex ->
+                        logger.error (
+                            Log.setMessage "Failed to read sub directories of {dir}"
+                            >> Log.addContextDestructured "dir" dirInfo.Name
+                            >> Log.addExn ex
+                        )
+
+                        Array.empty
+
                 let rec scanDirs (dirInfo: DirectoryInfo) lvl =
                     seq {
                         if lvl <= deep then
                             yield dirInfo
 
-                            for s in dirInfo.GetDirectories() do
+                            for s in getDirectories dirInfo do
                                 if not (ignored s.Name) then
                                     yield! scanDirs s (lvl + 1)
                     }
