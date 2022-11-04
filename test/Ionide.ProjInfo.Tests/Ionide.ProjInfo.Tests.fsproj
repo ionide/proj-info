@@ -5,6 +5,7 @@
     <TargetFrameworks>net6.0</TargetFrameworks>
     <TargetFrameworks Condition="'$(BuildNet7)' == 'true'">$(TargetFrameworks);net7.0</TargetFrameworks>
     <IsPackable>false</IsPackable>
+    <RollForward>LatestMajor</RollForward>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="FileUtils.fs" />
