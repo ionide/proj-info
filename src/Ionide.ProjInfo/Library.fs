@@ -383,12 +383,11 @@ module ProjectLoader =
                "CoreCompile" |]
         else
             [| "ResolveAssemblyReferencesDesignTime"
-               "FindReferenceAssembliesForReferences"
+               "FindReferenceAssembliesForReferences" // Populates ReferencePathWithRefAssemblies which CoreCompile requires
                "ResolveProjectReferencesDesignTime"
                "ResolvePackageDependenciesDesignTime"
                "_GenerateCompileDependencyCache"
                "_ComputeNonExistentFileProperty"
-            //    "ResolveFrameworkReferencesDesignTime"
                "CoreCompile" |]
 
     let setLegacyMsbuildProperties isOldStyleProjFile =
