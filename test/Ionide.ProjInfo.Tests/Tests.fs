@@ -872,7 +872,7 @@ let testFCSmapManyProjCheckCaching =
     testCase |> withLog "When creating FCS options, caches them" (fun _ _ ->
 
         let sdkInfo = ProjectLoader.getSdkInfo []
-        
+
         let template : ProjectOptions =
             { ProjectId = None
               ProjectFileName = "Template"
@@ -888,17 +888,17 @@ let testFCSmapManyProjCheckCaching =
               Items = []
               Properties = []
               CustomProperties = [] }
-            
+
         let makeReference (options : ProjectOptions) =
             { RelativePath = options.ProjectFileName
               ProjectFileName = options.ProjectFileName
               TargetFramework = options.TargetFramework }
-            
+
         let makeProject (name : string) (referencedProjects : ProjectOptions list) =
             { template with
                 ProjectFileName = name
                 ReferencedProjects = referencedProjects |> List.map makeReference }
-            
+
         let projectsInLayers =
             let layerCount = 4
             let layerSize = 2
@@ -920,11 +920,11 @@ let testFCSmapManyProjCheckCaching =
                     )
                 )
             let layers = first :: rest
-            
+
             layers |> List.concat
-        
+
         let fcsOptions = FCS.mapManyOptions projectsInLayers
-            
+
         let rec findProjectOptionsTransitively (project : FSharpProjectOptions) =
             project.ReferencedProjects
             |> Array.toList
@@ -932,17 +932,17 @@ let testFCSmapManyProjCheckCaching =
                 reference
                 |> internalGetProjectOptions
                 |> Option.map findProjectOptionsTransitively
-                |> Option.defaultValue [] 
+                |> Option.defaultValue []
             )
             |> List.append [project]
-                
+
         let findDistinctProjectOptionsTransitively (projects : FSharpProjectOptions seq) =
             projects
             |> Seq.collect findProjectOptionsTransitively
             |> countDistinctObjectsByReference
-            
+
         let distinctOptionsCount = findDistinctProjectOptionsTransitively fcsOptions
-        
+
         Expect.equal distinctOptionsCount projectsInLayers.Length "Mapping should reuse instances of FSharpProjectOptions and only create one per project"
     )
 
@@ -953,7 +953,7 @@ let testSample2WithBinLog toolsPath workspaceLoader (workspaceFactory: ToolsPath
 
         let projPath = testDir / (``sample2 NetSdk library``.ProjectFile)
         let projDir = Path.GetDirectoryName projPath
- 
+
         dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
 
         let loader = workspaceFactory toolsPath
@@ -1088,7 +1088,7 @@ let testLoadProject toolsPath =
         let projResult = ProjectLoader.getProjectInfo projPath [] BinaryLogGeneration.Off []
 
         match projResult with
-        | Result.Ok proj -> Expect.equal proj.ProjectFileName projPath "project file names"
+        | Result.Ok (proj, _) -> Expect.equal proj.ProjectFileName projPath "project file names"
         | Result.Error err -> failwith $"{err}"
 
     )
@@ -1242,7 +1242,7 @@ let testProjectSystemOnChange toolsPath workspaceLoader workspaceFactory =
     )
 
 let debugTests toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
-    ptestCase
+    ftestCase
     |> withLog (sprintf "debug - %s" workspaceLoader) (fun logger fs ->
 
         let loader = workspaceFactory toolsPath
@@ -1252,11 +1252,17 @@ let debugTests toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
 
         // printfn "%A" parsedProjs
 
-        let slnPath = @"C:\Users\JimmyByrd\Documents\Repositories\public\TheAngryByrd\FsToolkit.ErrorHandling\FsToolkit.ErrorHandling.sln"
-        let parsedProjs = loader.LoadSln slnPath |> Seq.toList
+        printfn "binlog output here: %s" Environment.CurrentDirectory
 
-        // printfn "%A" parsedProjs
-        parsedProjs
+        let slnPath = @"C:\Users\jimmy\Repositories\public\TheAngryByrd\dotnet-proj-info\test\testrun_ws\load_sample2\n1\n1.fsproj"
+        let projects = loader.LoadProjectsDebug([slnPath], [],BinaryLogGeneration.Within (DirectoryInfo(Environment.CurrentDirectory )))|> Seq.toList
+        projects |> Seq.map fst |> Newtonsoft.Json.JsonConvert.SerializeObject |> printfn "%s"
+        printfn "----"
+        projects |> Seq.map snd |> Seq.collect (fun x -> x.Items) |> Seq.map(fun ii -> ii.ItemType, ii.EvaluatedInclude) |> Newtonsoft.Json.JsonConvert.SerializeObject |> printfn "%s"
+        projects |> Seq.map snd |> Seq.collect (fun x -> x.Properties) |> Seq.map(fun ii -> ii.Name, ii.EvaluatedValue)  |> Newtonsoft.Json.JsonConvert.SerializeObject |> printfn "%s"
+
+        projects
+        |> Seq.map fst
         |> Seq.iter(fun p ->
             Expect.isGreaterThan p.SourceFiles.Length 0 $"{p.ProjectFileName} Should have SourceFiles"
         )
@@ -1294,7 +1300,7 @@ let loadProjfileFromDiskTests toolsPath  workspaceLoader (workspaceFactory: Tool
         dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
         let result = loader.LoadProjects [projPath] |> Seq.head
         Expect.equal result.SourceFiles.Length 2  "Should have 2 source file"
-        
+
         "Foo.fs" |> addFileToProject projPath
         let result = loader.LoadProjects [projPath] |> Seq.head
         Expect.equal result.SourceFiles.Length  3 "Should have 3 source file"
@@ -1407,7 +1413,7 @@ let tests toolsPath =
           testProjectSystemOnChange toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           testProjectSystemOnChange toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           debugTests toolsPath "WorkspaceLoader" WorkspaceLoader.Create
-          debugTests toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
+          // debugTests toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           testProjectSystemCacheLoad toolsPath "WorkspaceLoader" WorkspaceLoader.Create
 
           //loadProject test

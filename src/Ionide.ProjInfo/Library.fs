@@ -383,10 +383,12 @@ module ProjectLoader =
                "CoreCompile" |]
         else
             [| "ResolveAssemblyReferencesDesignTime"
+               "FindReferenceAssembliesForReferences"
                "ResolveProjectReferencesDesignTime"
                "ResolvePackageDependenciesDesignTime"
                "_GenerateCompileDependencyCache"
                "_ComputeNonExistentFileProperty"
+            //    "ResolveFrameworkReferencesDesignTime"
                "CoreCompile" |]
 
     let setLegacyMsbuildProperties isOldStyleProjFile =
@@ -652,11 +654,16 @@ module ProjectLoader =
     /// <param name="globalProperties">The global properties to use (e.g. Configuration=Release). Some additional global properties are pre-set by the tool</param>
     /// <param name="customProperties">List of additional MsBuild properties that you want to obtain.</param>
     /// <returns>Returns the record instance representing the loaded project or string containing error message</returns>
-    let getProjectInfo (path: string) (globalProperties: (string * string) list) (binaryLogs: BinaryLogGeneration) (customProperties: string list) : Result<Types.ProjectOptions, string> =
+    let getProjectInfo (path: string) (globalProperties: (string * string) list) (binaryLogs: BinaryLogGeneration) (customProperties: string list) : Result<Types.ProjectOptions * ProjectInstance, string> =
         let loadedProject = loadProject path binaryLogs globalProperties
 
         match loadedProject with
-        | ProjectLoadingStatus.Success project -> getLoadedProjectInfo path customProperties project
+        | ProjectLoadingStatus.Success project ->
+            getLoadedProjectInfo path customProperties project
+            |> Result.map(fun po ->
+                let (LoadedProject pi)  = project
+                po, pi
+            )
         | ProjectLoadingStatus.Error e -> Result.Error e
 
 /// A type that turns project files or solution files into deconstructed options.
@@ -673,6 +680,7 @@ type IWorkspaceLoader =
     /// <param name="binaryLog">determines if and where to write msbuild binary logs</param>
     /// <returns>the loaded project structures</returns>
     abstract member LoadProjects: projectPaths: string list * customProperties: list<string> * binaryLog: BinaryLogGeneration -> seq<ProjectOptions>
+    abstract member LoadProjectsDebug: projectPaths: string list * customProperties: list<string> * binaryLog: BinaryLogGeneration -> seq<ProjectOptions * ProjectInstance>
 
     /// <summary>
     /// Load a list of projects with no additional custom properties, without generating binary logs
@@ -688,6 +696,7 @@ type IWorkspaceLoader =
     /// <param name="customProperties">any custom msbuild properties that should be extracted from the build results. these will be available under the CustomProperties property of the returned ProjectOptions</param>
     /// <param name="binaryLog">determines if and where to write msbuild binary logs</param>
     abstract member LoadSln: solutionPath: string * customProperties: list<string> * binaryLog: BinaryLogGeneration -> seq<ProjectOptions>
+    abstract member LoadSlnDebug: solutionPath: string * customProperties: list<string> * binaryLog: BinaryLogGeneration -> seq<ProjectOptions * ProjectInstance>
 
     /// <summary>
     /// Load every project contained in the solution file with no additional custom properties, without generating binary logs
@@ -792,27 +801,29 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
                 bm.EndBuild()
 
+
+                logger.info (
+                    Log.setMessage "{overallCode}, projects built {count} {projects} "
+                    // >> Log.addContextDestructured "count" (buildProjs |> Seq.length)
+                    >> Log.addContextDestructured "overallCode" result.OverallResult
+                    >> Log.addExn result.Exception
+                )
+
+
                 let buildProjs =
                     result.ResultsByNode.Keys
                     |> Seq.collect (fun (pgn: ProjectGraphNode) -> seq { yield pgn.ProjectInstance })
                     |> Seq.toList
 
-                logger.info (
-                    Log.setMessage "{overallCode}, projects built {count} {projects} "
-                    >> Log.addContextDestructured "count" (buildProjs |> Seq.length)
-                    >> Log.addContextDestructured "overallCode" result.OverallResult
-                    >> Log.addExn result.Exception
-                )
-
                 let projects =
                     buildProjs
-                    |> Seq.map (fun p -> p.FullPath, ProjectLoader.getLoadedProjectInfo p.FullPath customProperties (ProjectLoader.LoadedProject p))
+                    |> Seq.map (fun p -> p.FullPath, ProjectLoader.getLoadedProjectInfo p.FullPath customProperties (ProjectLoader.LoadedProject p), p)
 
-                    |> Seq.choose (fun (projectPath, projectOptionResult) ->
+                    |> Seq.choose (fun (projectPath, projectOptionResult, pi) ->
                         match projectOptionResult with
                         | Ok projectOptions ->
 
-                            Some projectOptions
+                            Some (projectOptions, pi)
                         | Error e ->
                             logger.error (Log.setMessage "Failed loading projects {error}" >> Log.addContextDestructured "error" e)
                             loadingNotification.Trigger(WorkspaceProjectState.Failed(projectPath, GenericError(projectPath, e)))
@@ -821,9 +832,9 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                 let allProjectOptions = projects |> Seq.toList
 
                 allProjectOptions
-                |> Seq.iter (fun po ->
+                |> Seq.iter (fun (po, pi) ->
                     logger.info (Log.setMessage "Project loaded {project}" >> Log.addContextDestructured "project" po.ProjectFileName)
-                    loadingNotification.Trigger(WorkspaceProjectState.Loaded(po, allProjectOptions |> Seq.toList, false)))
+                    loadingNotification.Trigger(WorkspaceProjectState.Loaded(po, allProjectOptions |> Seq.map fst |> Seq.toList, false)))
 
                 allProjectOptions :> seq<_>
         with
@@ -848,10 +859,16 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
             Seq.empty
 
     interface IWorkspaceLoader with
-        override this.LoadProjects(projects: string list, customProperties, binaryLogs) =
+        member this.LoadSlnDebug(solutionPath: string, customProperties: string list, binaryLog: BinaryLogGeneration): seq<ProjectOptions * ProjectInstance> =
+           this.LoadSlnDebug(solutionPath, customProperties, binaryLog)
+        override this.LoadProjectsDebug(projects: string list, customProperties, binaryLogs) =
             projectGraphProjs projects
             |> Option.map (fun pg -> loadProjects (pg, customProperties, binaryLogs))
             |> Option.defaultValue Seq.empty
+
+        override this.LoadProjects(projects: string list, customProperties, binaryLogs) =
+            (this :> IWorkspaceLoader).LoadProjectsDebug(projects, customProperties, binaryLogs)
+            |> Seq.map fst
 
         override this.LoadProjects(projects: string list) =
             this.LoadProjects(projects, [], BinaryLogGeneration.Off)
@@ -884,10 +901,17 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
             .LoadProjects([ project ])
 
 
-    member this.LoadSln(sln: string, customProperties: string list, binaryLogs) =
+    member this.LoadSlnDebug(sln: string, customProperties: string list, binaryLogs) =
         projectGraphSln sln
         |> Option.map (fun pg -> loadProjects (pg, customProperties, binaryLogs))
         |> Option.defaultValue Seq.empty
+
+
+    member this.LoadSln(sln: string, customProperties: string list, binaryLogs) =
+            (this :> IWorkspaceLoader).LoadSlnDebug(sln, customProperties, binaryLogs)
+            |> Seq.map fst
+
+
 
     member this.LoadSln(sln, customProperties) =
         this.LoadSln(sln, customProperties, BinaryLogGeneration.Off)
@@ -901,23 +925,29 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
     let loadingNotification = new Event<Types.WorkspaceProjectState>()
 
     interface IWorkspaceLoader with
+        member this.LoadSlnDebug(solutionPath: string, customProperties: string list, binaryLog: BinaryLogGeneration): seq<ProjectOptions * ProjectInstance> =
+            raise (System.NotImplementedException())
 
         [<CLIEvent>]
         override __.Notifications = loadingNotification.Publish
 
-        override __.LoadProjects(projects: string list, customProperties, binaryLogs) =
-            let cache = Dictionary<string, ProjectOptions>()
+        override this.LoadProjects(projects, customProps, binlogs)=
+            (this :> IWorkspaceLoader).LoadProjectsDebug(projects, customProps, binlogs)
+            |> Seq.map fst
+
+        override __.LoadProjectsDebug(projects: string list, customProperties, binaryLogs) =
+            let cache = Dictionary<string, ProjectOptions * ProjectInstance>()
 
             let getAllKnown () =
-                cache |> Seq.map (fun n -> n.Value) |> Seq.toList
+                cache.Values |> Seq.map (fst) |> Seq.toList
 
             let rec loadProject p =
                 let res = ProjectLoader.getProjectInfo p globalProperties binaryLogs customProperties
 
                 match res with
-                | Ok project ->
+                | Ok (project, pi) ->
                     try
-                        cache.Add(p, project)
+                        cache.Add(p, (project, pi))
 
                         let lst =
                             project.ReferencedProjects
@@ -952,7 +982,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
                 for p in projectList do
                     let newList, toTrigger =
                         if cache.ContainsKey p then
-                            let project = cache.[p]
+                            let (project, _) = cache.[p]
                             loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, getAllKnown (), true)) //TODO: Should it even notify here?
 
                             let lst =
@@ -995,7 +1025,8 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
     member this.LoadProjects(projects, customProperties) =
         this.LoadProjects(projects, customProperties, BinaryLogGeneration.Off)
 
-
+    member this.LoadProjectsDebug(projects, customProperties: string list, binaryLogs) =
+         (this :> IWorkspaceLoader).LoadProjectsDebug(projects , customProperties, binaryLogs)
 
     member this.LoadProject(project, customProperties: string list, binaryLogs) =
         this.LoadProjects([ project ], customProperties, binaryLogs)
@@ -1008,12 +1039,17 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
             .LoadProjects([ project ])
 
 
-    member this.LoadSln(sln, customProperties: string list, binaryLogs) =
+    member this.LoadSlnDebug(sln, customProperties: string list, binaryLogs) =
         match InspectSln.tryParseSln sln with
         | Ok (_, slnData) ->
             let projs = InspectSln.loadingBuildOrder slnData
-            this.LoadProjects(projs, customProperties, binaryLogs)
+            this.LoadProjectsDebug(projs, customProperties, binaryLogs)
         | Error d -> failwithf "Cannot load the sln: %A" d
+
+
+    member this.LoadSln(sln, customProperties: string list, binaryLogs) =
+        this.LoadSlnDebug(sln, customProperties, binaryLogs)
+        |> Seq.map fst
 
     member this.LoadSln(sln, customProperties) =
         this.LoadSln(sln, customProperties, BinaryLogGeneration.Off)

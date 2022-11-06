@@ -1,12 +1,16 @@
+
+source https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet7/nuget/v3/index.json
+source https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet7-transport/nuget/v3/index.json
 source https://api.nuget.org/v3/index.json
+
 # this is the FCS nightly feed, re-enable at your own risk!
 # source https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3/index.json
 
 storage: none
 framework: net6.0, net7.0
 
-nuget FSharp.Core
-nuget FSharp.Compiler.Service ~> 41.0
+nuget FSharp.Core 7.0.0-beta.22473.1
+nuget FSharp.Compiler.Service 42.7.100-preview.22473.1
 nuget Argu
 
 # copy_local: true because this is a build-time dependency only
@@ -16,13 +20,14 @@ nuget Ionide.KeepAChangelog.Tasks copy_local:true
 nuget Expecto
 nuget Expecto.Diff
 nuget Expecto.TestResults
-nuget MedallionShell ~> 1.5.0
+nuget MedallionShell
 
 # copy_local: false excludes runtime assets (desired for msbuild)
-nuget Microsoft.Build 17.3.2 copy_local: false
-nuget Microsoft.Build.Framework 17.3.2 copy_local: false
-nuget Microsoft.Build.Utilities.Core 17.3.2 copy_local: false
-nuget Microsoft.Build.Tasks.Core 17.3.2 copy_local: false
+nuget Microsoft.Build  17.4.0-preview-22469-04 copy_local: false
+nuget Microsoft.Build.Framework 17.4.0-preview-22469-04  copy_local: false
+nuget Microsoft.Build.Utilities.Core 17.4.0-preview-22469-04  copy_local: false
+nuget Microsoft.Build.Tasks.Core 17.4.0-preview-22469-04  copy_local: false
+nuget Microsoft.NET.StringTools 17.4.0-preview-22469-04
 nuget Newtonsoft.Json
 nuget Fsharp.Control.Reactive
 nuget SemanticVersioning

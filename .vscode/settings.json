@@ -8,5 +8,5 @@
         "test/examples",
         "packages"
     ],
-    "editor.formatOnSave": true
+    // "editor.formatOnSave": true
 }

@@ -34,7 +34,7 @@ let parseProject (loaderFunc: LoaderFunc) (Rooted path) =
     let cwd = System.IO.Path.GetDirectoryName path |> System.IO.DirectoryInfo
     let toolsPath = Ionide.ProjInfo.Init.init cwd None
     let loader = loaderFunc (toolsPath, [])
-    loader.LoadProjects([ path ], [], BinaryLogGeneration.Within cwd)
+    loader.LoadProjectsDebug([ path ], [], BinaryLogGeneration.Within cwd)
 
 let parseSolution (loaderFunc: LoaderFunc) (Rooted path) =
     let cwd = System.IO.Path.GetDirectoryName path |> System.IO.DirectoryInfo
@@ -66,10 +66,10 @@ let main argv =
         let projects =
             match args.TryGetResult Project with
             | Some path -> parseProject loaderFunc path
-            | None ->
-                match args.TryGetResult Solution with
+            | None -> Seq.empty
+                (*match args.TryGetResult Solution with
                 | Some path -> parseSolution loaderFunc path
-                | None -> Seq.empty
+                | None -> Seq.empty*)
 
         let projects = projects |> List.ofSeq
         let shouldSerialize = args.Contains Serialize
@@ -80,7 +80,7 @@ let main argv =
             exit 1
         | projects ->
             if args.Contains Fcs then
-                let projects = projects |> List.map (fun p -> Ionide.ProjInfo.FCS.mapToFSharpProjectOptions p projects)
+                let projects = projects |> List.map (fun (p, po) -> Ionide.ProjInfo.FCS.mapToFSharpProjectOptions p (Seq.map fst projects))
 
                 if shouldSerialize then
                     projects |> Newtonsoft.Json.JsonConvert.SerializeObject |> printfn "%s"
@@ -88,7 +88,10 @@ let main argv =
                     printfn "%A" projects
 
             else if shouldSerialize then
-                projects |> Newtonsoft.Json.JsonConvert.SerializeObject |> printfn "%s"
+                projects |> Seq.map fst |> Newtonsoft.Json.JsonConvert.SerializeObject |> printfn "%s"
+                printfn "----"
+                projects |> Seq.map snd |> Seq.collect (fun x -> x.Items) |> Seq.map(fun ii -> ii.ItemType, ii.EvaluatedInclude) |> Newtonsoft.Json.JsonConvert.SerializeObject |> printfn "%s"
+                projects |> Seq.map snd |> Seq.collect (fun x -> x.Properties) |> Seq.map(fun ii -> ii.Name, ii.EvaluatedValue)  |> Newtonsoft.Json.JsonConvert.SerializeObject |> printfn "%s"
             else
                 printfn "%A" projects
 

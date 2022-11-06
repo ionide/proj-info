@@ -3,4 +3,4 @@ Argu
 Microsoft.Build copy_local: true
 Microsoft.Build.Framework copy_local: true
 Dotnet.ReproducibleBuilds
-Ionide.KeepAChangelog.Tasks
+# Ionide.KeepAChangelog.Tasks

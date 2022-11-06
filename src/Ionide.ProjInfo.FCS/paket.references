@@ -1,4 +1,4 @@
 FSharp.Core
 FSharp.Compiler.Service
 Dotnet.ReproducibleBuilds
-Ionide.KeepAChangelog.Tasks
+# Ionide.KeepAChangelog.Tasks
