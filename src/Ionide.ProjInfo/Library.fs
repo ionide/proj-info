@@ -759,7 +759,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
         <| fun () ->
             let pg = ProjectGraph(path, ProjectCollection.GlobalProjectCollection, projectInstanceFactory)
 
-            pg.ProjectNodesTopologicallySorted
+            pg.ProjectNodes
             |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
             |> Seq.map (fun p -> p.ProjectInstance.FullPath)
             |> Seq.iter (fun p -> loadingNotification.Trigger(WorkspaceProjectState.Loading p))
@@ -772,7 +772,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
             printfn "error -> %A" e
             logger.error (Log.setMessage "Failed loading" >> Log.addExn e)
 
-            projects.ProjectNodesTopologicallySorted
+            projects.ProjectNodes
             |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
             |> Seq.iter (fun p ->
 
