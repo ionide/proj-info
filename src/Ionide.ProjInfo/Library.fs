@@ -385,6 +385,9 @@ module ProjectLoader =
             [| "ResolveAssemblyReferencesDesignTime"
                "ResolveProjectReferencesDesignTime"
                "ResolvePackageDependenciesDesignTime"
+               // Populates ReferencePathWithRefAssemblies which CoreCompile requires.
+               // This can be removed one day when Microsoft.FSharp.Targets calls this.
+               "FindReferenceAssembliesForReferences"
                "_GenerateCompileDependencyCache"
                "_ComputeNonExistentFileProperty"
                "CoreCompile" |]
