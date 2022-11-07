@@ -133,10 +133,13 @@ let tfmForRuntime =
     let netcore31 = Version(3, 1, 100, "")
     let netcore5 = Version(5, 0, 100, "")
     let netcore6 = Version(6, 0, 100, "")
+    let netcore7 = Version(7, 0, 100, "")
 
     fun (sdkVersion: Version) ->
 
-        if netcore6 <= sdkVersion then
+        if netcore7 <= sdkVersion then
+            "net7.0"
+        else if netcore6 <= sdkVersion then
             "net6.0"
         else if netcore5 <= sdkVersion then
             "net5.0"

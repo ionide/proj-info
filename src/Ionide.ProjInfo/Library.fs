@@ -385,6 +385,9 @@ module ProjectLoader =
             [| "ResolveAssemblyReferencesDesignTime"
                "ResolveProjectReferencesDesignTime"
                "ResolvePackageDependenciesDesignTime"
+               // Populates ReferencePathWithRefAssemblies which CoreCompile requires.
+               // This can be removed one day when Microsoft.FSharp.Targets calls this.
+               "FindReferenceAssembliesForReferences"
                "_GenerateCompileDependencyCache"
                "_ComputeNonExistentFileProperty"
                "CoreCompile" |]
@@ -756,7 +759,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
         <| fun () ->
             let pg = ProjectGraph(path, ProjectCollection.GlobalProjectCollection, projectInstanceFactory)
 
-            pg.ProjectNodesTopologicallySorted
+            pg.ProjectNodes
             |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
             |> Seq.map (fun p -> p.ProjectInstance.FullPath)
             |> Seq.iter (fun p -> loadingNotification.Trigger(WorkspaceProjectState.Loading p))
@@ -764,10 +767,30 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
             pg
 
     let loadProjects (projects: ProjectGraph, customProperties: string list, binaryLogs: BinaryLogGeneration) =
+        let handleError (e: exn) =
+            let msg = e.Message
+            printfn "error -> %A" e
+            logger.error (Log.setMessage "Failed loading" >> Log.addExn e)
+
+            projects.ProjectNodes
+            |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
+            |> Seq.iter (fun p ->
+
+                let p = p.ProjectInstance.FullPath
+
+                if msg.Contains "The project file could not be loaded." then
+                    loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
+                elif msg.Contains "not restored" then
+                    loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotRestored(p)))
+                else
+                    loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg))))
+
+            Seq.empty
+
         try
             lock WorkspaceLoaderViaProjectGraph.locker
             <| fun () ->
-                let allKnown = projects.ProjectNodesTopologicallySorted |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
+                let allKnown = projects.ProjectNodes |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
 
                 let allKnownNames = allKnown |> Seq.map (fun p -> p.ProjectInstance.FullPath) |> Seq.toList
 
@@ -792,60 +815,46 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
                 bm.EndBuild()
 
-                let buildProjs =
-                    result.ResultsByNode.Keys
-                    |> Seq.collect (fun (pgn: ProjectGraphNode) -> seq { yield pgn.ProjectInstance })
-                    |> Seq.toList
-
-                logger.info (
-                    Log.setMessage "{overallCode}, projects built {count} {projects} "
-                    >> Log.addContextDestructured "count" (buildProjs |> Seq.length)
-                    >> Log.addContextDestructured "overallCode" result.OverallResult
-                    >> Log.addExn result.Exception
-                )
-
-                let projects =
-                    buildProjs
-                    |> Seq.map (fun p -> p.FullPath, ProjectLoader.getLoadedProjectInfo p.FullPath customProperties (ProjectLoader.LoadedProject p))
-
-                    |> Seq.choose (fun (projectPath, projectOptionResult) ->
-                        match projectOptionResult with
-                        | Ok projectOptions ->
-
-                            Some projectOptions
-                        | Error e ->
-                            logger.error (Log.setMessage "Failed loading projects {error}" >> Log.addContextDestructured "error" e)
-                            loadingNotification.Trigger(WorkspaceProjectState.Failed(projectPath, GenericError(projectPath, e)))
-                            None)
-
-                let allProjectOptions = projects |> Seq.toList
-
-                allProjectOptions
-                |> Seq.iter (fun po ->
-                    logger.info (Log.setMessage "Project loaded {project}" >> Log.addContextDestructured "project" po.ProjectFileName)
-                    loadingNotification.Trigger(WorkspaceProjectState.Loaded(po, allProjectOptions |> Seq.toList, false)))
-
-                allProjectOptions :> seq<_>
-        with
-        | e ->
-            let msg = e.Message
-
-            logger.error (Log.setMessage "Failed loading" >> Log.addExn e)
-
-            projects.ProjectNodesTopologicallySorted
-            |> Seq.distinctBy (fun p -> p.ProjectInstance.FullPath)
-            |> Seq.iter (fun p ->
-
-                let p = p.ProjectInstance.FullPath
-
-                if msg.Contains "The project file could not be loaded." then
-                    loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
-                elif msg.Contains "not restored" then
-                    loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotRestored(p)))
+                if result.Exception |> isNull |> not then
+                    handleError result.Exception
                 else
-                    loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg))))
+                    let buildProjs =
+                        result.ResultsByNode.Keys
+                        |> Seq.collect (fun (pgn: ProjectGraphNode) -> seq { yield pgn.ProjectInstance })
+                        |> Seq.toList
 
-            Seq.empty
+                    logger.info (
+                        Log.setMessage "{overallCode}, projects built {count} {projects} "
+                        >> Log.addContextDestructured "count" (buildProjs |> Seq.length)
+                        >> Log.addContextDestructured "overallCode" result.OverallResult
+                        >> Log.addExn result.Exception
+                    )
+
+                    let projects =
+                        buildProjs
+                        |> Seq.map (fun p -> p.FullPath, ProjectLoader.getLoadedProjectInfo p.FullPath customProperties (ProjectLoader.LoadedProject p))
+
+                        |> Seq.choose (fun (projectPath, projectOptionResult) ->
+                            match projectOptionResult with
+                            | Ok projectOptions ->
+
+                                Some projectOptions
+                            | Error e ->
+                                logger.error (Log.setMessage "Failed loading projects {error}" >> Log.addContextDestructured "error" e)
+                                loadingNotification.Trigger(WorkspaceProjectState.Failed(projectPath, GenericError(projectPath, e)))
+                                None)
+
+                    let allProjectOptions = projects |> Seq.toList
+
+                    allProjectOptions
+                    |> Seq.iter (fun po ->
+                        logger.info (Log.setMessage "Project loaded {project}" >> Log.addContextDestructured "project" po.ProjectFileName)
+                        loadingNotification.Trigger(WorkspaceProjectState.Loaded(po, allProjectOptions |> Seq.toList, false)))
+
+                    allProjectOptions :> seq<_>
+        with
+        | e -> handleError e
+
 
     interface IWorkspaceLoader with
         override this.LoadProjects(projects: string list, customProperties, binaryLogs) =
