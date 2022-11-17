@@ -390,6 +390,8 @@ module ProjectLoader =
                "FindReferenceAssembliesForReferences"
                "_GenerateCompileDependencyCache"
                "_ComputeNonExistentFileProperty"
+               "_GenerateBuildPropertiesFile"
+               "BeforeCompile"
                "CoreCompile" |]
 
     let setLegacyMsbuildProperties isOldStyleProjFile =
