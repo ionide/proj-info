@@ -6,6 +6,7 @@ MedallionShell
 YoloDev.Expecto.TestSdk
 FSharp.Compiler.Service
 Microsoft.NET.Test.Sdk
+GitHubActionsTestLogger
 Microsoft.Build.Framework copy_local: false
 Microsoft.Build.Utilities.Core copy_local: false
 Microsoft.Build.Tasks.Core copy_local: false
