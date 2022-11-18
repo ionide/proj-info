@@ -3,7 +3,9 @@ Expecto
 Expecto.TestResults
 Expecto.Diff
 MedallionShell
+YoloDev.Expecto.TestSdk
 FSharp.Compiler.Service
+Microsoft.NET.Test.Sdk
 Microsoft.Build.Framework copy_local: false
 Microsoft.Build.Utilities.Core copy_local: false
 Microsoft.Build.Tasks.Core copy_local: false
