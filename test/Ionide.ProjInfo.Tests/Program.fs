@@ -16,8 +16,6 @@ let tests = Tests.tests toolsPath
 
 [<EntryPoint>]
 let main argv =
-    let toolsPath = Init.init (IO.DirectoryInfo Environment.CurrentDirectory) None
-
     Tests.runTestsWithArgs
         { defaultConfig with
             printer = TestPrinters.summaryPrinter defaultConfig.printer
