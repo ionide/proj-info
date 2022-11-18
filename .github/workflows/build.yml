@@ -1,6 +1,10 @@
 name: Build for multiple SDK versions
 
-on: [pull_request]
+on: 
+  push:
+    branches:
+      - main
+  pull_request:
 
 jobs:
   build:
