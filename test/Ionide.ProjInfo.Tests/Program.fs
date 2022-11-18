@@ -16,6 +16,8 @@ let tests = Tests.tests toolsPath
 
 [<EntryPoint>]
 let main argv =
+    printfn "Running tests..."
+
     Tests.runTestsWithArgs
         { defaultConfig with
             printer = TestPrinters.summaryPrinter defaultConfig.printer
