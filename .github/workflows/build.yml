@@ -80,4 +80,4 @@ jobs:
 
         with:
           name: test-results
-          path: tests/**/TestResults/*.trx
+          path: test/**/TestResults/*.trx
