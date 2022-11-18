@@ -37,6 +37,8 @@ jobs:
     timeout-minutes: 15
 
     name: Build on ${{matrix.os}} for ${{ matrix.label }}
+    env:
+      testResults: ${{ matrix.os + '-' + matrix.label  }}
 
     steps:
       - uses: actions/checkout@v3

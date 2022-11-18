@@ -30,8 +30,19 @@ let initializeContext args =
 let getBuildParam = Environment.environVar
 let DoNothing = ignore
 
-let init args =
+let init (args: string list) =
     initializeContext args
+
+    let testResults = Environment.environVarOrDefault "testResults" "testResults"
+    let testResults = testResults + ".trx"
+
+    let ciLogger = Environment.environVarAsBoolOrDefault "CI" false
+
+    let ciLogger =
+        if ciLogger then
+            "--logger GitHubActions "
+        else
+            ""
 
     let buildNet7 =
         match System.Environment.GetEnvironmentVariable("BuildNet7") |> bool.TryParse with
@@ -50,7 +61,7 @@ let init args =
     Target.create "Build" (fun _ -> DotNet.build id "")
 
     let testTFM tfm =
-        exec "dotnet" $"test --no-build --framework {tfm} --logger trx --logger GitHubActions -c Release .\\test\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj" "."
+        exec "dotnet" $"test --no-build --framework {tfm} --logger \"trx;logfilename={testResults}\" {ciLogger}-c Release .\\test\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj" "."
         |> ignore
 
     Target.create "Test" DoNothing
