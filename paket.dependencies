@@ -23,9 +23,11 @@ nuget Microsoft.Build copy_local: false
 nuget Microsoft.Build.Framework copy_local: false
 nuget Microsoft.Build.Utilities.Core copy_local: false
 nuget Microsoft.Build.Tasks.Core copy_local: false
+nuget Microsoft.NET.Test.Sdk
 nuget Newtonsoft.Json
 nuget Fsharp.Control.Reactive
 nuget SemanticVersioning
+nuget YoloDev.Expecto.TestSdk
 
 // [ FAKE GROUP ]
 group Build

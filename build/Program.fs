@@ -50,7 +50,7 @@ let init args =
     Target.create "Build" (fun _ -> DotNet.build id "")
 
     let testTFM tfm =
-        exec "dotnet" $"run --no-build --framework {tfm} -c Release --project .\\test\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj" "."
+        exec "dotnet" $"test --no-build --framework {tfm} --logger trx -c Release .\\test\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj" "."
         |> ignore
 
     Target.create "Test" DoNothing

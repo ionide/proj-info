@@ -8,6 +8,11 @@ open Expecto
 open Expecto.Impl
 open Expecto.Logging
 
+let toolsPath = Init.init (IO.DirectoryInfo Environment.CurrentDirectory) None
+
+[<Tests>]
+let tests = Tests.tests toolsPath
+
 
 [<EntryPoint>]
 let main argv =
@@ -18,4 +23,4 @@ let main argv =
             printer = TestPrinters.summaryPrinter defaultConfig.printer
             verbosity = LogLevel.Verbose }
         argv
-        (Tests.tests toolsPath)
+        tests
