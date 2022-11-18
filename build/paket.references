@@ -1,5 +1,3 @@
-YoloDev.Expecto.TestSdk
-Microsoft.NET.Test.Sdk
 group Build
 Fake.Core.Target
 Fake.Core.Process
