@@ -1,6 +1,6 @@
 name: Build for multiple SDK versions
 
-on: 
+on:
   push:
     branches:
       - main
@@ -74,3 +74,10 @@ jobs:
         with:
           name: packages
           path: src/**/*.nupkg
+
+      - name: Archive test results
+        uses: actions/upload-artifact@v3
+
+        with:
+          name: test-results
+          path: tests/**/TestResults/*.trx
