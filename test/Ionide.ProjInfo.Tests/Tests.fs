@@ -267,7 +267,8 @@ let testSample2 toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPath
         let n1Parsed = parsed |> expectFind projPath "first is a lib"
 
         let expectedSources =
-            [ projDir / ("obj/" + config + "/netstandard2.0/n1.AssemblyInfo.fs")
+            [ projDir / ("obj/" + config + "/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs")
+              projDir / ("obj/" + config + "/netstandard2.0/n1.AssemblyInfo.fs")
               projDir / "Library.fs"
               if isRelease then
                   projDir / "Other.fs" ]
@@ -300,7 +301,8 @@ let testSample22 toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPat
 
         let watcher = watchNotifications logger loader
 
-        let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+        // let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+        let parsed = loader.LoadProjects([ projPath ], [], BinaryLogGeneration.Within(DirectoryInfo "c:/projekty/fsharp/projinfo_binlogs")) |> Seq.toList
         
         [ loading "n1.fsproj"
           loaded "n1.fsproj" ]
@@ -311,7 +313,8 @@ let testSample22 toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPat
         let n1Parsed = parsed |> expectFind projPath "first is a lib"
 
         let expectedSources =
-            [ projDir / ("obj/" + config + "/netstandard2.0/n1.AssemblyInfo.fs")
+            [ projDir / ("obj/" + config + "/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs")
+              projDir / ("obj/" + config + "/netstandard2.0/n1.AssemblyInfo.fs")
               projDir / "BeforeBuild.fs"
               projDir / "BeforeCompile.fs" ]
             |> List.map Path.GetFullPath
@@ -356,6 +359,7 @@ let testSample3 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
 
         let l1ExpectedSources =
             [ l1Dir / "Class1.cs"
+              l1Dir / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.cs"
               l1Dir / "obj/Debug/netstandard2.0/l1.AssemblyInfo.cs" ]
             |> List.map Path.GetFullPath
 
@@ -365,7 +369,8 @@ let testSample3 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
         let l2Parsed = parsed |> expectFind l2 "the F# lib"
 
         let l2ExpectedSources =
-            [ l2Dir / "obj/Debug/netstandard2.0/l2.AssemblyInfo.fs"
+            [ l2Dir / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
+              l2Dir / "obj/Debug/netstandard2.0/l2.AssemblyInfo.fs"
               l2Dir / "Library.fs" ]
             |> List.map Path.GetFullPath
 
@@ -374,7 +379,8 @@ let testSample3 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
 
 
         let c1ExpectedSources =
-            [ projDir / "obj/Debug/netcoreapp2.1/c1.AssemblyInfo.fs"
+            [ projDir / "obj/Debug/netcoreapp2.1/.NETCoreApp,Version=v2.1.AssemblyAttributes.fs"
+              projDir / "obj/Debug/netcoreapp2.1/c1.AssemblyInfo.fs"
               projDir / "Program.fs" ]
             |> List.map Path.GetFullPath
 
@@ -416,12 +422,16 @@ let testSample4 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
         let m1Parsed = parsed |> expectFind projPath "the F# console"
 
         let m1ExpectedSources =
-            [ projDir / "obj/Debug/netstandard2.0/m1.AssemblyInfo.fs"
+            [ projDir / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
+              projDir / "obj/Debug/netstandard2.0/m1.AssemblyInfo.fs"
               projDir / "LibraryA.fs" ]
             |> List.map Path.GetFullPath
 
         Expect.equal m1Parsed.SourceFiles m1ExpectedSources "check sources"
         Expect.equal m1Parsed m1Loaded "m1 notificaton and parsed should be the same")
+
+let expectEqualSourcesIgnoreOrder (actual : string seq) (expected : string seq) =
+    Expect.equal (actual |> Seq.sort |> Seq.toArray) (expected |> Seq.sort |> Seq.toArray)
 
 let testSample5 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
@@ -452,13 +462,13 @@ let testSample5 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
         let l2Parsed = parsed |> expectFind projPath "a C# lib"
 
         let l2ExpectedSources =
-            [ projDir / "Class1.cs"
+            [ projDir / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.cs"
+              projDir / "Class1.cs"
               projDir / "obj/Debug/netstandard2.0/l2.AssemblyInfo.cs" ]
             |> List.map Path.GetFullPath
 
-        // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
-        // Expect.equal l2Parsed.SourceFiles l2ExpectedSources "check sources"
-        Expect.equal l2Parsed.SourceFiles l2ExpectedSources "check sources"
+        // TODO C# doesnt have OtherOptions atm. It should.
+        expectEqualSourcesIgnoreOrder l2Parsed.SourceFiles l2ExpectedSources "check sources"
 
         Expect.equal l2Parsed l2Loaded "l2 notificaton and parsed should be the same")
 
@@ -496,7 +506,8 @@ let testLoadSln toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
         let l1Parsed = parsed |> expectFind l1 "the F# lib"
 
         let l1ExpectedSources =
-            [ l1Dir / "obj/Debug/netstandard2.0/l1.AssemblyInfo.fs"
+            [ l1Dir / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
+              l1Dir / "obj/Debug/netstandard2.0/l1.AssemblyInfo.fs"
               l1Dir / "Library.fs" ]
             |> List.map Path.GetFullPath
 
@@ -506,7 +517,8 @@ let testLoadSln toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
         let l2Parsed = parsed |> expectFind l2 "the C# lib"
 
         let l2ExpectedSources =
-            [ l2Dir / "obj/Debug/netstandard2.0/l2.AssemblyInfo.fs"
+            [ l2Dir / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
+              l2Dir / "obj/Debug/netstandard2.0/l2.AssemblyInfo.fs"
               l2Dir / "Library.fs" ]
             |> List.map Path.GetFullPath
 
@@ -516,7 +528,8 @@ let testLoadSln toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
         let c1Parsed = parsed |> expectFind c1 "the F# console"
 
         let c1ExpectedSources =
-            [ c1Dir / "obj/Debug/netcoreapp2.1/c1.AssemblyInfo.fs"
+            [ c1Dir / "obj/Debug/netcoreapp2.1/.NETCoreApp,Version=v2.1.AssemblyAttributes.fs"
+              c1Dir / "obj/Debug/netcoreapp2.1/c1.AssemblyInfo.fs"
               c1Dir / "Program.fs" ]
             |> List.map Path.GetFullPath
 
@@ -591,7 +604,8 @@ let testSample9 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
         let n1Parsed = parsed |> expectFind projPath "first is a lib"
 
         let expectedSources =
-            [ projDir / "obj2/Debug/netstandard2.0/n1.AssemblyInfo.fs"
+            [ projDir / "obj2/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
+              projDir / "obj2/Debug/netstandard2.0/n1.AssemblyInfo.fs"
               projDir / "Library.fs" ]
             |> List.map Path.GetFullPath
 
@@ -620,7 +634,11 @@ let testRender2 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
 
         let rendered = ProjectViewer.render n1Parsed
 
-        let expectedSources = [ projDir / "Library.fs", "Library.fs" ] |> List.map (fun (p, l) -> Path.GetFullPath p, l)
+        let expectedSources =
+            [ projDir / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs", "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
+              projDir / "Library.fs", "Library.fs"
+              projDir / "obj/Debug/netstandard2.0/n1.AssemblyInfo.fs", "obj/Debug/netstandard2.0/n1.AssemblyInfo.fs" ]
+            |> List.map (fun (p, l) -> Path.GetFullPath p, l)
 
         Expect.equal rendered (renderOf sampleProj expectedSources) "check rendered project")
 
@@ -660,7 +678,10 @@ let testRender3 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
 
         Expect.equal (ProjectViewer.render l1Parsed) (renderOf l1Proj l1ExpectedSources) "check rendered l1"
 
-        let l2ExpectedSources = [ l2Dir / "Library.fs", "Library.fs" ] |> List.map (fun (p, l) -> Path.GetFullPath p, l)
+        let l2ExpectedSources =
+            [ l2Dir / "Library.fs", "Library.fs"
+              l2Dir / "obj/Debug/netstandard2.0/l2.AssemblyInfo.cs", "obj/Debug/netstandard2.0/l2.AssemblyInfo.cs" ]
+            |> List.map (fun (p, l) -> Path.GetFullPath p, l)
 
         Expect.equal (ProjectViewer.render l2Parsed) (renderOf l2Proj l2ExpectedSources) "check rendered l2"
 
@@ -686,7 +707,10 @@ let testRender4 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
 
         let m1Parsed = parsed |> expectFind projPath "the F# console"
 
-        let m1ExpectedSources = [ projDir / "LibraryA.fs", "LibraryA.fs" ] |> List.map (fun (p, l) -> Path.GetFullPath p, l)
+        let m1ExpectedSources =
+            [ projDir / "obj/Debug/netstandard2.0/m1.AssemblyInfo.fs", "obj/Debug/netstandard2.0/m1.AssemblyInfo.fs"
+              projDir / "LibraryA.fs", "LibraryA.fs" ]
+            |> List.map (fun (p, l) -> Path.GetFullPath p, l)
 
         Expect.equal (ProjectViewer.render m1Parsed) (renderOf m1Proj m1ExpectedSources) "check rendered m1")
 
@@ -1015,7 +1039,8 @@ let testSample2WithBinLog toolsPath workspaceLoader (workspaceFactory: ToolsPath
         let n1Parsed = parsed |> expectFind projPath "first is a lib"
 
         let expectedSources =
-            [ projDir / "obj/Debug/netstandard2.0/n1.AssemblyInfo.fs"
+            [ projDir / ("obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs")
+              projDir / "obj/Debug/netstandard2.0/n1.AssemblyInfo.fs"
               projDir / "Library.fs" ]
             |> List.map Path.GetFullPath
 
@@ -1164,7 +1189,7 @@ let testProjectSystem toolsPath workspaceLoader workspaceFactory =
         |> expectNotifications (watcher.Notifications)
 
         Expect.equal fcsPo.ReferencedProjects.Length ``sample2 NetSdk library``.ProjectReferences.Length "refs"
-        Expect.equal fcsPo.SourceFiles.Length 2 "files"
+        Expect.equal fcsPo.SourceFiles.Length 3 "files"
 
         let fcs = createFCS ()
         let result = fcs.ParseAndCheckProject(fcsPo) |> Async.RunSynchronously
@@ -1337,11 +1362,11 @@ let loadProjfileFromDiskTests toolsPath  workspaceLoader (workspaceFactory: Tool
         let projPath = testDir / (``sample2 NetSdk library``.ProjectFile)
         dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
         let result = loader.LoadProjects [projPath] |> Seq.head
-        Expect.equal result.SourceFiles.Length 2  "Should have 2 source file"
+        Expect.equal result.SourceFiles.Length 3  "Should have 2 source file"
         
         "Foo.fs" |> addFileToProject projPath
         let result = loader.LoadProjects [projPath] |> Seq.head
-        Expect.equal result.SourceFiles.Length  3 "Should have 3 source file"
+        Expect.equal result.SourceFiles.Length 4 "Should have 3 source file"
     )
 
 let csharpLibTest toolsPath (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
