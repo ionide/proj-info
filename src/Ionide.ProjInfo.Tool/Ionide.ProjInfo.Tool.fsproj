@@ -2,7 +2,8 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-    <TargetFrameworks>net7.0</TargetFrameworks>
+    <TargetFrameworks>net6.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(BuildNet7)' == 'true'">$(TargetFrameworks);net7.0</TargetFrameworks>
         <PackAsTool>true</PackAsTool>
         <ToolCommandName>proj-info</ToolCommandName>
         <RollForward>LatestMajor</RollForward>

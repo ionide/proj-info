@@ -13,6 +13,5 @@
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageDescription>MSBuild evaluation, fsproj file loading, and project system for F# tooling</PackageDescription>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-        <BuildNet7>true</BuildNet7>
     </PropertyGroup>
 </Project>
