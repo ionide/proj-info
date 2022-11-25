@@ -277,6 +277,50 @@ let testSample2 toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPath
         Expect.equal n1Parsed n1Loaded "notificaton and parsed should be the same"
         Expect.equal n1Parsed.SourceFiles expectedSources "check sources")
 
+
+let testSample22 toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPath * (string * string) list -> IWorkspaceLoader) =
+    testCase
+    |> withLog (sprintf "can load sample22 - %s - isRelease is %b" workspaceLoader isRelease) (fun logger fs ->
+        let testDir = inDir fs "load_sample2"
+        copyDirFromAssets fs ``sample2 NetSdk library with custom targets``.ProjDir testDir
+
+        let projPath = testDir / (``sample2 NetSdk library with custom targets``.ProjectFile)
+        let projDir = Path.GetDirectoryName projPath
+
+        dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
+
+        let config =
+            if isRelease then
+                "Release"
+            else
+                "Debug"
+
+        let props = [ ("Configuration", config) ]
+        let loader = workspaceFactory (toolsPath, props)
+
+        let watcher = watchNotifications logger loader
+
+        let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+        
+        [ loading "n1.fsproj"
+          loaded "n1.fsproj" ]
+        |> expectNotifications (watcher.Notifications)
+        
+        let [ _; WorkspaceProjectState.Loaded (n1Loaded, _, _) ] = watcher.Notifications
+
+        let n1Parsed = parsed |> expectFind projPath "first is a lib"
+
+        let expectedSources =
+            [ projDir / ("obj/" + config + "/netstandard2.0/n1.AssemblyInfo.fs")
+              projDir / "BeforeBuild.fs"
+              projDir / "BeforeCompile.fs" ]
+            |> List.map Path.GetFullPath
+
+        Expect.equal parsed.Length 1 "lib"
+        Expect.equal n1Parsed n1Loaded "notificaton and parsed should be the same"
+        Expect.equal n1Parsed.SourceFiles expectedSources "check sources")
+
+
 let testSample3 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) expected =
     testCase
     |> withLog (sprintf "can load sample3 - %s" workspaceLoader) (fun logger fs ->
@@ -1364,7 +1408,8 @@ let tests toolsPath =
     testSequenced
     <| testList
         "Main tests"
-        [ testSample2 toolsPath "WorkspaceLoader" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
+        [ testSample22 toolsPath "WorkspaceLoader" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
+          testSample2 toolsPath "WorkspaceLoader" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
           testSample2 toolsPath "WorkspaceLoader" true (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
           testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" false (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))
           testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" true (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))

@@ -1,4 +1,5 @@
 ﻿namespace Ionide.ProjInfo
+namespace Ionide.ProjInfo
 
 open System
 open System.Collections.Generic
@@ -390,7 +391,7 @@ module ProjectLoader =
                "FindReferenceAssembliesForReferences"
                "_GenerateCompileDependencyCache"
                "_ComputeNonExistentFileProperty"
-               "_GenerateBuildPropertiesFile"
+               "BeforeBuild"
                "BeforeCompile"
                "CoreCompile" |]
 
