@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+  <Target Name="BeforeBuild">
+    <ItemGroup>
+      <Compile Include="BeforeBuild.fs" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="BeforeCompile">
+    <ItemGroup>
+      <Compile Include="BeforeCompile.fs" />
+    </ItemGroup>
+  </Target>
+    
+</Project>
