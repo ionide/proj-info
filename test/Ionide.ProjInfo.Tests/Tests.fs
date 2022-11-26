@@ -624,8 +624,7 @@ let testRender2 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
 
         let loader = workspaceFactory toolsPath
 
-        //let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
-        let parsed = loader.LoadProjects([ projPath ], [], BinaryLogGeneration.Within(DirectoryInfo "c:/projekty/projinfo_binlogs")) |> Seq.toList
+        let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
 
 
         let n1Parsed = parsed |> expectFind projPath "first is a lib"
@@ -1031,7 +1030,7 @@ let testSample2WithBinLog toolsPath workspaceLoader (workspaceFactory: ToolsPath
         let n1Parsed = parsed |> expectFind projPath "first is a lib"
 
         let expectedSources =
-            [ projDir / ("obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs")
+            [ projDir / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
               projDir / "obj/Debug/netstandard2.0/n1.AssemblyInfo.fs"
               projDir / "Library.fs" ]
             |> List.map Path.GetFullPath
@@ -1425,8 +1424,7 @@ let tests toolsPath =
     testSequenced
     <| testList
         "Main tests"
-        [
-          testSample2 toolsPath "WorkspaceLoader" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
+        [ testSample2 toolsPath "WorkspaceLoader" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
           testSample2 toolsPath "WorkspaceLoader" true (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
           testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" false (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))
           testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" true (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))
@@ -1439,7 +1437,7 @@ let tests toolsPath =
           testSample9 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           testSample9 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           testSample10 toolsPath "WorkspaceLoader" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
-          // TODO Add with project graph
+          testSample10 toolsPath "WorkspaceLoaderViaProjectGraph" false (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))
           //Sln tests
           testLoadSln toolsPath "WorkspaceLoader" WorkspaceLoader.Create testSlnExpected
           //   testLoadSln toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create testSlnGraphExpected // Having issues on CI
@@ -1473,25 +1471,25 @@ let tests toolsPath =
           debugTests toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           debugTests toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           testProjectSystemCacheLoad toolsPath "WorkspaceLoader" WorkspaceLoader.Create
-          
+
           //loadProject test
           testLoadProject toolsPath
           loadProjfileFromDiskTests toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           loadProjfileFromDiskTests toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
-          
+
           //Binlog test
           testSample2WithBinLog toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           testSample2WithBinLog toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           test "can get runtimes" {
               let runtimes =
                   SdkDiscovery.runtimes (Paths.dotnetRoot.Value |> Option.defaultWith (fun _ -> failwith "unable to find dotnet binary"))
-          
+
               Expect.isNonEmpty runtimes "should have found at least the currently-executing runtime"
           }
           test "can get sdks" {
               let sdks =
                   SdkDiscovery.sdks (Paths.dotnetRoot.Value |> Option.defaultWith (fun _ -> failwith "unable to find dotnet binary"))
-          
+
               Expect.isNonEmpty sdks "should have found at least the currently-executing sdk"
           }
           testLegacyFrameworkProject toolsPath "can load legacy project file" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
