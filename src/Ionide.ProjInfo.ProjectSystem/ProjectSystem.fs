@@ -90,7 +90,11 @@ type ProjectController(toolsPath: ToolsPath, workspaceLoaderFactory: ToolsPath -
 
     let loadProjects (files: string list) (binaryLogs: BinaryLogGeneration) =
         async {
-            let onChange fn = projectsChanged.OnNext(fn, binaryLogs)
+            let onChange fn =
+                try
+                    projectsChanged.OnNext(fn, binaryLogs)
+                with
+                | :? ObjectDisposedException -> ()
 
             let onLoaded p =
                 match p with

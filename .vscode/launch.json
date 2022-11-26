@@ -48,6 +48,11 @@
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
             "console": "internalConsole"
+        },
+        {
+            "request": "attach",
+            "type": "coreclr",
+            "name": "Attach"
         }
     ],
     "inputs": [
