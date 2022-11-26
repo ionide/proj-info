@@ -72,7 +72,7 @@ module SdkDiscovery =
 
     /// Given the DOTNET_ROOT, that is the directory where the `dotnet` binary is present and the sdk/runtimes/etc are,
     /// enumerates the available runtimes in descending version order
-    let runtimes (dotnetBinaryPath: FileInfo) : DotnetRuntimeInfo[] =
+    let runtimes (dotnetBinaryPath: FileInfo) : DotnetRuntimeInfo [] =
         execDotnet dotnetBinaryPath.Directory dotnetBinaryPath [ "--list-runtimes" ]
         |> Seq.choose (fun line ->
             match line with
@@ -90,7 +90,7 @@ module SdkDiscovery =
 
     /// Given the DOTNET_sROOT, that is the directory where the `dotnet` binary is present and the sdk/runtimes/etc are,
     /// enumerates the available SDKs in descending version order
-    let sdks (dotnetBinaryPath: FileInfo) : DotnetSdkInfo[] =
+    let sdks (dotnetBinaryPath: FileInfo) : DotnetSdkInfo [] =
         execDotnet dotnetBinaryPath.Directory dotnetBinaryPath [ "--list-sdks" ]
         |> Seq.choose (fun line ->
             match line with
@@ -139,7 +139,11 @@ module LegacyFrameworkDiscovery =
                      failwith $"\"{vsWhereExe}\" does not exist. It is a expected to be present in '<ProgramFilesX86>/Microsoft Visual Studio/Installer' when resolving the MsBuild for legacy projects."
 
                  let msbuildExe =
-                     SdkDiscovery.execDotnet vsWhereDir vsWhereExe [ "-find"; "MSBuild\**\Bin\MSBuild.exe" ]
+                     SdkDiscovery.execDotnet
+                         vsWhereDir
+                         vsWhereExe
+                         [ "-find"
+                           "MSBuild\**\Bin\MSBuild.exe" ]
                      |> Seq.tryHead
                      |> Option.map FileInfo
 
@@ -169,7 +173,7 @@ module Init =
         null
 
     let private resolveFromSdkRoot (sdkRoot: DirectoryInfo) : Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly> =
-        Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly>(fun assemblyLoadContext assemblyName ->
+        Func<AssemblyLoadContext, System.Reflection.AssemblyName, System.Reflection.Assembly> (fun assemblyLoadContext assemblyName ->
             let paths =
                 [ Path.Combine(sdkRoot.FullName, assemblyName.Name + ".dll")
                   Path.Combine(sdkRoot.FullName, "en", assemblyName.Name + ".dll") ]
@@ -342,20 +346,19 @@ module ProjectLoader =
             [ logger; yield! loggers ]
 
     let getGlobalProps (path: string) (tfm: string option) (globalProperties: (string * string) list) =
-        dict
-            [ "ProvideCommandLineArgs", "true"
-              "DesignTimeBuild", "true"
-              "SkipCompilerExecution", "true"
-              "GeneratePackageOnBuild", "false"
-              "Configuration", "Debug"
-              "DefineExplicitDefaults", "true"
-              "BuildProjectReferences", "false"
-              "UseCommonOutputDirectory", "false"
-              "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__") // Required by the Clean Target
-              if tfm.IsSome then
-                  "TargetFramework", tfm.Value
-              "DotnetProjInfo", "true"
-              yield! globalProperties ]
+        dict [ "ProvideCommandLineArgs", "true"
+               "DesignTimeBuild", "true"
+               "SkipCompilerExecution", "true"
+               "GeneratePackageOnBuild", "false"
+               "Configuration", "Debug"
+               "DefineExplicitDefaults", "true"
+               "BuildProjectReferences", "false"
+               "UseCommonOutputDirectory", "false"
+               "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__") // Required by the Clean Target
+               if tfm.IsSome then
+                   "TargetFramework", tfm.Value
+               "DotnetProjInfo", "true"
+               yield! globalProperties ]
 
     ///<summary>
     /// These are a list of build targets that are run during a design-time build (mostly).
@@ -435,8 +438,8 @@ module ProjectLoader =
                 ProjectLoadingStatus.Success(LoadedProject pi)
             else
                 ProjectLoadingStatus.Error(sw.ToString())
-        with exc ->
-            ProjectLoadingStatus.Error(exc.Message)
+        with
+        | exc -> ProjectLoadingStatus.Error(exc.Message)
 
     let getFscArgs (LoadedProject project) =
         project.Items |> Seq.filter (fun p -> p.ItemType = "FscCommandLineArgs") |> Seq.map (fun p -> p.EvaluatedInclude)
@@ -851,8 +854,8 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                         loadingNotification.Trigger(WorkspaceProjectState.Loaded(po, allProjectOptions |> Seq.toList, false)))
 
                     allProjectOptions :> seq<_>
-        with e ->
-            handleError e
+        with
+        | e -> handleError e
 
 
     interface IWorkspaceLoader with
@@ -874,7 +877,8 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
         override this.Notifications = loadingNotification.Publish
 
     member this.LoadProjects(projects: string list, customProperties: string list, binaryLogs) =
-        (this :> IWorkspaceLoader).LoadProjects(projects, customProperties, binaryLogs)
+        (this :> IWorkspaceLoader)
+            .LoadProjects(projects, customProperties, binaryLogs)
 
     member this.LoadProjects(projects: string list, customProperties) =
         this.LoadProjects(projects, customProperties, BinaryLogGeneration.Off)
@@ -887,7 +891,8 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
         this.LoadProjects([ project ], customProperties)
 
     member this.LoadProject(project: string) =
-        (this :> IWorkspaceLoader).LoadProjects([ project ])
+        (this :> IWorkspaceLoader)
+            .LoadProjects([ project ])
 
 
     member this.LoadSln(sln: string, customProperties: string list, binaryLogs) =
@@ -936,7 +941,8 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
 
                         let info = Some project
                         lst, info
-                    with exc ->
+                    with
+                    | exc ->
                         loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, exc.Message)))
                         [], None
                 | Error msg when msg.Contains "The project file could not be loaded." ->
@@ -994,7 +1000,8 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
 
     /// <inheritdoc />
     member this.LoadProjects(projects: string list, customProperties: string list, binaryLogs) =
-        (this :> IWorkspaceLoader).LoadProjects(projects, customProperties, binaryLogs)
+        (this :> IWorkspaceLoader)
+            .LoadProjects(projects, customProperties, binaryLogs)
 
     member this.LoadProjects(projects, customProperties) =
         this.LoadProjects(projects, customProperties, BinaryLogGeneration.Off)
@@ -1008,7 +1015,8 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
         this.LoadProjects([ project ], customProperties)
 
     member this.LoadProject(project) =
-        (this :> IWorkspaceLoader).LoadProjects([ project ])
+        (this :> IWorkspaceLoader)
+            .LoadProjects([ project ])
 
 
     member this.LoadSln(sln, customProperties: string list, binaryLogs) =
