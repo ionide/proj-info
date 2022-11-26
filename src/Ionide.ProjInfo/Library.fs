@@ -1047,20 +1047,55 @@ module ProjectViewer =
     let render (proj: ProjectOptions) =
 
         let compileFiles =
+            let isCSharpProject =
+                proj.ProjectFileName.EndsWith ".csproj"
+            let sourceFilesExtension =
+                if isCSharpProject then "cs" else "fs" 
             let sources = proj.Items
+            let projName = proj.ProjectFileName |> Path.GetFileNameWithoutExtension
 
+            let normalize (path: string) =
+                path.Replace("\\", "/").ToLowerInvariant()
+            
+            let assemblyAttributesName =
+                let getProperty (name : string) =
+                    proj.Properties
+                    |> List.tryFind (fun p -> p.Name = name)
+                    |> Option.map (fun p -> p.Value)
+                    
+                let intermediateOutputPath = getProperty "IntermediateOutputPath"
+                let tfi = proj.ProjectSdkInfo.TargetFrameworkIdentifier
+                let tfv = proj.ProjectSdkInfo.TargetFrameworkVersion
+                
+                match intermediateOutputPath with
+                | Some (iop: string) ->
+                    Path.Combine(iop, $@"{tfi},Version={tfv}.AssemblyAttributes.{sourceFilesExtension}")
+                    |> normalize
+                    |> Some
+                | _ -> None
+            
+            let isAssemblyAttributes (path : string) =
+                match assemblyAttributesName with
+                | Some assemblyAttributesName ->
+                    path
+                    |> normalize
+                    |> fun path -> path.EndsWith(assemblyAttributesName)
+                | None -> false
+            
             //the generated assemblyinfo.fs are not shown as sources
             let isGeneratedAssemblyinfo (name: string) =
-                let projName = proj.ProjectFileName |> Path.GetFileNameWithoutExtension
                 //TODO check is in `obj` dir for the tfm
                 //TODO better, get the name from fsproj
-                //TODO cs too
-                name.EndsWith(sprintf "%s.AssemblyInfo.fs" projName)
+                name.EndsWith($"{projName}.AssemblyInfo.{sourceFilesExtension}")
 
+            let includeSourceFile (name: string) =
+                not (isAssemblyAttributes name)
+                && not (isGeneratedAssemblyinfo name)
+            
             sources
             |> List.choose (function
                 | ProjectItem.Compile (name, fullpath) -> Some(name, fullpath))
-            |> List.filter (fun (_, p) -> not (isGeneratedAssemblyinfo p))
+            |> List.filter (fun (_, p) -> includeSourceFile p)
 
         { ProjectViewerTree.Name = proj.ProjectFileName |> Path.GetFileNameWithoutExtension
           Items =

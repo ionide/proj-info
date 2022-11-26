@@ -624,7 +624,8 @@ let testRender2 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
 
         let loader = workspaceFactory toolsPath
 
-        let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+        //let parsed = loader.LoadProjects [ projPath ] |> Seq.toList
+        let parsed = loader.LoadProjects([ projPath ], [], BinaryLogGeneration.Within(DirectoryInfo "c:/projekty/projinfo_binlogs")) |> Seq.toList
 
 
         let n1Parsed = parsed |> expectFind projPath "first is a lib"
@@ -632,9 +633,7 @@ let testRender2 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
         let rendered = ProjectViewer.render n1Parsed
 
         let expectedSources =
-            [ projDir / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs", "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
-              projDir / "Library.fs", "Library.fs"
-              projDir / "obj/Debug/netstandard2.0/n1.AssemblyInfo.fs", "obj/Debug/netstandard2.0/n1.AssemblyInfo.fs" ]
+            [ projDir / "Library.fs", "Library.fs" ]
             |> List.map (fun (p, l) -> Path.GetFullPath p, l)
 
         Expect.equal rendered (renderOf sampleProj expectedSources) "check rendered project")
@@ -669,15 +668,13 @@ let testRender3 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
 
 
         let l1ExpectedSources =
-            [ l1Dir / "Class1.cs", "Class1.cs"
-              l1Dir / "obj/Debug/netstandard2.0/l1.AssemblyInfo.cs", "obj/Debug/netstandard2.0/l1.AssemblyInfo.cs" ]
+            [ l1Dir / "Class1.cs", "Class1.cs" ]
             |> List.map (fun (p, l) -> Path.GetFullPath p, l)
 
         Expect.equal (ProjectViewer.render l1Parsed) (renderOf l1Proj l1ExpectedSources) "check rendered l1"
 
         let l2ExpectedSources =
-            [ l2Dir / "Library.fs", "Library.fs"
-              l2Dir / "obj/Debug/netstandard2.0/l2.AssemblyInfo.cs", "obj/Debug/netstandard2.0/l2.AssemblyInfo.cs" ]
+            [ l2Dir / "Library.fs", "Library.fs" ]
             |> List.map (fun (p, l) -> Path.GetFullPath p, l)
 
         Expect.equal (ProjectViewer.render l2Parsed) (renderOf l2Proj l2ExpectedSources) "check rendered l2"
@@ -705,8 +702,7 @@ let testRender4 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
         let m1Parsed = parsed |> expectFind projPath "the F# console"
 
         let m1ExpectedSources =
-            [ projDir / "obj/Debug/netstandard2.0/m1.AssemblyInfo.fs", "obj/Debug/netstandard2.0/m1.AssemblyInfo.fs"
-              projDir / "LibraryA.fs", "LibraryA.fs" ]
+            [ projDir / "LibraryA.fs", "LibraryA.fs" ]
             |> List.map (fun (p, l) -> Path.GetFullPath p, l)
 
         Expect.equal (ProjectViewer.render m1Parsed) (renderOf m1Proj m1ExpectedSources) "check rendered m1")
@@ -731,8 +727,7 @@ let testRender5 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
         let l2Parsed = parsed |> expectFind projPath "a C# lib"
 
         let l2ExpectedSources =
-            [ projDir / "Class1.cs", "Class1.cs"
-              projDir / "obj/Debug/netstandard2.0/l2.AssemblyInfo.cs", "obj/Debug/netstandard2.0/l2.AssemblyInfo.cs" ]
+            [ projDir / "Class1.cs", "Class1.cs" ]
             |> List.map (fun (p, l) -> Path.GetFullPath p, l)
 
         // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
@@ -1225,7 +1220,7 @@ let testProjectSystemCacheLoad toolsPath workspaceLoader workspaceFactory =
 
 
         Expect.equal fcsPo.ReferencedProjects.Length ``sample2 NetSdk library``.ProjectReferences.Length "refs"
-        Expect.equal fcsPo.SourceFiles.Length 2 "files"
+        Expect.equal fcsPo.SourceFiles.Length 3 "files"
 
         let fcs = createFCS ()
         let result = fcs.ParseAndCheckProject(fcsPo) |> Async.RunSynchronously
@@ -1256,7 +1251,7 @@ let testProjectSystemCacheLoad toolsPath workspaceLoader workspaceFactory =
         |> expectNotifications (watcher2.Notifications)
 
         Expect.equal fcsPo2.ReferencedProjects.Length ``sample2 NetSdk library``.ProjectReferences.Length "refs"
-        Expect.equal fcsPo2.SourceFiles.Length 2 "files"
+        Expect.equal fcsPo2.SourceFiles.Length 3 "files"
 
         let fcs2 = createFCS ()
         let result2 = fcs2.ParseAndCheckProject(fcsPo2) |> Async.RunSynchronously
@@ -1430,7 +1425,7 @@ let tests toolsPath =
     testSequenced
     <| testList
         "Main tests"
-        [ testSample10 toolsPath "WorkspaceLoader" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
+        [
           testSample2 toolsPath "WorkspaceLoader" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
           testSample2 toolsPath "WorkspaceLoader" true (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
           testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" false (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))
@@ -1443,6 +1438,8 @@ let tests toolsPath =
           testSample5 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           testSample9 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           testSample9 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
+          testSample10 toolsPath "WorkspaceLoader" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
+          // TODO Add with project graph
           //Sln tests
           testLoadSln toolsPath "WorkspaceLoader" WorkspaceLoader.Create testSlnExpected
           //   testLoadSln toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create testSlnGraphExpected // Having issues on CI
@@ -1476,25 +1473,25 @@ let tests toolsPath =
           debugTests toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           debugTests toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           testProjectSystemCacheLoad toolsPath "WorkspaceLoader" WorkspaceLoader.Create
-
+          
           //loadProject test
           testLoadProject toolsPath
           loadProjfileFromDiskTests toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           loadProjfileFromDiskTests toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
-
+          
           //Binlog test
           testSample2WithBinLog toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           testSample2WithBinLog toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
           test "can get runtimes" {
               let runtimes =
                   SdkDiscovery.runtimes (Paths.dotnetRoot.Value |> Option.defaultWith (fun _ -> failwith "unable to find dotnet binary"))
-
+          
               Expect.isNonEmpty runtimes "should have found at least the currently-executing runtime"
           }
           test "can get sdks" {
               let sdks =
                   SdkDiscovery.sdks (Paths.dotnetRoot.Value |> Option.defaultWith (fun _ -> failwith "unable to find dotnet binary"))
-
+          
               Expect.isNonEmpty sdks "should have found at least the currently-executing sdk"
           }
           testLegacyFrameworkProject toolsPath "can load legacy project file" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
