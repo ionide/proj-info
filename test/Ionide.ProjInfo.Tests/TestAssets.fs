@@ -52,8 +52,8 @@ let ``sample2 NetSdk library`` =
       ProjectReferences = [] }
     
 /// dotnet sdk, one netstandard2.0 lib n1, custom msbuild targets
-let ``sample2 NetSdk library with custom targets`` =
-    { ProjDir = "sample2-netsdk-custom-targets"
+let ``sample10 NetSdk library with custom targets`` =
+    { ProjDir = "sample10-netsdk-custom-targets"
       AssemblyName = "n1"
       ProjectFile = "n1" / "n1.fsproj"
       TargetFrameworks = Map.ofList [ "netstandard2.0", sourceFiles [ ] ] // Source files are added by custom targets

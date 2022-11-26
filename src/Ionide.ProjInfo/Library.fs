@@ -1,5 +1,4 @@
 ﻿namespace Ionide.ProjInfo
-namespace Ionide.ProjInfo
 
 open System
 open System.Collections.Generic
