@@ -571,9 +571,9 @@ let testSample10 toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPat
     testCase
     |> withLog (sprintf "can load sample10 - %s - isRelease is %b" workspaceLoader isRelease) (fun logger fs ->
         let testDir = inDir fs "load_sample10"
-        copyDirFromAssets fs ``sample2 NetSdk library with custom targets``.ProjDir testDir
+        copyDirFromAssets fs ``sample10 NetSdk library with custom targets``.ProjDir testDir
 
-        let projPath = testDir / (``sample2 NetSdk library with custom targets``.ProjectFile)
+        let projPath = testDir / (``sample10 NetSdk library with custom targets``.ProjectFile)
         let projDir = Path.GetDirectoryName projPath
 
         dotnet fs [ "restore"; projPath ] |> checkExitCodeZero
