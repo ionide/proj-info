@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+  
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+
+  <!-- Must appear after Sdk.targets import -->
+  <Target Name="BeforeBuild">
+    <ItemGroup>
+      <Compile Include="BeforeBuild.fs" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="BeforeCompile">
+    <ItemGroup>
+      <Compile Include="BeforeCompile.fs" />
+    </ItemGroup>
+  </Target>
+
+</Project>
