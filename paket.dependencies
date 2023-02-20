@@ -6,7 +6,7 @@ storage: none
 framework: net6.0, net7.0
 
 nuget FSharp.Core
-nuget FSharp.Compiler.Service ~> 41.0
+nuget FSharp.Compiler.Service
 nuget Argu
 
 # copy_local: true because this is a build-time dependency only
