@@ -14,38 +14,48 @@ module FCS =
         let getStamp () = projectFile.LastWriteTimeUtc
 
         let getStream (ctok: System.Threading.CancellationToken) =
-            projectFile.OpenRead() :> Stream |> Some
+            projectFile.OpenRead() :> Stream
+            |> Some
 
         FSharpReferencedProject.CreatePortableExecutable(p.TargetPath, getStamp, getStream)
 
-    let private makeFCSOptions mapProjectToReference (project: ProjectOptions) =
-        { ProjectId = None
-          ProjectFileName = project.ProjectFileName
-          SourceFiles = List.toArray project.SourceFiles
-          OtherOptions = List.toArray project.OtherOptions
-          ReferencedProjects = project.ReferencedProjects |> List.toArray |> Array.choose mapProjectToReference
-          IsIncompleteTypeCheckEnvironment = false
-          UseScriptResolutionRules = false
-          LoadTime = project.LoadTime
-          UnresolvedReferences = None // it's always None
-          OriginalLoadReferences = [] // it's always empty list
-          Stamp = None }
+    let private makeFCSOptions mapProjectToReference (project: ProjectOptions) = {
+        ProjectId = None
+        ProjectFileName = project.ProjectFileName
+        SourceFiles = List.toArray project.SourceFiles
+        OtherOptions = List.toArray project.OtherOptions
+        ReferencedProjects =
+            project.ReferencedProjects
+            |> List.toArray
+            |> Array.choose mapProjectToReference
+        IsIncompleteTypeCheckEnvironment = false
+        UseScriptResolutionRules = false
+        LoadTime = project.LoadTime
+        UnresolvedReferences = None // it's always None
+        OriginalLoadReferences = [] // it's always empty list
+        Stamp = None
+    }
 
     let rec private makeProjectReference isKnownProject makeFSharpProjectReference (p: ProjectReference) : FSharpReferencedProject option =
         let knownProject = isKnownProject p
 
         let isDotnetProject (knownProject: ProjectOptions option) =
             match knownProject with
-            | Some p -> (p.ProjectFileName.EndsWith(".csproj") || p.ProjectFileName.EndsWith(".vbproj")) && File.Exists p.TargetPath
+            | Some p ->
+                (p.ProjectFileName.EndsWith(".csproj")
+                 || p.ProjectFileName.EndsWith(".vbproj"))
+                && File.Exists p.TargetPath
             | None -> false
 
         if p.ProjectFileName.EndsWith ".fsproj" then
             knownProject
             |> Option.map (fun p ->
                 let theseOptions = makeFSharpProjectReference p
-                FSharpReferencedProject.CreateFSharp(p.TargetPath, theseOptions))
+                FSharpReferencedProject.CreateFSharp(p.TargetPath, theseOptions)
+            )
         elif isDotnetProject knownProject then
-            knownProject |> Option.map loadFromDotnetDll
+            knownProject
+            |> Option.map loadFromDotnetDll
         else
             None
 
@@ -54,7 +64,8 @@ module FCS =
             let dict = System.Collections.Concurrent.ConcurrentDictionary<ProjectOptions, FSharpProjectOptions>()
 
             let isKnownProject (p: ProjectReference) =
-                allKnownProjects |> Seq.tryFind (fun kp -> kp.ProjectFileName = p.ProjectFileName)
+                allKnownProjects
+                |> Seq.tryFind (fun kp -> kp.ProjectFileName = p.ProjectFileName)
 
             let rec makeFSharpProjectReference (p: ProjectOptions) =
                 let factory = makeProjectReference isKnownProject makeFSharpProjectReference
@@ -69,6 +80,7 @@ module FCS =
 
     let rec mapToFSharpProjectOptions (projectOptions: ProjectOptions) (allKnownProjects: ProjectOptions seq) : FSharpProjectOptions =
         let isKnownProject (d: ProjectReference) =
-            allKnownProjects |> Seq.tryFind (fun n -> n.ProjectFileName = d.ProjectFileName)
+            allKnownProjects
+            |> Seq.tryFind (fun n -> n.ProjectFileName = d.ProjectFileName)
 
         makeFCSOptions (makeProjectReference isKnownProject (fun p -> mapToFSharpProjectOptions p allKnownProjects)) projectOptions

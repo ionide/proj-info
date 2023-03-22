@@ -19,7 +19,8 @@ let exec cmd args dir =
     (if isNullOrWhiteSpace dir then
          proc
      else
-         proc |> CreateProcess.withWorkingDirectory dir)
+         proc
+         |> CreateProcess.withWorkingDirectory dir)
     |> Proc.run
     |> ignore
 
@@ -34,18 +35,29 @@ let init args =
     initializeContext args
 
     let buildNet7 =
-        match System.Environment.GetEnvironmentVariable("BuildNet7") |> bool.TryParse with
+        match
+            System.Environment.GetEnvironmentVariable("BuildNet7")
+            |> bool.TryParse
+        with
         | true, v -> v
         | _ -> false
 
     let ignoreTests =
-        match System.Environment.GetEnvironmentVariable("IgnoreTests") |> bool.TryParse with
+        match
+            System.Environment.GetEnvironmentVariable("IgnoreTests")
+            |> bool.TryParse
+        with
         | true, v -> v
         | _ -> false
 
     let packages () = !! "src/**/*.nupkg"
 
-    Target.create "Clean" (fun _ -> packages () |> Seq.iter Shell.rm)
+    Target.create
+        "Clean"
+        (fun _ ->
+            packages ()
+            |> Seq.iter Shell.rm
+        )
 
     Target.create "Build" (fun _ -> DotNet.build id "")
 
@@ -58,53 +70,83 @@ let init args =
     Target.create "Test:net6.0" (fun _ -> testTFM "net6.0")
     Target.create "Test:net7.0" (fun _ -> testTFM "net7.0")
 
-    "Build" =?> ("Test:net6.0", not buildNet7) =?> ("Test", not ignoreTests) |> ignore
-    "Build" =?> ("Test:net7.0", buildNet7) =?> ("Test", not ignoreTests) |> ignore
+    "Build"
+    =?> ("Test:net6.0", not buildNet7)
+    =?> ("Test", not ignoreTests)
+    |> ignore
 
-    Target.create "ListPackages" (fun _ -> packages () |> Seq.iter (fun pkg -> printfn $"Found package at: {pkg}"))
+    "Build"
+    =?> ("Test:net7.0", buildNet7)
+    =?> ("Test", not ignoreTests)
+    |> ignore
 
-    Target.create "Push" (fun _ ->
-        let key =
-            match getBuildParam "nuget-key" with
-            | s when not (isNullOrWhiteSpace s) -> s
-            | _ -> UserInput.getUserPassword "NuGet Key: "
+    Target.create
+        "ListPackages"
+        (fun _ ->
+            packages ()
+            |> Seq.iter (fun pkg -> printfn $"Found package at: {pkg}")
+        )
 
-        let pushPkg (opts: DotNet.NuGetPushOptions) =
-            { opts with
-                PushParams =
-                    { opts.PushParams with
-                        ApiKey = Some key
-                        Source = Some "https://api.nuget.org/v3/index.json" } }
+    Target.create
+        "Push"
+        (fun _ ->
+            let key =
+                match getBuildParam "nuget-key" with
+                | s when not (isNullOrWhiteSpace s) -> s
+                | _ -> UserInput.getUserPassword "NuGet Key: "
 
-        packages () |> Seq.iter (fun pkg -> DotNet.nugetPush pushPkg pkg))
+            let pushPkg (opts: DotNet.NuGetPushOptions) = {
+                opts with
+                    PushParams = {
+                        opts.PushParams with
+                            ApiKey = Some key
+                            Source = Some "https://api.nuget.org/v3/index.json"
+                    }
+            }
 
-    Target.create "CheckFormat" (fun _ ->
-        let result =
-              DotNet.exec id "fantomas" "--check -r ."
+            packages ()
+            |> Seq.iter (fun pkg -> DotNet.nugetPush pushPkg pkg)
+        )
 
-        if result.ExitCode = 0 then
-            Trace.log "No files need formatting"
-        elif result.ExitCode = 99 then
-            failwith "Some files need formatting, check output for more info"
-        else
-            Trace.logf "Errors while formatting: %A" result.Errors)
+    Target.create
+        "CheckFormat"
+        (fun _ ->
+            let result = DotNet.exec id "fantomas" "--check."
 
-    Target.create "Format" (fun _ ->
-        let result =
-              DotNet.exec id "fantomas" "-r ."
+            if result.ExitCode = 0 then
+                Trace.log "No files need formatting"
+            elif result.ExitCode = 99 then
+                failwith "Some files need formatting, check output for more info"
+            else
+                Trace.logf "Errors while formatting: %A" result.Errors
+        )
 
-        if not result.OK then
-            printfn "Errors while formatting all files: %A" result.Messages)
+    Target.create
+        "Format"
+        (fun _ ->
+            let result = DotNet.exec id "fantomas" "."
+
+            if not result.OK then
+                printfn "Errors while formatting all files: %A" result.Messages
+        )
 
     Target.create "Default" DoNothing
 
     Target.create "Release" DoNothing
 
-    "Clean" ==> "CheckFormat" ==> "Build" ==> "Test" ==> "Default" |> ignore
+    "Clean"
+    ==> "CheckFormat"
+    ==> "Build"
+    ==> "Test"
+    ==> "Default"
+    |> ignore
 
 [<EntryPoint>]
 let main args =
-    init ((args |> List.ofArray))
+    init (
+        (args
+         |> List.ofArray)
+    )
 
     try
         match args with
@@ -112,7 +154,6 @@ let main args =
         | _ -> Target.runOrDefaultWithArguments "Default"
 
         0
-    with
-    | e ->
+    with e ->
         printfn "%A" e
         1

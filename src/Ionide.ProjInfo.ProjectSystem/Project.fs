@@ -7,19 +7,28 @@ open Newtonsoft.Json
 open Ionide.ProjInfo
 
 // need to expose this so that json.net can serialize it
-type ProjectCrackerCache =
-    { Options: FSharpProjectOptions
-      OutFile: string option
-      References: string list
-      Items: ProjectViewerItem list
-      ProjectFileName: string
-      ExtraInfo: Types.ProjectOptions }
+type ProjectCrackerCache = {
+    Options: FSharpProjectOptions
+    OutFile: string option
+    References: string list
+    Items: ProjectViewerItem list
+    ProjectFileName: string
+    ExtraInfo: Types.ProjectOptions
+}
 
 module internal ProjectCrackerCache =
     let create (opts: FSharpProjectOptions, extraInfo: Types.ProjectOptions, projViewerItems: ProjectViewerItem list) =
         let outFileOpt = Some(extraInfo.TargetPath)
-        let references = FscArguments.references (opts.OtherOptions |> List.ofArray)
-        let fullPathNormalized = Path.GetFullPath >> Utils.normalizePath
+
+        let references =
+            FscArguments.references (
+                opts.OtherOptions
+                |> List.ofArray
+            )
+
+        let fullPathNormalized =
+            Path.GetFullPath
+            >> Utils.normalizePath
 
         let projViewerItemsNormalized =
             if obj.ReferenceEquals(null, projViewerItems) then
@@ -29,15 +38,19 @@ module internal ProjectCrackerCache =
 
         let projViewerItemsNormalized =
             projViewerItemsNormalized
-            |> List.map (function
-                | ProjectViewerItem.Compile (p, c) -> ProjectViewerItem.Compile(fullPathNormalized p, c))
+            |> List.map (
+                function
+                | ProjectViewerItem.Compile(p, c) -> ProjectViewerItem.Compile(fullPathNormalized p, c)
+            )
 
-        { ProjectCrackerCache.Options = opts
-          OutFile = outFileOpt
-          References = references
-          ExtraInfo = extraInfo
-          ProjectFileName = opts.ProjectFileName
-          Items = projViewerItemsNormalized }
+        {
+            ProjectCrackerCache.Options = opts
+            OutFile = outFileOpt
+            References = references
+            ExtraInfo = extraInfo
+            ProjectFileName = opts.ProjectFileName
+            Items = projViewerItemsNormalized
+        }
 
 
 type private ProjectPersistentCacheMessage =
@@ -45,7 +58,11 @@ type private ProjectPersistentCacheMessage =
     | Load of lastWriteTime: DateTime * channel: AsyncReplyChannel<ProjectCrackerCache option>
 
 type internal ProjectPersistentCache(projectFile: string) =
-    let cachePath = (Path.GetDirectoryName projectFile) </> "obj" </> "fsac.cache"
+    let cachePath =
+        (Path.GetDirectoryName projectFile)
+        </> "obj"
+        </> "fsac.cache"
+
     let settings = JsonSerializerSettings()
 
     do
@@ -60,19 +77,26 @@ type internal ProjectPersistentCache(projectFile: string) =
                     let! msg = mb.Receive()
 
                     match msg with
-                    | Save (lwt, resp) ->
+                    | Save(lwt, resp) ->
                         try
-                            let r = resp |> Option.map JsonConvert.SerializeObject
+                            let r =
+                                resp
+                                |> Option.map JsonConvert.SerializeObject
+
                             let resp' = defaultArg r ""
-                            let ctn = [| lwt.ToString(); resp' |]
+
+                            let ctn = [|
+                                lwt.ToString()
+                                resp'
+                            |]
+
                             File.WriteAllLines(cachePath, ctn)
-                        with
-                        | _ex ->
+                        with _ex ->
                             //TODO add trace
                             ()
 
                         return! loop ()
-                    | Load (lwt, channel) ->
+                    | Load(lwt, channel) ->
                         let resp =
                             try
                                 if File.Exists cachePath then
@@ -85,7 +109,10 @@ type internal ProjectPersistentCache(projectFile: string) =
                                             // older versions would write the {} literal in place of actual data, so we need to check for that
                                             let x = Linq.JObject.Parse r
 
-                                            if isNull x || x.Count = 0 then
+                                            if
+                                                isNull x
+                                                || x.Count = 0
+                                            then
                                                 File.Delete cachePath //Remove cache that can't be deserialized
                                                 None
                                             else
@@ -95,16 +122,14 @@ type internal ProjectPersistentCache(projectFile: string) =
                                                     None
                                                 else
                                                     Some deserialized
-                                        with
-                                        | _ ->
+                                        with _ ->
                                             File.Delete cachePath
                                             None
                                     else
                                         None
                                 else
                                     None
-                            with
-                            | _ex ->
+                            with _ex ->
                                 //TODO add trace
                                 None
 
@@ -128,9 +153,16 @@ type internal Project(projectFile, onChange: string -> unit) =
     let persistentCache = ProjectPersistentCache(projectFile)
 
     let fullPath = Path.GetFullPath projectFile
-    let objFolder = (Path.GetDirectoryName projectFile) </> "obj" |> Path.GetFullPath
 
-    let projectAssetsFile = objFolder </> "project.assets.json"
+    let objFolder =
+        (Path.GetDirectoryName projectFile)
+        </> "obj"
+        |> Path.GetFullPath
+
+    let projectAssetsFile =
+        objFolder
+        </> "project.assets.json"
+
     let projectProps = "*.props"
 
     let agent =
@@ -141,7 +173,10 @@ type internal Project(projectFile, onChange: string -> unit) =
                     let! msg = mb.Receive()
 
                     match msg with
-                    | Changed lwt when lwt <> lastWriteTime ->
+                    | Changed lwt when
+                        lwt
+                        <> lastWriteTime
+                        ->
                         onChange projectFile
                         return! loop (lwt, None)
                     | Changed _ -> return! loop (lastWriteTime, response)
@@ -168,11 +203,16 @@ type internal Project(projectFile, onChange: string -> unit) =
 
             let projectPropsTime =
                 if Directory.Exists objFolder then
-                    let propsFiles = Directory.EnumerateFiles(objFolder, projectProps) |> Seq.toList
+                    let propsFiles =
+                        Directory.EnumerateFiles(objFolder, projectProps)
+                        |> Seq.toList
 
                     match propsFiles with
                     | [] -> DateTime.MinValue
-                    | _ -> propsFiles |> Seq.map File.GetLastWriteTimeUtc |> Seq.max
+                    | _ ->
+                        propsFiles
+                        |> Seq.map File.GetLastWriteTimeUtc
+                        |> Seq.max
                 else
                     DateTime.MinValue
 
@@ -190,8 +230,16 @@ type internal Project(projectFile, onChange: string -> unit) =
     do fsw.EnableRaisingEvents <- true
 
     do
-        if projectAssetsFile |> Path.GetDirectoryName |> Directory.Exists |> not then
-            projectAssetsFile |> Path.GetDirectoryName |> Directory.CreateDirectory |> ignore
+        if
+            projectAssetsFile
+            |> Path.GetDirectoryName
+            |> Directory.Exists
+            |> not
+        then
+            projectAssetsFile
+            |> Path.GetDirectoryName
+            |> Directory.CreateDirectory
+            |> ignore
 
     ///File System Watcher for `obj` dir, at the moment only `project.assets.json` and `*.props`
     let afsw =

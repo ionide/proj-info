@@ -30,12 +30,14 @@ let versionDirectoriesIn (baseDir: DirectoryInfo) =
     |> Array.choose (fun dir ->
         match Version.TryParse dir.Name with
         | true, v -> Some v
-        | false, _ -> None)
+        | false, _ -> None
+    )
     |> Array.sort
 
 /// path to the directory where .Net SDK versions are stored
 let sdkDir (dotnetRoot: DirectoryInfo) =
-    Path.Combine(dotnetRoot.FullName, "sdk") |> DirectoryInfo
+    Path.Combine(dotnetRoot.FullName, "sdk")
+    |> DirectoryInfo
 
 /// returns a sorted list of the SDK versions available at the given dotnet root
 let sdkVersions dotnetRoot =
@@ -48,11 +50,13 @@ let sdkVersions dotnetRoot =
 
 /// path to the .netcoreapp reference assembly storage location
 let netcoreAppPacksDir (dotnetRoot: DirectoryInfo) =
-    Path.Combine(dotnetRoot.FullName, "packs/Microsoft.NETCore.App.Ref") |> DirectoryInfo
+    Path.Combine(dotnetRoot.FullName, "packs/Microsoft.NETCore.App.Ref")
+    |> DirectoryInfo
 
 /// path to the .netcoreapp implementation assembly storage location
 let netcoreAppDir (dotnetRoot: DirectoryInfo) =
-    Path.Combine(dotnetRoot.FullName, "shared/Microsoft.NETCore.App") |> DirectoryInfo
+    Path.Combine(dotnetRoot.FullName, "shared/Microsoft.NETCore.App")
+    |> DirectoryInfo
 
 /// Returns a sorted list of the .Net Core runtime versions available at the given dotnet root.
 ///
@@ -97,35 +101,41 @@ let runtimeDir dotnetRoot runtimeVersion =
 /// but will accept the runtime dir if no pack exists.
 let findRuntimeRefs packDir runtimeDir =
     match packDir, runtimeDir with
-    | Some (refDir: DirectoryInfo), _
-    | _, Some (refDir: DirectoryInfo) ->
+    | Some(refDir: DirectoryInfo), _
+    | _, Some(refDir: DirectoryInfo) ->
         refDir.EnumerateFiles()
         // SUPER IMPORTANT: netstandard/netcore assembly resolution _must not_ contain mscorlib or else
         // its presence triggers old netfx fallbacks, which end up bringing assemblies that aren't part
         // of netcore.
         |> Seq.choose (fun r ->
-            if r.Extension.EndsWith "dll" && not (Path.GetFileNameWithoutExtension(r.Name) = "mscorlib") then
+            if
+                r.Extension.EndsWith "dll"
+                && not (Path.GetFileNameWithoutExtension(r.Name) = "mscorlib")
+            then
                 Some r.FullName
             else
-                None)
+                None
+        )
         |> Seq.toArray
     | None, None -> [||]
 
 /// given the compiler root dir and if to include FSI refs, returns the set of compiler assemblies to references if that dir exists.
 let compilerAndInteractiveRefs compilerDir useFsiAuxLib =
     match compilerDir with
-    | Some (dir: DirectoryInfo) ->
-        [ yield Path.Combine(dir.FullName, "FSharp.Core.dll")
-          if useFsiAuxLib then
-              yield Path.Combine(dir.FullName, "FSharp.Compiler.Interactive.Settings.dll") ]
+    | Some(dir: DirectoryInfo) -> [
+        yield Path.Combine(dir.FullName, "FSharp.Core.dll")
+        if useFsiAuxLib then
+            yield Path.Combine(dir.FullName, "FSharp.Compiler.Interactive.Settings.dll")
+      ]
     | None -> []
 
 /// refs for .net core include:
 /// * runtime-required refs (either ref façades if available or full assemblies if no ref façades are present), and
 /// * compiler/fsi-required refs
-let netCoreRefs dotnetRoot sdkVersion runtimeVersion tfm useFsiAuxLib =
-    [ yield! findRuntimeRefs (appPackDir dotnetRoot runtimeVersion tfm) (runtimeDir dotnetRoot runtimeVersion)
-      yield! compilerAndInteractiveRefs (compilerDir dotnetRoot sdkVersion) useFsiAuxLib ]
+let netCoreRefs dotnetRoot sdkVersion runtimeVersion tfm useFsiAuxLib = [
+    yield! findRuntimeRefs (appPackDir dotnetRoot runtimeVersion tfm) (runtimeDir dotnetRoot runtimeVersion)
+    yield! compilerAndInteractiveRefs (compilerDir dotnetRoot sdkVersion) useFsiAuxLib
+]
 
 /// <summary>picks a TFM for F# scripts based on the provided SDK version.</summary>
 let tfmForRuntime =
@@ -137,15 +147,30 @@ let tfmForRuntime =
 
     fun (sdkVersion: Version) ->
 
-        if netcore7 <= sdkVersion then
+        if
+            netcore7
+            <= sdkVersion
+        then
             "net7.0"
-        else if netcore6 <= sdkVersion then
+        else if
+            netcore6
+            <= sdkVersion
+        then
             "net6.0"
-        else if netcore5 <= sdkVersion then
+        else if
+            netcore5
+            <= sdkVersion
+        then
             "net5.0"
-        else if netcore31 <= sdkVersion then
+        else if
+            netcore31
+            <= sdkVersion
+        then
             "netcoreapp3.1"
-        else if netcore3 <= sdkVersion then
+        else if
+            netcore3
+            <= sdkVersion
+        then
             "netcoreapp3.0"
         else
             "netcoreapp2.2"
