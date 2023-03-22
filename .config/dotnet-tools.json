@@ -20,8 +20,8 @@
         "octonav"
       ]
     },
-    "fantomas-tool": {
-      "version": "4.7.6",
+    "fantomas": {
+      "version": "6.0.0-alpha-006",
       "commands": [
         "fantomas"
       ]
