@@ -26,7 +26,9 @@ let private getItems isFromCache fcsPo po =
     items
 
 let private getProjectOptions (loader: IWorkspaceLoader) (onEvent: ProjectSystemState -> unit) binaryLogs (projectFileNames: string list) =
-    let existing, notExisting = projectFileNames |> List.partition (File.Exists)
+    let existing, notExisting =
+        projectFileNames
+        |> List.partition (File.Exists)
 
     for e in notExisting do
         let error = GenericError(e, sprintf "File '%s' does not exist" e)
@@ -34,22 +36,26 @@ let private getProjectOptions (loader: IWorkspaceLoader) (onEvent: ProjectSystem
 
     let handler state =
         match state with
-        | WorkspaceProjectState.Failed (projectFileName, error) -> onEvent (ProjectSystemState.Failed(projectFileName, error))
-        | WorkspaceProjectState.Loading (p) -> onEvent (ProjectSystemState.Loading p)
-        | WorkspaceProjectState.Loaded (po, allProjects, isFromCache) when po.ProjectFileName.EndsWith ".fsproj" ->
+        | WorkspaceProjectState.Failed(projectFileName, error) -> onEvent (ProjectSystemState.Failed(projectFileName, error))
+        | WorkspaceProjectState.Loading(p) -> onEvent (ProjectSystemState.Loading p)
+        | WorkspaceProjectState.Loaded(po, allProjects, isFromCache) when po.ProjectFileName.EndsWith ".fsproj" ->
             let fpo = FCS.mapToFSharpProjectOptions po allProjects
             let items = getItems isFromCache fpo po
             onEvent (ProjectSystemState.Loaded(fpo, po, items, isFromCache))
-        | WorkspaceProjectState.Loaded (po, allProjects, isFromCache) ->
+        | WorkspaceProjectState.Loaded(po, allProjects, isFromCache) ->
             let view = ProjectViewer.render po
             let items = view.Items
             onEvent (ProjectSystemState.LoadedOther(po, items, isFromCache))
 
     use notif = loader.Notifications.Subscribe handler
-    loader.LoadProjects(existing, [], binaryLogs) |> ignore // TODO: Maybe we should move away from event driven approach???
+
+    loader.LoadProjects(existing, [], binaryLogs)
+    |> ignore // TODO: Maybe we should move away from event driven approach???
 
 let internal loadInBackground onLoaded (loader: IWorkspaceLoader) (projects: Project list) binaryLogs =
-    let (resProjects, otherProjects) = projects |> List.partition (fun n -> n.Response.IsSome)
+    let (resProjects, otherProjects) =
+        projects
+        |> List.partition (fun n -> n.Response.IsSome)
 
     for project in resProjects do
         match project.Response with
@@ -60,4 +66,6 @@ let internal loadInBackground onLoaded (loader: IWorkspaceLoader) (projects: Pro
             onLoaded (ProjectSystemState.Loaded(res.Options, res.ExtraInfo, res.Items, true))
         | None -> () //Shouldn't happen
 
-    otherProjects |> List.map (fun n -> n.FileName) |> getProjectOptions loader onLoaded binaryLogs
+    otherProjects
+    |> List.map (fun n -> n.FileName)
+    |> getProjectOptions loader onLoaded binaryLogs

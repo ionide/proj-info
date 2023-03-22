@@ -6,7 +6,13 @@ open System.Collections.Concurrent
 [<AutoOpen>]
 module internal Utils =
     let inline combinePaths path1 (path2: string) =
-        Path.Combine(path1, path2.TrimStart [| '\\'; '/' |])
+        Path.Combine(
+            path1,
+            path2.TrimStart [|
+                '\\'
+                '/'
+            |]
+        )
 
     let inline (</>) path1 path2 = combinePaths path1 path2
 
@@ -23,13 +29,19 @@ module internal Utils =
         | _ -> path
 
     let normalizePath (file: string) =
-        if file.EndsWith ".fs" || file.EndsWith ".fsi" then
+        if
+            file.EndsWith ".fs"
+            || file.EndsWith ".fsi"
+        then
             let p = Path.GetFullPath file
-            (p.Chars 0).ToString().ToLower() + p.Substring(1)
+
+            (p.Chars 0).ToString().ToLower()
+            + p.Substring(1)
         else
             file
 
     type ConcurrentDictionary<'key, 'value> with
+
         member x.TryFind key =
             match x.TryGetValue key with
             | true, value -> Some value

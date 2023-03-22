@@ -8,7 +8,10 @@ module Paths =
     let private isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
     let private isMac = RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
     let private isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
-    let private isUnix = isLinux || isMac
+
+    let private isUnix =
+        isLinux
+        || isMac
 
     let private dotnetBinaryName =
         if isUnix then
@@ -16,10 +19,11 @@ module Paths =
         else
             "dotnet.exe"
 
-    let private potentialDotnetHostEnvVars =
-        [ "DOTNET_HOST_PATH", id // is a full path to dotnet binary
-          "DOTNET_ROOT", (fun s -> Path.Combine(s, dotnetBinaryName)) // needs dotnet binary appended
-          "DOTNET_ROOT(x86)", (fun s -> Path.Combine(s, dotnetBinaryName)) ] // needs dotnet binary appended
+    let private potentialDotnetHostEnvVars = [
+        "DOTNET_HOST_PATH", id // is a full path to dotnet binary
+        "DOTNET_ROOT", (fun s -> Path.Combine(s, dotnetBinaryName)) // needs dotnet binary appended
+        "DOTNET_ROOT(x86)", (fun s -> Path.Combine(s, dotnetBinaryName))
+    ] // needs dotnet binary appended
 
     let private existingEnvVarValue envVarValue =
         match envVarValue with
@@ -30,9 +34,17 @@ module Paths =
     let private tryFindFromEnvVar () =
         potentialDotnetHostEnvVars
         |> List.tryPick (fun (envVar, transformer) ->
-            match Environment.GetEnvironmentVariable envVar |> existingEnvVarValue with
-            | Some varValue -> Some(transformer varValue |> FileInfo)
-            | None -> None)
+            match
+                Environment.GetEnvironmentVariable envVar
+                |> existingEnvVarValue
+            with
+            | Some varValue ->
+                Some(
+                    transformer varValue
+                    |> FileInfo
+                )
+            | None -> None
+        )
 
     let private PATHSeparator =
         if isUnix then
@@ -41,17 +53,23 @@ module Paths =
             ';'
 
     let private tryFindFromPATH () =
-        System
-            .Environment
+        System.Environment
             .GetEnvironmentVariable("PATH")
-            .Split(PATHSeparator, StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
+            .Split(
+                PATHSeparator,
+                StringSplitOptions.RemoveEmptyEntries
+                ||| StringSplitOptions.TrimEntries
+            )
         |> Array.tryPick (fun d ->
-            let fi = Path.Combine(d, dotnetBinaryName) |> FileInfo
+            let fi =
+                Path.Combine(d, dotnetBinaryName)
+                |> FileInfo
 
             if fi.Exists then
                 Some fi
             else
-                None)
+                None
+        )
 
 
     let private tryFindFromDefaultDirs () =
@@ -81,7 +99,10 @@ module Paths =
     /// Also probes the PATH and checks the default installation locations
     /// </summary>
     let dotnetRoot =
-        lazy (tryFindFromEnvVar () |> Option.orElseWith tryFindFromPATH |> Option.orElseWith tryFindFromDefaultDirs)
+        lazy
+            (tryFindFromEnvVar ()
+             |> Option.orElseWith tryFindFromPATH
+             |> Option.orElseWith tryFindFromDefaultDirs)
 
     let sdksPath (dotnetRoot: string) =
         System.IO.Path.Combine(dotnetRoot, "Sdks")
@@ -95,7 +116,8 @@ module internal CommonHelpers =
             None
 
     let chooseByPrefix2 prefixes (s: string) =
-        prefixes |> List.tryPick (fun prefix -> chooseByPrefix prefix s)
+        prefixes
+        |> List.tryPick (fun prefix -> chooseByPrefix prefix s)
 
     let splitByPrefix (prefix: string) (s: string) =
         if s.StartsWith(prefix) then
@@ -104,7 +126,8 @@ module internal CommonHelpers =
             None
 
     let splitByPrefix2 prefixes (s: string) =
-        prefixes |> List.tryPick (fun prefix -> splitByPrefix prefix s)
+        prefixes
+        |> List.tryPick (fun prefix -> splitByPrefix prefix s)
 
 module FscArguments =
 
@@ -119,7 +142,10 @@ module FscArguments =
         | Some v -> ProjectOutputType.Custom v
         | None -> ProjectOutputType.Exe // default if arg is not passed to fsc
 
-    let private outputFileArg = [ "--out:"; "-o:" ]
+    let private outputFileArg = [
+        "--out:"
+        "-o:"
+    ]
 
     let private makeAbs (projDir: string) (f: string) =
         if Path.IsPathRooted f then
@@ -128,22 +154,38 @@ module FscArguments =
             Path.Combine(projDir, f)
 
     let outputFile projDir rsp =
-        rsp |> List.tryPick (chooseByPrefix2 outputFileArg) |> Option.map (makeAbs projDir)
+        rsp
+        |> List.tryPick (chooseByPrefix2 outputFileArg)
+        |> Option.map (makeAbs projDir)
 
     let isCompileFile (s: string) =
-        let isArg = s.StartsWith("-") && s.Contains(":")
-        (not isArg) && (s.EndsWith(".fs") || s.EndsWith(".fsi") || s.EndsWith(".fsx"))
+        let isArg =
+            s.StartsWith("-")
+            && s.Contains(":")
+
+        (not isArg)
+        && (s.EndsWith(".fs")
+            || s.EndsWith(".fsi")
+            || s.EndsWith(".fsx"))
 
     let references =
         //TODO valid also --reference:
         List.choose (chooseByPrefix "-r:")
 
     let useFullPaths projDir (s: string) =
-        match s |> splitByPrefix2 outputFileArg with
-        | Some (prefix, v) -> prefix + (v |> makeAbs projDir)
+        match
+            s
+            |> splitByPrefix2 outputFileArg
+        with
+        | Some(prefix, v) ->
+            prefix
+            + (v
+               |> makeAbs projDir)
         | None ->
             if isCompileFile s then
-                s |> makeAbs projDir |> Path.GetFullPath
+                s
+                |> makeAbs projDir
+                |> Path.GetFullPath
             else
                 s
 
@@ -154,7 +196,8 @@ module FscArguments =
 
     let isDeprecatedArg n =
         // TODO put in FCS
-        (n = "--times") || (n = "--no-jit-optimize")
+        (n = "--times")
+        || (n = "--no-jit-optimize")
 
     let isSourceFile (file: string) : (string -> bool) =
         if System.IO.Path.GetExtension(file) = ".fsproj" then
@@ -167,7 +210,10 @@ module CscArguments =
     open System.IO
     open Types
 
-    let private outputFileArg = [ "--out:"; "-o:" ]
+    let private outputFileArg = [
+        "--out:"
+        "-o:"
+    ]
 
     let private makeAbs (projDir: string) (f: string) =
         if Path.IsPathRooted f then
@@ -176,12 +222,18 @@ module CscArguments =
             Path.Combine(projDir, f)
 
     let isCompileFile (s: string) =
-        let isArg = s.StartsWith("-") && s.Contains(":")
-        (not isArg) && s.EndsWith(".cs")
+        let isArg =
+            s.StartsWith("-")
+            && s.Contains(":")
+
+        (not isArg)
+        && s.EndsWith(".cs")
 
     let useFullPaths projDir (s: string) =
         if isCompileFile s then
-            s |> makeAbs projDir |> Path.GetFullPath
+            s
+            |> makeAbs projDir
+            |> Path.GetFullPath
         else
             s
 
@@ -192,7 +244,9 @@ module CscArguments =
             (fun n -> n.EndsWith ".fs")
 
     let outputFile projDir rsp =
-        rsp |> List.tryPick (chooseByPrefix2 outputFileArg) |> Option.map (makeAbs projDir)
+        rsp
+        |> List.tryPick (chooseByPrefix2 outputFileArg)
+        |> Option.map (makeAbs projDir)
 
     let outType rsp =
         match List.tryPick (chooseByPrefix "/target:") rsp with
