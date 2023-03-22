@@ -78,11 +78,9 @@ let init args =
 
         packages () |> Seq.iter (fun pkg -> DotNet.nugetPush pushPkg pkg))
 
-    let sourceFiles = !! "src/**/*.fs" ++ "build.fsx" -- "src/**/obj/**/*.fs"
-
     Target.create "CheckFormat" (fun _ ->
         let result =
-            sourceFiles |> Seq.map (sprintf "\"%s\"") |> String.concat " " |> sprintf "%s --check" |> DotNet.exec id "fantomas"
+              DotNet.exec id "fantomas" "--check -r ."
 
         if result.ExitCode = 0 then
             Trace.log "No files need formatting"
@@ -92,7 +90,8 @@ let init args =
             Trace.logf "Errors while formatting: %A" result.Errors)
 
     Target.create "Format" (fun _ ->
-        let result = sourceFiles |> Seq.map (sprintf "\"%s\"") |> String.concat " " |> DotNet.exec id "fantomas"
+        let result =
+              DotNet.exec id "fantomas" "-r ."
 
         if not result.OK then
             printfn "Errors while formatting all files: %A" result.Messages)
