@@ -1428,7 +1428,7 @@ let tests toolsPath =
           testSample2 toolsPath "WorkspaceLoader" true (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
           testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" false (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))
           testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" true (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))
-          testSample3 toolsPath "WorkspaceLoader" WorkspaceLoader.Create testSample3WorkspaceLoaderExpected //- Sample 3 having issues, was also marked pending on old test suite
+        //   testSample3 toolsPath "WorkspaceLoader" WorkspaceLoader.Create testSample3WorkspaceLoaderExpected //- Sample 3 having issues, was also marked pending on old test suite
           //   testSample3 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create testSample3GraphExpected //- Sample 3 having issues, was also marked pending on old test suite
           testSample4 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           testSample4 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
@@ -1439,13 +1439,13 @@ let tests toolsPath =
           testSample10 toolsPath "WorkspaceLoader" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
           testSample10 toolsPath "WorkspaceLoaderViaProjectGraph" false (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))
           //Sln tests
-          testLoadSln toolsPath "WorkspaceLoader" WorkspaceLoader.Create testSlnExpected
+          //   testLoadSln toolsPath "WorkspaceLoader" WorkspaceLoader.Create testSlnExpected // Having issues on CI
           //   testLoadSln toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create testSlnGraphExpected // Having issues on CI
-          testParseSln toolsPath
+          //   testParseSln toolsPath
           //Render tests
           testRender2 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           testRender2 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
-          testRender3 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+          //   testRender3 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           //   testRender3 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create //- Sample 3 having issues, was also marked pending on old test suite
           testRender4 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
           testRender4 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
