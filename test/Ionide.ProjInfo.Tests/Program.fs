@@ -19,8 +19,10 @@ let main argv =
     let toolsPath = Init.init (IO.DirectoryInfo Environment.CurrentDirectory) None
 
     Tests.runTestsWithArgs
-        { defaultConfig with
-            printer = TestPrinters.summaryPrinter defaultConfig.printer
-            verbosity = LogLevel.Verbose }
+        {
+            defaultConfig with
+                printer = TestPrinters.summaryPrinter defaultConfig.printer
+                verbosity = LogLevel.Verbose
+        }
         argv
         tests
