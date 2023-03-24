@@ -28,14 +28,13 @@ module Types =
 
     /// Type representing a Log
     [<NoEquality; NoComparison>]
-    type Log =
-        {
-            LogLevel: LogLevel
-            Message: MessageThunk
-            Exception: exn option
-            Parameters: obj list
-            AdditionalNamedParameters: ((string * obj * bool) list)
-        }
+    type Log = {
+        LogLevel: LogLevel
+        Message: MessageThunk
+        Exception: exn option
+        Parameters: obj list
+        AdditionalNamedParameters: ((string * obj * bool) list)
+    } with
 
         static member StartLogLevel(logLevel: LogLevel) = {
             LogLevel = logLevel
@@ -263,10 +262,10 @@ module Types =
         /// <param name="message">The message to set for the log.</param>
         /// <param name="log">The log to amend.</param>
         /// <returns>The amended log.</returns>
-        let setMessage (message: string) (log: Log) =
-            { log with
+        let setMessage (message: string) (log: Log) = {
+            log with
                 Message = Some(fun () -> message)
-            }
+        }
 
         /// <summary>
         /// Amends a <see cref="T:FsLibLog.Types.Log">Log</see> with a message thunk.  Useful for "expensive" string construction scenarios.
@@ -274,8 +273,7 @@ module Types =
         /// <param name="messageThunk">The function that generates a message to add to a Log.</param>
         /// <param name="log">The log to amend.</param>
         /// <returns>The amended log.</returns>
-        let setMessageThunk (messageThunk: unit -> string) (log: Log) =
-            { log with Message = Some messageThunk }
+        let setMessageThunk (messageThunk: unit -> string) (log: Log) = { log with Message = Some messageThunk }
 
         /// <summary>
         /// Amends a <see cref="T:FsLibLog.Types.Log">Log</see> with a parameter.
@@ -283,10 +281,10 @@ module Types =
         /// <param name="param">The value to add to the log</param>
         /// <param name="log">The log to amend.</param>
         /// <returns>The amended log.</returns>
-        let addParameter (param: 'a) (log: Log) =
-            { log with
+        let addParameter (param: 'a) (log: Log) = {
+            log with
                 Parameters = List.append log.Parameters [ (box param) ]
-            }
+        }
 
         /// <summary>
         /// Amends a <see cref="T:FsLibLog.Types.Log">Log</see> with a list of parameters.
@@ -299,10 +297,11 @@ module Types =
                 ``params``
                 |> List.map box
 
-            { log with
-                Parameters =
-                    log.Parameters
-                    @ ``params``
+            {
+                log with
+                    Parameters =
+                        log.Parameters
+                        @ ``params``
             }
 
 
@@ -315,10 +314,10 @@ module Types =
         /// <param name="value">The value of the parameter to add to the log.</param>
         /// <param name="log">The log to amend.</param>
         /// <returns>The amended log.</returns>
-        let addContext (key: string) (value: obj) (log: Log) =
-            { log with
+        let addContext (key: string) (value: obj) (log: Log) = {
+            log with
                 AdditionalNamedParameters = List.append log.AdditionalNamedParameters [ key, (box value), false ]
-            }
+        }
 
 
         /// <summary>
@@ -332,10 +331,10 @@ module Types =
         /// <param name="value">The value of the parameter to add to the log.</param>
         /// <param name="log">The log to amend.</param>
         /// <returns>The amended log.</returns>
-        let addContextDestructured (key: string) (value: obj) (log: Log) =
-            { log with
+        let addContextDestructured (key: string) (value: obj) (log: Log) = {
+            log with
                 AdditionalNamedParameters = List.append log.AdditionalNamedParameters [ key, (box value), true ]
-            }
+        }
 
 
         /// <summary>
@@ -344,10 +343,10 @@ module Types =
         /// <param name="exception">The exception to add to the log.</param>
         /// <param name="log">The log to amend.</param>
         /// <returns>The amended log.</returns>
-        let addException (``exception``: exn) (log: Log) =
-            { log with
+        let addException (``exception``: exn) (log: Log) = {
+            log with
                 Exception = Option.ofObj ``exception``
-            }
+        }
 
         /// <summary>
         /// Amends a <see cref="T:FsLibLog.Types.Log">Log</see> with an <see cref="T:System.Exception">exn</see>. Handles nulls.
@@ -589,13 +588,12 @@ module Providers =
             fun name -> func.Invoke("SourceContext", name, false)
 
         [<NoEquality; NoComparison>]
-        type SerilogGateway =
-            {
-                Write: obj -> obj -> string -> obj[] -> unit
-                WriteException: obj -> obj -> exn -> string -> obj[] -> unit
-                IsEnabled: obj -> obj -> bool
-                TranslateLevel: LogLevel -> obj
-            }
+        type SerilogGateway = {
+            Write: obj -> obj -> string -> obj[] -> unit
+            WriteException: obj -> obj -> exn -> string -> obj[] -> unit
+            IsEnabled: obj -> obj -> bool
+            TranslateLevel: LogLevel -> obj
+        } with
 
             static member Create() =
                 let logEventLevelType = Type.GetType("Serilog.Events.LogEventLevel, Serilog")
@@ -767,10 +765,9 @@ module Providers =
         type MessageArgs = obj array
 
         [<NoEquality; NoComparison>]
-        type LoggerFactoryGateway =
-            {
-                CreateLogger: ILoggerFactory -> LoggerName -> ILogger
-            }
+        type LoggerFactoryGateway = {
+            CreateLogger: ILoggerFactory -> LoggerName -> ILogger
+        } with
 
             static member Create() =
                 let createLogger =
@@ -791,14 +788,13 @@ module Providers =
 
                 { CreateLogger = createLogger }
 
-        type LoggerGateway =
-            {
-                Write: ILogger -> MicrosoftLogLevel -> MessageFormat -> MessageArgs -> unit
-                WriteError: ILogger -> MicrosoftLogLevel -> exn -> MessageFormat -> MessageArgs -> unit
-                IsEnabled: ILogger -> MicrosoftLogLevel -> bool
-                TranslateLevel: LogLevel -> MicrosoftLogLevel
-                BeginScope: ILogger -> obj -> IDisposable
-            }
+        type LoggerGateway = {
+            Write: ILogger -> MicrosoftLogLevel -> MessageFormat -> MessageArgs -> unit
+            WriteError: ILogger -> MicrosoftLogLevel -> exn -> MessageFormat -> MessageArgs -> unit
+            IsEnabled: ILogger -> MicrosoftLogLevel -> bool
+            TranslateLevel: LogLevel -> MicrosoftLogLevel
+            BeginScope: ILogger -> obj -> IDisposable
+        } with
 
             static member Create() =
                 let loggerExtensions =

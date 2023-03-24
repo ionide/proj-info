@@ -1,22 +1,22 @@
-*.doc  diff=astextplain
-*.DOC	diff=astextplain
-*.docx	diff=astextplain
-*.DOCX	diff=astextplain
-*.dot	diff=astextplain
-*.DOT	diff=astextplain
-*.pdf	diff=astextplain
-*.PDF	diff=astextplain
-*.rtf	diff=astextplain
-*.RTF	diff=astextplain
+*.doc diff=astextplain
+*.DOC diff=astextplain
+*.docx diff=astextplain
+*.DOCX diff=astextplain
+*.dot diff=astextplain
+*.DOT diff=astextplain
+*.pdf diff=astextplain
+*.PDF diff=astextplain
+*.rtf diff=astextplain
+*.RTF diff=astextplain
 
-*.jpg  	binary
-*.png 	binary
-*.gif 	binary
+*.jpg binary
+*.png binary
+*.gif binary
 
 *.sh eol=lf
 
-*.cs text=auto diff=csharp 
-*.vb text=auto
+*.cs text=auto diff=csharp ol=lf
+*.vb text=auto diff=csharp ol=lf
 *.resx text=auto
 *.c text=auto
 *.cpp text=auto
@@ -41,8 +41,8 @@
 *.m text=auto
 *.asm text=auto
 *.erl text=auto
-*.fs text=auto
-*.fsx text=auto
+*.fs text=auto diff=csharp ol=lf
+*.fsx text=auto diff=csharp ol=lf
 *.hs text=auto
 
 *.csproj text=auto
