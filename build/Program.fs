@@ -68,6 +68,11 @@ let init args =
             "."
         |> ignore
 
+    let testTFM tfm =
+        exec "dotnet" $"run --framework {tfm} -c Release --project .\\test\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj" "."
+        |> ignore
+
+
     Target.create "Test" DoNothing
 
     Target.create "Test:net6.0" (fun _ -> testTFM "net6.0")
