@@ -7,11 +7,14 @@ open Ionide.ProjInfo.ProjectSystem
 open Expecto
 open Expecto.Impl
 open Expecto.Logging
+open FsLibLog.Providers.Expecto
 
 let toolsPath = Init.init (IO.DirectoryInfo Environment.CurrentDirectory) None
 
 [<Tests>]
 let tests = Tests.tests toolsPath
+
+Ionide.ProjInfo.Logging.LogProvider.setLoggerProvider (ExpectoLogProvider())
 
 
 [<EntryPoint>]
