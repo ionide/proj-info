@@ -821,11 +821,7 @@ let testParseSln toolsPath =
             let p = InspectSln.tryParseSln (slnPath)
 
             ()
-        // Expect.isTrue
-        //     (match p with
-        //      | Ok _ -> true
-        //      | Result.Error _ -> false)
-        //     "expected successful parse"
+            Expect.isOk p "expected successful parse"
 
         // let actualProjects =
         //     InspectSln.loadingBuildOrder (

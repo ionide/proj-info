@@ -1,4 +1,4 @@
-// As of commit 599e765db64ba5bcde23a589f427453c52fdb132
+// As of commit 1fe15c95c008567db63e00e823ca8768155e85c6
 namespace Ionide.ProjInfo.Logging
 
 open System.Text.RegularExpressions
@@ -772,10 +772,13 @@ module Providers =
             static member Create() =
                 let createLogger =
                     let factoryType = getLogFactoryType.Value
+
                     let createLoggerMethodInfo = factoryType.GetMethod("CreateLogger", [| typedefof<string> |])
+
                     let instanceParam = Expression.Parameter(typedefof<ILoggerFactory>)
                     let nameParam = Expression.Parameter(typedefof<string>)
                     let instanceCast = Expression.Convert(instanceParam, factoryType)
+
                     let createLoggerMethodExp = Expression.Call(instanceCast, createLoggerMethodInfo, nameParam)
 
                     let createLogger =
@@ -801,7 +804,9 @@ module Providers =
                     Type.GetType("Microsoft.Extensions.Logging.LoggerExtensions, Microsoft.Extensions.Logging.Abstractions")
 
                 let loggerType = Type.GetType("Microsoft.Extensions.Logging.ILogger, Microsoft.Extensions.Logging.Abstractions")
+
                 let logEventLevelType = Type.GetType("Microsoft.Extensions.Logging.LogLevel, Microsoft.Extensions.Logging.Abstractions")
+
                 let instanceParam = Expression.Parameter(typedefof<ILogger>)
 
                 let instanceCast = Expression.Convert(instanceParam, loggerType)
@@ -811,6 +816,7 @@ module Providers =
 
                 let isEnabled =
                     let isEnabledMethodInfo = loggerType.GetMethod("IsEnabled", [| logEventLevelType |])
+
                     let isEnabledMethodCall = Expression.Call(instanceCast, isEnabledMethodInfo, levelCast)
 
 
@@ -907,6 +913,7 @@ module Providers =
                     let beginScopeMethodInfo = loggerType.GetMethod("BeginScope").MakeGenericMethod(typedefof<obj>)
 
                     let stateParam = Expression.Parameter(typedefof<obj>)
+
                     let beginScopeMethodCall = Expression.Call(instanceCast, beginScopeMethodInfo, stateParam)
 
                     Expression
@@ -973,6 +980,7 @@ module Providers =
                     | Some factory ->
                         // Create bogus logger that will propagate to a real logger later
                         let logger = factoryGateway.Value.CreateLogger factory (Guid.NewGuid().ToString())
+
                         loggerGateway.Value.BeginScope logger (box message)
 
         let create () = MicrosoftProvider() :> ILogProvider

@@ -329,6 +329,7 @@ type BinaryLogGeneration =
 /// </summary>
 module ProjectLoader =
 
+
     type LoadedProject = internal LoadedProject of ProjectInstance
 
     [<RequireQualifiedAccess>]
@@ -337,11 +338,14 @@ module ProjectLoader =
         | Success of LoadedProject
         | Error of string
 
-    let internal logger (writer: StringWriter) =
+    let internal stringWriterLogger (writer: StringWriter) =
         { new ILogger with
             member this.Initialize(eventSource: IEventSource) : unit =
                 // eventSource.ErrorRaised.Add(fun t -> writer.WriteLine t.Message) //Only log errors
-                eventSource.AnyEventRaised.Add(fun t -> writer.WriteLine t.Message)
+                eventSource.AnyEventRaised.Add(fun t ->
+                    let message = t.Message
+                    writer.WriteLine message
+                )
 
             member this.Parameters: string = ""
 
@@ -353,6 +357,28 @@ module ProjectLoader =
 
             member this.Verbosity
                 with set (v: LoggerVerbosity): unit = ()
+        }
+
+
+    let msBuildToLogProvider () =
+        let msBuildLogger = LogProvider.getLoggerByName "MsBuild"
+
+        { new ILogger with
+            member this.Initialize(eventSource: IEventSource) : unit =
+                eventSource.ErrorRaised.Add(fun t -> msBuildLogger.error (Log.setMessage t.Message))
+                eventSource.WarningRaised.Add(fun t -> msBuildLogger.warn (Log.setMessage t.Message))
+
+                eventSource.AnyEventRaised.Add(fun t -> msBuildLogger.info (Log.setMessage t.Message))
+
+            member this.Parameters
+                with get (): string = ""
+                and set (v: string): unit = ()
+
+            member this.Shutdown() : unit = ()
+
+            member this.Verbosity
+                with get (): LoggerVerbosity = LoggerVerbosity.Diagnostic
+                and set (v: LoggerVerbosity): unit = ()
         }
 
     let getTfm (path: string) readingProps isLegacyFrameworkProj =
@@ -379,7 +405,8 @@ module ProjectLoader =
             Some tfm
 
     let createLoggers (paths: string seq) (binaryLogs: BinaryLogGeneration) (sw: StringWriter) =
-        let logger = logger (sw)
+        let swLogger = stringWriterLogger (sw)
+        let msbuildLogger = msBuildToLogProvider ()
 
         let logFilePath (dir: DirectoryInfo, projectPath: string) =
             let projectFileName = Path.GetFileName projectPath
@@ -387,7 +414,10 @@ module ProjectLoader =
             Path.Combine(dir.FullName, logFileName)
 
         match binaryLogs with
-        | BinaryLogGeneration.Off -> [ logger ]
+        | BinaryLogGeneration.Off -> [
+            swLogger
+            msbuildLogger
+          ]
         | BinaryLogGeneration.Within dir ->
             let loggers =
                 paths
@@ -397,7 +427,8 @@ module ProjectLoader =
                 )
 
             [
-                logger
+                msbuildLogger
+                swLogger
                 yield! loggers
             ]
 
@@ -851,6 +882,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
     let (ToolsPath toolsPath) = toolsPath
     let globalProperties = defaultArg globalProperties []
     let logger = LogProvider.getLoggerFor<WorkspaceLoaderViaProjectGraph> ()
+
     let loadingNotification = new Event<Types.WorkspaceProjectState>()
 
     let handleProjectGraphFailures f =
@@ -1041,10 +1073,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
                     allProjectOptions
                     |> Seq.iter (fun po ->
-                        logger.info (
-                            Log.setMessage "Project loaded {project}"
-                            >> Log.addContextDestructured "project" po.ProjectFileName
-                        )
+                        logger.info (Log.setMessageI $"Project loaded {po.ProjectFileName:project}")
 
                         loadingNotification.Trigger(
                             WorkspaceProjectState.Loaded(
