@@ -337,7 +337,44 @@ module ProjectLoader =
         | Success of LoadedProject
         | Error of string
 
-    let internal logger (writer: StringWriter) =
+    let internal msBuildLogger = lazy (LogProvider.getLoggerByName "MsBuild") //lazy because dotnet test wont pickup our logger otherwise
+
+    let msBuildToLogProvider () =
+        let msBuildLogger = msBuildLogger.Value
+
+        { new ILogger with
+            member this.Initialize(eventSource: IEventSource) : unit =
+                eventSource.ErrorRaised.Add(fun t -> msBuildLogger.error (Log.setMessage t.Message))
+                eventSource.WarningRaised.Add(fun t -> msBuildLogger.warn (Log.setMessage t.Message))
+                eventSource.BuildStarted.Add(fun t -> msBuildLogger.info (Log.setMessage t.Message))
+                eventSource.BuildFinished.Add(fun t -> msBuildLogger.info (Log.setMessage t.Message))
+
+                eventSource.MessageRaised.Add(fun t ->
+                    match t.Importance with
+                    | MessageImportance.High -> msBuildLogger.debug (Log.setMessage t.Message)
+                    | MessageImportance.Normal
+                    | MessageImportance.Low
+                    | _ -> msBuildLogger.trace (Log.setMessage t.Message)
+                )
+
+                eventSource.TargetStarted.Add(fun t -> msBuildLogger.trace (Log.setMessage t.Message))
+                eventSource.TargetFinished.Add(fun t -> msBuildLogger.trace (Log.setMessage t.Message))
+                eventSource.TaskStarted.Add(fun t -> msBuildLogger.trace (Log.setMessage t.Message))
+                eventSource.TaskFinished.Add(fun t -> msBuildLogger.trace (Log.setMessage t.Message))
+
+            member this.Parameters
+                with get (): string = ""
+                and set (v: string): unit = ()
+
+            member this.Shutdown() : unit = ()
+
+            member this.Verbosity
+                with get (): LoggerVerbosity = LoggerVerbosity.Detailed
+                and set (v: LoggerVerbosity): unit = ()
+        }
+
+
+    let internal stringWriterLogger (writer: StringWriter) =
         { new ILogger with
             member this.Initialize(eventSource: IEventSource) : unit =
                 // eventSource.ErrorRaised.Add(fun t -> writer.WriteLine t.Message) //Only log errors
@@ -379,7 +416,8 @@ module ProjectLoader =
             Some tfm
 
     let createLoggers (paths: string seq) (binaryLogs: BinaryLogGeneration) (sw: StringWriter) =
-        let logger = logger (sw)
+        let swLogger = stringWriterLogger (sw)
+        let msBuildLogger = msBuildToLogProvider ()
 
         let logFilePath (dir: DirectoryInfo, projectPath: string) =
             let projectFileName = Path.GetFileName projectPath
@@ -387,7 +425,10 @@ module ProjectLoader =
             Path.Combine(dir.FullName, logFileName)
 
         match binaryLogs with
-        | BinaryLogGeneration.Off -> [ logger ]
+        | BinaryLogGeneration.Off -> [
+            swLogger
+            msBuildLogger
+          ]
         | BinaryLogGeneration.Within dir ->
             let loggers =
                 paths
@@ -397,7 +438,8 @@ module ProjectLoader =
                 )
 
             [
-                logger
+                swLogger
+                msBuildLogger
                 yield! loggers
             ]
 
@@ -923,12 +965,11 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
             pg
 
     let loadProjects (projects: ProjectGraph, customProperties: string list, binaryLogs: BinaryLogGeneration) =
-        let handleError (e: exn) =
+        let handleError (msbuildErrors: string) (e: exn) =
             let msg = e.Message
-            printfn "error -> %A" e
 
             logger.error (
-                Log.setMessage "Failed loading"
+                Log.setMessageI $"Failed loading {msbuildErrors:msbuildErrors}"
                 >> Log.addExn e
             )
 
@@ -994,27 +1035,34 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
                 bm.EndBuild()
 
+                let msbuildMessage = sw.ToString()
+
                 if
                     result.Exception
                     |> isNull
                     |> not
                 then
-                    handleError result.Exception
+                    handleError msbuildMessage result.Exception
                 else
                     let buildProjs =
                         result.ResultsByNode.Keys
                         |> Seq.collect (fun (pgn: ProjectGraphNode) -> seq { yield pgn.ProjectInstance })
                         |> Seq.toList
 
-                    logger.info (
-                        Log.setMessage "{overallCode}, projects built {count} {projects} "
-                        >> Log.addContextDestructured
-                            "count"
-                            (buildProjs
-                             |> Seq.length)
-                        >> Log.addContextDestructured "overallCode" result.OverallResult
-                        >> Log.addExn result.Exception
-                    )
+                    let projectsBuilt = Seq.length buildProjs
+
+                    match result.OverallResult with
+                    | BuildResultCode.Success ->
+                        logger.info (
+                            Log.setMessageI $"Overall Build: {result.OverallResult:overallCode}, projects built {projectsBuilt:count}"
+                            >> Log.addExn result.Exception
+                        )
+                    | BuildResultCode.Failure
+                    | _ ->
+                        logger.error (
+                            Log.setMessageI $"Overall Build: {result.OverallResult:overallCode}, projects built {projectsBuilt:count} : {msbuildMessage:msbuildMessage} "
+                            >> Log.addExn result.Exception
+                        )
 
                     let projects =
                         buildProjs
@@ -1058,7 +1106,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
                     allProjectOptions :> seq<_>
         with e ->
-            handleError e
+            handleError "" e
 
 
     interface IWorkspaceLoader with
