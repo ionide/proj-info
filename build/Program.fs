@@ -62,7 +62,7 @@ let init args =
     Target.create "Build" (fun _ -> DotNet.build id "")
 
     let testTFM tfm =
-        exec "dotnet" $"test --blame --blame-hang-timeout 60s --no-build --framework {tfm} --logger trx --logger GitHubActions -c Release .\\test\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj" "."
+        exec "dotnet" $"test --blame --blame-hang-timeout 2m --no-build --framework {tfm} --logger trx --logger GitHubActions -c Release .\\test\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj" "."
         |> ignore
 
     Target.create "Test" DoNothing

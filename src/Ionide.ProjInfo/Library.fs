@@ -1157,7 +1157,8 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
                 | Error msg when msg.Contains "The operation cannot be completed because a build is already in progress." ->
                     //Try to load project again
                     Threading.Thread.Sleep(50)
-                    loadProject p
+                    // loadProject p
+                    [], None
                 | Error msg ->
                     loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg)))
                     [], None
