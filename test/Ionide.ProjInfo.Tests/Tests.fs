@@ -19,6 +19,11 @@ open System.Linq
 
 #nowarn "25"
 
+open Microsoft.Build.Execution
+open Microsoft.Build.Graph
+open System.Threading.Tasks
+open Microsoft.Build.Evaluation
+
 let RepoDir =
     (__SOURCE_DIRECTORY__
      / ".."
@@ -1378,6 +1383,128 @@ let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
 
         )
 
+let buildManagerSessionTests toolsPath =
+    ftestList "buildManagerSessionTests" [
+        testCase
+        |> withLog
+            "Happy Path"
+            (fun logger fs ->
+                let path =
+                    [ @"C:\Users\jimmy\Repositories\public\TheAngryByrd\FAKE\Fake.sln" ]
+                    |> List.map ProjectGraphEntryPoint
+
+                // Evaluation
+                let pc = new ProjectCollection(ProjectLoader.defaultGlobalProperties)
+                let graph = ProjectLoader2.EvalutateAsGraph(path, pc)
+
+                // Execution
+                let bp = BuildParameters(ProjectLoadSettings = ProjectLoadSettings.FailOnUnresolvedSdk, EnableNodeReuse = true)
+                let bm = new BuildManagerSession(buildParameters = bp)
+
+                let result =
+                    ProjectLoader2.Execution(bm, graph)
+                    |> Async.RunSynchronously
+
+                let result =
+                    match result with
+                    | Result.Error e -> failtest "%s" e
+                    | Result.Ok v -> v
+
+                // Parse
+                let projectsAfterBuild =
+                    ProjectLoader2.Parse result
+                    |> Array.map (
+                        function
+                        | Ok v -> v
+                        | Result.Error e -> failtest "%s" e
+                    )
+
+                let emptyPackageReferences =
+                    projectsAfterBuild
+                    |> Array.filter (fun v -> v.PackageReferences.Length = 0)
+
+                Expect.isEmpty emptyPackageReferences "Should have no empty PackageReferences"
+                ()
+            )
+
+        testCase
+        |> withLog
+            "Concurrency - new graph  everytime"
+            (fun logger fs ->
+                let path =
+                    [ @"C:\Users\jimmy\Repositories\public\TheAngryByrd\FAKE\Fake.sln" ]
+                    |> List.map ProjectGraphEntryPoint
+
+                use sw = new StringWriter()
+                let pc = new ProjectCollection(ProjectLoader.defaultGlobalProperties)
+
+                let loggers = ProjectLoader.createLoggers [] BinaryLogGeneration.Off sw
+
+                let bp =
+                    BuildParameters(ProjectLoadSettings = ProjectLoadSettings.FailOnUnresolvedSdk, EnableNodeReuse = true, Loggers = loggers)
+
+                let bm = new BuildManagerSession(buildParameters = bp)
+
+                let work =
+                    async {
+                        // Evaluation
+                        let graph = ProjectLoader2.EvalutateAsGraph(path, pc)
+
+                        // Execution
+
+                        return! ProjectLoader2.Execution(bm, graph)
+                    }
+
+                // Should be throttled so concurrent builds won't fail
+                let result =
+                    Async.Parallel [
+                        work
+                        work
+                        work
+                        work
+                    ]
+
+                    |> Async.RunSynchronously
+
+                File.WriteAllText("Concurrency2.txt", sw.ToString())
+                ()
+
+            )
+
+
+        testCase
+        |> withLog
+            "Cancellable"
+            (fun logger fs ->
+                let path =
+                    [ @"C:\Users\jimmy\Repositories\public\TheAngryByrd\FAKE\Fake.sln" ]
+                    |> List.map ProjectGraphEntryPoint
+
+
+                // Evaluation
+                let pc = new ProjectCollection(ProjectLoader.defaultGlobalProperties)
+                let graph = ProjectLoader2.EvalutateAsGraph(path, pc)
+
+                // Execution
+                let bp = BuildParameters(ProjectLoadSettings = ProjectLoadSettings.FailOnUnresolvedSdk, EnableNodeReuse = true)
+                let  bm = new BuildManagerSession(buildParameters = bp)
+
+                Expect.throwsT<TaskCanceledException>
+                    (fun () ->
+                        use cts = new CancellationTokenSource()
+                        cts.CancelAfter(TimeSpan.FromSeconds(1.))
+                        let build = ProjectLoader2.Execution(bm, graph)
+
+                        Async.RunSynchronously(build, cancellationToken = cts.Token)
+                        |> ignore
+
+                    )
+                    "Should throw a TaskCanceledException"
+
+            )
+    ]
+
+
 let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     ptestCase
     |> withLog
@@ -2500,8 +2627,8 @@ let tests toolsPath =
     ]
 
 
-    testSequenced
-    <| testList "Main tests" [
+    testList "Main tests" [
+        buildManagerSessionTests toolsPath
         testSample2 toolsPath "WorkspaceLoader" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
         testSample2 toolsPath "WorkspaceLoader" true (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
         testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" false (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))

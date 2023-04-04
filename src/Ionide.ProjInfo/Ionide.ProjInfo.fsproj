@@ -12,6 +12,7 @@
     <Compile Include="VisualTree.fs" />
     <Compile Include="InspectSln.fs" />
     <Compile Include="Library.fs" />
+    <Compile Include="ProjectLoader2.fs" />
   </ItemGroup>
 
   <ItemGroup>
