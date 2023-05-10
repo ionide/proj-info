@@ -31,6 +31,12 @@ module Paths =
         | "" -> None
         | other -> Some other
 
+    let private checkExistence (f: FileInfo) =
+        if f.Exists then
+            Some f
+        else
+            None
+
     let private tryFindFromEnvVar () =
         potentialDotnetHostEnvVars
         |> List.tryPick (fun (envVar, transformer) ->
@@ -39,10 +45,9 @@ module Paths =
                 |> existingEnvVarValue
             with
             | Some varValue ->
-                Some(
-                    transformer varValue
-                    |> FileInfo
-                )
+                transformer varValue
+                |> FileInfo
+                |> checkExistence
             | None -> None
         )
 
@@ -61,14 +66,9 @@ module Paths =
                 ||| StringSplitOptions.TrimEntries
             )
         |> Array.tryPick (fun d ->
-            let fi =
-                Path.Combine(d, dotnetBinaryName)
-                |> FileInfo
-
-            if fi.Exists then
-                Some fi
-            else
-                None
+            Path.Combine(d, dotnetBinaryName)
+            |> FileInfo
+            |> checkExistence
         )
 
 
@@ -78,12 +78,9 @@ module Paths =
         let linuxPath = $"/usr/share/dotnet/{dotnetBinaryName}"
 
         let tryFindFile p =
-            let f = FileInfo p
+            FileInfo p
+            |> checkExistence
 
-            if f.Exists then
-                Some f
-            else
-                None
 
         if isWindows then
             tryFindFile windowsPath
