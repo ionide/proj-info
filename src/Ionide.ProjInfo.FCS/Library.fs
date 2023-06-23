@@ -17,7 +17,7 @@ module FCS =
             projectFile.OpenRead() :> Stream
             |> Some
 
-        FSharpReferencedProject.CreatePortableExecutable(p.TargetPath, getStamp, getStream)
+        FSharpReferencedProject.PEReference(getStamp, DelayedILModuleReader(p.TargetPath, getStream))
 
     let private makeFCSOptions mapProjectToReference (project: ProjectOptions) = {
         ProjectId = None
@@ -51,7 +51,7 @@ module FCS =
             knownProject
             |> Option.map (fun p ->
                 let theseOptions = makeFSharpProjectReference p
-                FSharpReferencedProject.CreateFSharp(p.TargetPath, theseOptions)
+                FSharpReferencedProject.FSharpReference(p.TargetPath, theseOptions)
             )
         elif isDotnetProject knownProject then
             knownProject
