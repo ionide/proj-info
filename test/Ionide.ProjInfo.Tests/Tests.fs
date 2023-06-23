@@ -1281,10 +1281,9 @@ let internalGetCSharpReferenceInfo =
             )
 
         if rCase.Name = "PEReference" then
-            let path: string = fields[0] :?> _
-            let getStamp: unit -> DateTime = fields[1] :?> _
-            let reader = fields[2]
-            Some(path, getStamp, reader)
+            let getStamp: unit -> DateTime = fields[0] :?> _
+            let reader: DelayedILModuleReader = fields[1] :?> _
+            Some(getStamp, reader)
         else
             None
 
@@ -2151,8 +2150,11 @@ let csharpLibTest toolsPath (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
             Expect.hasLength referencedProjects 1 "Should have a reference to the C# lib"
 
             match internalGetCSharpReferenceInfo referencedProjects[0] with
-            | Some(path, getStamp, reader) ->
-                let fileName = System.IO.Path.GetFileName path
+            | Some(getStamp, reader) ->
+                let fileName =
+                    reader.OutputFile
+                    |> Path.GetFileName
+
                 Expect.equal fileName "csharp-lib.dll" "Should have found the C# lib"
             | None -> failwith "Should have found a C# reference"
         )
