@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFrameworks>net6.0</TargetFrameworks>
-    <TargetFrameworks Condition="'$(BuildNet7)' == 'true'">$(TargetFrameworks);net7.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(BuildNet7)' == 'true'">net7.0</TargetFrameworks>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <GenerateProgramFile>false</GenerateProgramFile>
