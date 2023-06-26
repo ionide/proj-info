@@ -59,7 +59,16 @@ let init args =
             |> Seq.iter Shell.rm
         )
 
-    Target.create "Build" (fun _ -> DotNet.build id "")
+    // Avoid msbuild loading issues: https://github.com/fsprojects/FAKE/issues/2515#issue-622856864
+    let buildOpts (opts: DotNet.BuildOptions) = {
+        opts with
+            MSBuildParams = {
+                opts.MSBuildParams with
+                    DisableInternalBinLog = true
+            }
+    }
+
+    Target.create "Build" (fun _ -> DotNet.build buildOpts "")
 
     let testTFM tfm =
         exec "dotnet" $"test --blame --blame-hang-timeout 60s --no-build --framework {tfm} --logger trx --logger GitHubActions -c Release .\\test\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj" "."
