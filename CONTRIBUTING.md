@@ -16,3 +16,10 @@
     1. `git tag v0.45.0`
 4. Push changes to the repo.
     1. `git push --atomic origin main v0.45.0`
+
+
+## Nighty
+
+To use the `-nightly` packages, you'll need to add a custom nuget feed for FSharp.Compiler.Service:
+
+- https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet7/nuget/v3/index.json
