@@ -6,13 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.61.3] - 2022-04-01
+## [0.62.0-nightly001] - 2023-06-26
+
+### Changed
+
+* [FCS to 43.7.400-preview.23322.4](https://github.com/ionide/proj-info/pull/192)
+
+## [0.61.3] - 2023-04-01
 
 ### Fixed
 
 * [Pulling logs from MsBuild](https://github.com/ionide/proj-info/pull/189)
 
-## [0.61.2] - 2022-02-20
+## [0.61.2] - 2023-02-20
 
 ### Fixed
 
