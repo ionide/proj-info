@@ -120,7 +120,7 @@ let init args =
     Target.create
         "CheckFormat"
         (fun _ ->
-            let result = DotNet.exec id "fantomas" "--check."
+            let result = DotNet.exec id "fantomas" "--check ."
 
             if result.ExitCode = 0 then
                 Trace.log "No files need formatting"

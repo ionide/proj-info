@@ -14,10 +14,15 @@ module FCS =
         let getStamp () = projectFile.LastWriteTimeUtc
 
         let getStream (ctok: System.Threading.CancellationToken) =
-            projectFile.OpenRead() :> Stream
-            |> Some
+            try
+                projectFile.OpenRead() :> Stream
+                |> Some
+            with _ ->
+                None
 
-        FSharpReferencedProject.CreatePortableExecutable(p.TargetPath, getStamp, getStream)
+        let delayedReader = DelayedILModuleReader(p.TargetPath, getStream)
+
+        FSharpReferencedProject.PEReference(getStamp, delayedReader)
 
     let private makeFCSOptions mapProjectToReference (project: ProjectOptions) = {
         ProjectId = None
@@ -51,7 +56,7 @@ module FCS =
             knownProject
             |> Option.map (fun p ->
                 let theseOptions = makeFSharpProjectReference p
-                FSharpReferencedProject.CreateFSharp(p.TargetPath, theseOptions)
+                FSharpReferencedProject.FSharpReference(p.TargetPath, theseOptions)
             )
         elif isDotnetProject knownProject then
             knownProject
