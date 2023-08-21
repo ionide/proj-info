@@ -2112,8 +2112,8 @@ let csharpLibTest toolsPath (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
             Expect.hasLength referencedProjects 1 "Should have a reference to the C# lib"
 
             match referencedProjects[0] with
-            | FSharpReferencedProject.ILModuleReference(projectOutputFile = outputPath) ->
-                let fileName = System.IO.Path.GetFileName outputPath
+            | FSharpReferencedProject.PEReference(delayedReader = reader) ->
+                let fileName = System.IO.Path.GetFileName reader.OutputFile
                 Expect.equal fileName "csharp-lib.dll" "Should have found the C# lib"
             | _ -> failwith "Should have found a C# reference"
         )
