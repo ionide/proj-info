@@ -1269,42 +1269,6 @@ let testProjectNotFound toolsPath workspaceLoader (workspaceFactory: ToolsPath -
                 "check error type"
         )
 
-let internalGetCSharpReferenceInfo =
-    fun (r: FSharpReferencedProject) ->
-        let rCase, fields =
-            FSharp.Reflection.FSharpValue.GetUnionFields(
-                r,
-                typeof<FSharpReferencedProject>,
-                System.Reflection.BindingFlags.Public
-                ||| System.Reflection.BindingFlags.NonPublic
-                ||| System.Reflection.BindingFlags.Instance
-            )
-
-        if rCase.Name = "PEReference" then
-            let path: string = fields[0] :?> _
-            let getStamp: unit -> DateTime = fields[1] :?> _
-            let reader = fields[2]
-            Some(path, getStamp, reader)
-        else
-            None
-
-let internalGetProjectOptions =
-    fun (r: FSharpReferencedProject) ->
-        let rCase, fields =
-            FSharp.Reflection.FSharpValue.GetUnionFields(
-                r,
-                typeof<FSharpReferencedProject>,
-                System.Reflection.BindingFlags.Public
-                ||| System.Reflection.BindingFlags.NonPublic
-                ||| System.Reflection.BindingFlags.Instance
-            )
-
-        if rCase.Name = "FSharpReference" then
-            let projOptions: FSharpProjectOptions = rCase.GetFields().[1].GetValue(box r) :?> _
-            Some projOptions
-        else
-            None
-
 let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog
@@ -1314,20 +1278,19 @@ let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
             let rec allFCSProjects (po: FSharpProjectOptions) = [
                 yield po
                 for reference in po.ReferencedProjects do
-                    match internalGetProjectOptions reference with
-                    | Some opts -> yield! allFCSProjects opts
-                    | None -> ()
+                    match reference with
+                    | FSharpReferencedProject.FSharpReference(options = options) -> yield! allFCSProjects options
+                    | _ -> ()
             ]
 
 
             let rec allP2P (po: FSharpProjectOptions) = [
                 for reference in po.ReferencedProjects do
-                    let opts =
-                        internalGetProjectOptions reference
-                        |> Option.get
-
-                    yield reference.OutputFile, opts
-                    yield! allP2P opts
+                    match reference with
+                    | FSharpReferencedProject.FSharpReference(outputFile, options) ->
+                        yield (outputFile, options)
+                        yield! allP2P options
+                    | _ -> ()
             ]
 
             let expectP2PKeyIsTargetPath (pos: Map<string, ProjectOptions>) fcsPo =
@@ -1406,19 +1369,18 @@ let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath ->
             let rec allFCSProjects (po: FSharpProjectOptions) = [
                 yield po
                 for reference in po.ReferencedProjects do
-                    match internalGetProjectOptions reference with
-                    | Some opts -> yield! allFCSProjects opts
-                    | None -> ()
+                    match reference with
+                    | FSharpReferencedProject.FSharpReference(options = opts) -> yield! allFCSProjects opts
+                    | _ -> ()
             ]
 
             let rec allP2P (po: FSharpProjectOptions) = [
                 for reference in po.ReferencedProjects do
-                    let opts =
-                        internalGetProjectOptions reference
-                        |> Option.get
-
-                    yield reference.OutputFile, opts
-                    yield! allP2P opts
+                    match reference with
+                    | FSharpReferencedProject.FSharpReference(outputFile, opts) ->
+                        yield outputFile, opts
+                        yield! allP2P opts
+                    | _ -> ()
             ]
 
             let testDir = inDir fs "load_sample_fsc"
@@ -1580,10 +1542,9 @@ let testFCSmapManyProjCheckCaching =
                 project.ReferencedProjects
                 |> Array.toList
                 |> List.collect (fun reference ->
-                    reference
-                    |> internalGetProjectOptions
-                    |> Option.map findProjectOptionsTransitively
-                    |> Option.defaultValue []
+                    match reference with
+                    | FSharpReferencedProject.FSharpReference(_, options) -> findProjectOptionsTransitively options
+                    | _ -> []
                 )
                 |> List.append [ project ]
 
@@ -2150,11 +2111,11 @@ let csharpLibTest toolsPath (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
             let referencedProjects = mapped.ReferencedProjects
             Expect.hasLength referencedProjects 1 "Should have a reference to the C# lib"
 
-            match internalGetCSharpReferenceInfo referencedProjects[0] with
-            | Some(path, getStamp, reader) ->
-                let fileName = System.IO.Path.GetFileName path
+            match referencedProjects[0] with
+            | FSharpReferencedProject.ILModuleReference(projectOutputFile = outputPath) ->
+                let fileName = System.IO.Path.GetFileName outputPath
                 Expect.equal fileName "csharp-lib.dll" "Should have found the C# lib"
-            | None -> failwith "Should have found a C# reference"
+            | _ -> failwith "Should have found a C# reference"
         )
 
 let testProjectLoadBadData =
