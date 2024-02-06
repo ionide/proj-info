@@ -8,5 +8,12 @@
         "test/examples",
         "packages"
     ],
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "cSpell.words": [
+        "binlog",
+        "inheritdoc",
+        "tfms",
+        "vswhere",
+        "xbuild"
+    ]
 }
