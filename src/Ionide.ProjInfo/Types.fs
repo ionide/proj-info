@@ -59,13 +59,21 @@ module Types =
         ReferencedProjects: ProjectReference list
         PackageReferences: PackageReference list
         LoadTime: DateTime
+        /// The path to the primary executable or loadable output of this project
         TargetPath: string
+        /// If present, this project produced a reference assembly and this should be used as primary reference for downstream proejcts
+        TargetRefPath: string option
         ProjectOutputType: ProjectOutputType
         ProjectSdkInfo: ProjectSdkInfo
         Items: ProjectItem list
         Properties: Property list
         CustomProperties: Property list
-    }
+    } with
+        /// ResolvedTargetPath is the path to the primary reference assembly for this project.
+        /// For projects that produce ReferenceAssemblies, this is the path to the reference assembly.
+        /// For other projects, this is the same as TargetPath.
+        member x.ResolvedTargetPath =
+            defaultArg x.TargetRefPath x.TargetPath
 
     type CompileItem = {
         Name: string
