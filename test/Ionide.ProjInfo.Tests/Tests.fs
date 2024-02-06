@@ -1482,6 +1482,7 @@ let testFCSmapManyProjCheckCaching =
                 PackageReferences = []
                 LoadTime = DateTime.MinValue
                 TargetPath = "TP"
+                TargetRefPath = Some "TRP"
                 ProjectOutputType = ProjectOutputType.Library
                 ProjectSdkInfo = sdkInfo
                 Items = []

@@ -49,14 +49,14 @@ module FCS =
             | Some p ->
                 (p.ProjectFileName.EndsWith(".csproj")
                  || p.ProjectFileName.EndsWith(".vbproj"))
-                && File.Exists p.TargetPath
+                && File.Exists p.ResolvedTargetPath
             | None -> false
 
         if p.ProjectFileName.EndsWith ".fsproj" then
             knownProject
-            |> Option.map (fun p ->
+            |> Option.map (fun (p: ProjectOptions) ->
                 let theseOptions = makeFSharpProjectReference p
-                FSharpReferencedProject.FSharpReference(p.TargetPath, theseOptions)
+                FSharpReferencedProject.FSharpReference(p.ResolvedTargetPath, theseOptions)
             )
         elif isDotnetProject knownProject then
             knownProject
