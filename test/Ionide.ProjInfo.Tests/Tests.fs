@@ -30,6 +30,20 @@ let ExamplesDir =
     / "test"
     / "examples"
 
+let pathForTestAssets (test: TestAssetProjInfo) =
+    ExamplesDir
+    / test.ProjDir
+
+let pathForProject (test: TestAssetProjInfo) =
+    pathForTestAssets test
+    / test.ProjectFile
+
+let implAssemblyForProject (test: TestAssetProjInfo) =
+    $"{test.AssemblyName}.dll"
+
+let refAssemblyForProject (test: TestAssetProjInfo) =
+    Path.Combine("ref", implAssemblyForProject test)
+
 let TestRunDir =
     RepoDir
     / "test"
@@ -2119,6 +2133,41 @@ let csharpLibTest toolsPath (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
             | _ -> failwith "Should have found a C# reference"
         )
 
+let referenceAssemblySupportTest toolsPath prefix (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
+    testCase
+    |> withLog
+        $"{prefix} can reference projects that support reference assemblies"
+        (fun logger fs ->
+            let parentProj: TestAssetProjInfo = ``NetSDK library with ProduceReferenceAssembly``
+            let childProj = ``NetSDK library referencing ProduceReferenceAssembly library``
+
+            let projPath = pathForProject childProj
+
+            // need to build the projects first so that there's something to latch on to
+            dotnet fs [
+                "build"
+                projPath
+            ]
+            |> checkExitCodeZero
+
+            let loader = workspaceFactory toolsPath
+
+            let parsed =
+                loader.LoadProjects [ projPath ]
+                |> Seq.toList
+
+            Expect.hasLength parsed 2 "Should have loaded the F# lib and the referenced F# lib"
+            let fsharpProject = parsed |> Seq.find (fun p -> Path.GetFileName(p.ProjectFileName) = Path.GetFileName(childProj.ProjectFile))
+            let mapped = FCS.mapToFSharpProjectOptions fsharpProject parsed
+            let referencedProjects = mapped.ReferencedProjects
+            Expect.hasLength referencedProjects 1 "Should have a reference to the F# ProjectReference lib"
+
+            match referencedProjects[0] with
+            | FSharpReferencedProject.FSharpReference(targetPath, _) ->
+                Expect.stringContains targetPath  (refAssemblyForProject parentProj) "Should have found the ref assembly for the F# lib"
+            | _ -> failwith "Should have found a F# reference"
+        )
+
 let testProjectLoadBadData =
     testCase
     |> withLog
@@ -2247,4 +2296,8 @@ let tests toolsPath =
         testProjectLoadBadData
         expensiveTests toolsPath WorkspaceLoader.Create
         csharpLibTest toolsPath WorkspaceLoader.Create
+
+        referenceAssemblySupportTest toolsPath (nameof(WorkspaceLoader)) WorkspaceLoader.Create
+        referenceAssemblySupportTest toolsPath (nameof(WorkspaceLoaderViaProjectGraph)) WorkspaceLoaderViaProjectGraph.Create
+
     ]

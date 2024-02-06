@@ -280,3 +280,27 @@ let ``sample9 NetSdk library`` = {
     TargetFrameworks = Map.ofList [ "netstandard2.0", sourceFiles [ "Library.fs" ] ]
     ProjectReferences = []
 }
+
+/// dotnet sdk library with ProduceReferenceAssembly=true
+let ``NetSDK library with ProduceReferenceAssembly`` = {
+    ProjDir = "sample-netsdk-prodref"
+    AssemblyName = "l1"
+    ProjectFile =
+        "l1"
+        / "l1.fsproj"
+    TargetFrameworks = Map.ofList [ "netstandard2.0", sourceFiles [ "Library.fs" ] ]
+    ProjectReferences = []
+}
+
+
+let ``NetSDK library referencing ProduceReferenceAssembly library`` = {
+    ProjDir = "sample-netsdk-prodref"
+    AssemblyName = "l2"
+    ProjectFile =
+        "l2"
+        / "l2.fsproj"
+    TargetFrameworks = Map.ofList [ "netstandard2.0", sourceFiles [ "Library.fs" ] ]
+    ProjectReferences = [
+        ``NetSDK library with ProduceReferenceAssembly``
+    ]
+}
