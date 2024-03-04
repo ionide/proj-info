@@ -91,6 +91,24 @@ module Paths =
         else
             None
 
+    let private tryFindFromSelf () =
+        let rec findDotnetAbove (self: DirectoryInfo) =
+            match self.Parent with
+            | null -> None
+            | parent ->
+                let candidate =
+                    Path.Combine(parent.FullName, dotnetBinaryName)
+                    |> FileInfo
+                    |> checkExistence
+
+                match candidate with
+                | Some candidate -> Some candidate
+                | None -> findDotnetAbove parent
+
+        RuntimeEnvironment.GetRuntimeDirectory()
+        |> DirectoryInfo
+        |> findDotnetAbove
+
     /// <summary>
     /// provides the path to the `dotnet` binary running this library, respecting various dotnet <see href="https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-environment-variables#dotnet_root-dotnet_rootx86%5D">environment variables</see>.
     /// Also probes the PATH and checks the default installation locations
@@ -98,6 +116,7 @@ module Paths =
     let dotnetRoot =
         lazy
             (tryFindFromEnvVar ()
+             |> Option.orElseWith tryFindFromSelf
              |> Option.orElseWith tryFindFromPATH
              |> Option.orElseWith tryFindFromDefaultDirs)
 
