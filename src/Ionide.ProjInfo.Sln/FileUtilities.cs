@@ -24,7 +24,7 @@ namespace Ionide.ProjInfo.Sln.Shared
 
     internal static class FileUtilitiesRegex
     {
-        // regular expression used to match file-specs beginning with "<drive letter>:" 
+        // regular expression used to match file-specs beginning with "<drive letter>:"
         internal static readonly Regex DrivePattern = new Regex(@"^[A-Za-z]:");
 
         // regular expression used to match UNC paths beginning with "\\<server>\<share>"
@@ -650,11 +650,6 @@ namespace Ionide.ProjInfo.Sln.Shared
 
         // ISO 8601 Universal time with sortable format
         internal const string FileTimeFormat = "yyyy'-'MM'-'dd HH':'mm':'ss'.'fffffff";
-
-        /// <summary>
-        /// Get the currently executing assembly path
-        /// </summary>
-        internal static string ExecutingAssemblyPath => Path.GetFullPath(Assembly.GetAssembly(typeof(FileUtilities)).Location);
 
         /// <summary>
         /// Determines the full path for the given file-spec.
