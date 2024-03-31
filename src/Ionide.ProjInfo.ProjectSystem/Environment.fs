@@ -142,12 +142,6 @@ module Environment =
                 </> "fsc.exe"
             )
 
-    let fsharpCore =
-        let dir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
-
-        dir
-        </> "FSharp.Core.dll"
-
     let workspaceLoadDelay () =
         match System.Environment.GetEnvironmentVariable("FSAC_WORKSPACELOAD_DELAY") with
         | delayMs when not (String.IsNullOrWhiteSpace(delayMs)) ->

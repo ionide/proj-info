@@ -765,58 +765,6 @@ namespace Ionide.ProjInfo.Sln.Shared
         }
 
         /// <summary>
-        /// The base directory for all framework paths in Mono
-        /// </summary>
-        private static string s_frameworkBasePath;
-
-        /// <summary>
-        /// The directory of the current framework
-        /// </summary>
-        private static string s_frameworkCurrentPath;
-
-        /// <summary>
-        /// Gets the currently running framework path
-        /// </summary>
-        internal static string FrameworkCurrentPath
-        {
-            get
-            {
-                if (s_frameworkCurrentPath == null)
-                {
-                    var baseTypeLocation = Assembly.GetAssembly(typeof(string)).Location;
-
-                    s_frameworkCurrentPath =
-                        Path.GetDirectoryName(baseTypeLocation)
-                        ?? string.Empty;
-                }
-
-                return s_frameworkCurrentPath;
-            }
-        }
-
-        /// <summary>
-        /// Gets the base directory of all Mono frameworks
-        /// </summary>
-        internal static string FrameworkBasePath
-        {
-            get
-            {
-                if (s_frameworkBasePath == null)
-                {
-                    var dir = FrameworkCurrentPath;
-                    if (dir != string.Empty)
-                    {
-                        dir = Path.GetDirectoryName(dir);
-                    }
-
-                    s_frameworkBasePath = dir ?? string.Empty;
-                }
-
-                return s_frameworkBasePath;
-            }
-        }
-
-        /// <summary>
         /// System information, initialized when required.
         /// </summary>
         /// <remarks>
