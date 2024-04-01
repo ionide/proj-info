@@ -13,6 +13,7 @@ open System.Diagnostics
 open System.Runtime.InteropServices
 open Ionide.ProjInfo.Logging
 open Patterns
+open System.Xml
 
 /// functions for .net sdk probing
 module SdkDiscovery =
@@ -598,6 +599,13 @@ module ProjectLoader =
                 Link = link
             }
         )
+
+    let getFsprojCompileItemPaths (fsprojPath: string) =
+        use pc = new ProjectCollection(null)
+        let pi = pc.LoadProject(fsprojPath)
+        let pi = pi.CreateProjectInstance()
+        let compileItems = getCompileItems (LoadedProject pi)
+        compileItems |> Seq.map(fun i -> i.FullPath)
 
     let getNuGetReferences (LoadedProject project) =
         project.Items

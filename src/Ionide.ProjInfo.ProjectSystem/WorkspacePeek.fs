@@ -9,10 +9,12 @@ module WorkspacePeek =
 
     let rec logger = LogProvider.getLoggerByQuotation <@ logger @>
 
+    type FsprojData = { Path: string; CompileItems: string list }
+
     [<RequireQualifiedAccess>]
     type Interesting =
         | Solution of string * InspectSln.SolutionData
-        | Directory of string * string list
+        | Directory of string * FsprojData list
 
     open System.IO
 
@@ -160,7 +162,11 @@ module WorkspacePeek =
 
                         None
                 | UsefulFile.Fsx -> Some(Choice2Of3(f.FullName))
-                | UsefulFile.FsProj -> Some(Choice3Of3(f.FullName))
+                | UsefulFile.FsProj -> 
+                    // TODO: Read the fsproj file and get the compile items
+                    let compileItems = Ionide.ProjInfo.ProjectLoader.getFsprojCompileItemPaths f.FullName
+
+                    Some(Choice3Of3(f.FullName, compileItems))
 
             let found =
                 dirs
@@ -175,13 +181,12 @@ module WorkspacePeek =
             let dir =
                 rootDir,
                 (fsprojs
-                 |> List.sort)
+                 |> List.sortBy (fun (p, _) -> p))
 
             [
                 yield!
                     slns
                     |> List.map Interesting.Solution
                 yield
-                    dir
-                    |> Interesting.Directory
+                    Interesting.Directory (fst dir, (snd dir) |> List.map (fun (p, c) -> { Path = p; CompileItems = c |> List.ofSeq }))
             ]
