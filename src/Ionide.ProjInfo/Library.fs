@@ -373,7 +373,6 @@ module ProjectLoader =
                 and set (v: LoggerVerbosity): unit = ()
         }
 
-
     let internal stringWriterLogger (writer: StringWriter) =
         { new ILogger with
             member this.Initialize(eventSource: IEventSource) : unit =
@@ -530,14 +529,17 @@ module ProjectLoader =
             let globalProperties = getGlobalProps path tfm globalProperties
 
             use pc = new ProjectCollection(globalProperties)
-
-            let pi = pc.LoadProject(path, globalProperties, toolsVersion = null)
+            let loadSettings =
+                ProjectLoadSettings.RecordEvaluatedItemElements
+                    ||| ProjectLoadSettings.ProfileEvaluation
+                    ||| ProjectLoadSettings.IgnoreMissingImports
+            let project = Project(projectFile = path, globalProperties = globalProperties, toolsVersion = null, projectCollection = pc, loadSettings = loadSettings)
 
             use sw = new StringWriter()
 
             let loggers = createLoggers [ path ] binaryLogs sw
 
-            let pi = pi.CreateProjectInstance()
+            let pi = project.CreateProjectInstance()
 
             let build = pi.Build(designTimeBuildTargets isLegacyFrameworkProjFile, loggers)
 
@@ -1030,6 +1032,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                 buildParameters.ProjectLoadSettings <-
                     ProjectLoadSettings.RecordEvaluatedItemElements
                     ||| ProjectLoadSettings.ProfileEvaluation
+                    ||| ProjectLoadSettings.IgnoreMissingImports
 
                 buildParameters.LogInitialPropertiesAndItems <- true
                 bm.BeginBuild(buildParameters)
