@@ -141,7 +141,7 @@ let createFile (logger: Logger) path setContent =
     setContent f
     ()
 
-let unzip (logger: Logger) file dir =
+let unzip (logger: Logger) (file: string) (dir: string) =
     logger.debug (
         eventX "unzip '{file}' to {directory}"
         >> setField "file" file

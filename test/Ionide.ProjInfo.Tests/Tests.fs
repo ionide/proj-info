@@ -2225,6 +2225,31 @@ let canLoadMissingImports toolsPath loaderType (workspaceFactory: ToolsPath -> I
             Expect.stringEnds parsed.SourceFiles[2] "Program.fs" "Filename should be Program.fs"
         )
 
+let traversalProjectTest toolsPath workspaceFactory =
+    testCase
+        $"can crack traversal projects"
+        (fun () ->
+            let logger = Log.create "Test 'can crack traversal projects'"
+            let fs = FileUtils(logger)
+            let projPath = pathForProject ``traversal project``
+            // // need to build the projects first so that there's something to latch on to
+            // dotnet fs [
+            //     "build"
+            //     projPath
+            //     "-bl"
+            // ]
+            // |> checkExitCodeZero
+
+            let loader: IWorkspaceLoader = workspaceFactory toolsPath
+
+            let parsed =
+                loader.LoadProjects [ projPath ]
+                |> Seq.toList
+
+            Expect.hasLength parsed 3 "Should have loaded the 3 referenced projects from the traversal project"
+
+        )
+
 let tests toolsPath =
     let testSample3WorkspaceLoaderExpected = [
         ExpectNotification.loading "c1.fsproj"
@@ -2348,4 +2373,6 @@ let tests toolsPath =
         // tests that cover our ability to handle missing imports
         canLoadMissingImports toolsPath (nameof (WorkspaceLoader)) WorkspaceLoader.Create
         canLoadMissingImports toolsPath (nameof (WorkspaceLoaderViaProjectGraph)) WorkspaceLoaderViaProjectGraph.Create
+
+        traversalProjectTest toolsPath WorkspaceLoader.Create
     ]

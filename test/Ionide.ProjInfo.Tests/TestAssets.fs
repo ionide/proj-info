@@ -310,3 +310,14 @@ let ``Console app with missing direct Import`` = {
     TargetFrameworks = Map.ofList [ "net6.0", sourceFiles [ "Program.fs" ] ]
     ProjectReferences = []
 }
+
+let ``traversal project`` = {
+    ProjDir = "traversal-project"
+    AssemblyName = ""
+    ProjectFile = "dirs.proj"
+    TargetFrameworks = Map.empty
+    ProjectReferences = [
+        yield ``sample3 Netsdk projs``
+        yield! ``sample3 Netsdk projs``.ProjectReferences
+    ]
+}

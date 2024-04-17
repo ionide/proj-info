@@ -329,7 +329,10 @@ type BinaryLogGeneration =
 /// </summary>
 module ProjectLoader =
 
-    type LoadedProject = internal LoadedProject of ProjectInstance
+    type LoadedProject =
+        internal
+        | StandardProject of ProjectInstance
+        | TraversalProject of ProjectInstance
 
     let internal projectLoaderLogger = lazy (LogProvider.getLoggerByName "ProjectLoader")
 
@@ -630,12 +633,22 @@ module ProjectLoader =
 
             let pi = project.CreateProjectInstance()
 
-            let build = pi.Build(designTimeBuildTargets isLegacyFrameworkProjFile, loggers)
+            let doDesignTimeBuild () =
+                let build = pi.Build(designTimeBuildTargets isLegacyFrameworkProjFile, loggers)
 
-            if build then
-                Ok(LoadedProject pi)
-            else
-                Error(sw.ToString())
+                if build then
+                    Ok(StandardProject pi)
+                else
+                    Error(sw.ToString())
+
+            let yieldTraversalProject () = Ok(TraversalProject pi)
+
+            // do traversal project detection here
+            match pi.GetProperty "IsTraversal" with
+            | null -> doDesignTimeBuild ()
+            | p when Boolean.Parse(p.EvaluatedValue) = false -> doDesignTimeBuild ()
+            | _ -> yieldTraversalProject ()
+
         with exc ->
             projectLoaderLogger.Value.error (
                 Log.setMessage "Generic error while loading project {path}"
@@ -645,77 +658,111 @@ module ProjectLoader =
 
             Error(exc.Message)
 
-    let getFscArgs (LoadedProject project) =
-        project.Items
-        |> Seq.filter (fun p -> p.ItemType = "FscCommandLineArgs")
-        |> Seq.map (fun p -> p.EvaluatedInclude)
+    let getFscArgs (project) =
+        match project with
+        | TraversalProject _ -> Seq.empty
+        | StandardProject p ->
+            p.Items
+            |> Seq.filter (fun p -> p.ItemType = "FscCommandLineArgs")
+            |> Seq.map (fun p -> p.EvaluatedInclude)
 
-    let getCscArgs (LoadedProject project) =
-        project.Items
-        |> Seq.filter (fun p -> p.ItemType = "CscCommandLineArgs")
-        |> Seq.map (fun p -> p.EvaluatedInclude)
+    let getCscArgs (project) =
+        match project with
+        | TraversalProject _ -> Seq.empty
+        | StandardProject p ->
+            p.Items
+            |> Seq.filter (fun p -> p.ItemType = "CscCommandLineArgs")
+            |> Seq.map (fun p -> p.EvaluatedInclude)
 
-    let getP2PRefs (LoadedProject project) =
-        project.Items
-        |> Seq.filter (fun p -> p.ItemType = "_MSBuildProjectReferenceExistent")
-        |> Seq.map (fun p ->
-            let relativePath = p.EvaluatedInclude
-            let path = p.GetMetadataValue "FullPath"
+    let getP2PRefs (project) =
+        match project with
+        | TraversalProject p -> [
+            for item in p.Items do
+                if item.ItemType = "ProjectReference" then
+                    let relativePath = item.EvaluatedInclude
+                    let fullPath = Path.GetFullPath(relativePath)
 
-            let tfms =
-                if p.HasMetadata "TargetFramework" then
-                    p.GetMetadataValue "TargetFramework"
-                else
-                    p.GetMetadataValue "TargetFrameworks"
-
-            {
-                RelativePath = relativePath
-                ProjectFileName = path
-                TargetFramework = tfms
-            }
-        )
-
-    let getCompileItems (LoadedProject project) =
-        project.Items
-        |> Seq.filter (fun p -> p.ItemType = "Compile")
-        |> Seq.map (fun p ->
-            let name = p.EvaluatedInclude
-
-            let link =
-                if p.HasMetadata "Link" then
-                    Some(p.GetMetadataValue "Link")
-                else
+                    {
+                        RelativePath = relativePath
+                        ProjectFileName = fullPath
+                        TargetFramework = ""
+                    }
+          ]
+        | StandardProject p ->
+            p.Items
+            |> Seq.choose (fun p ->
+                if
+                    p.ItemType
+                    <> "_MSBuildProjectReferenceExistent"
+                then
                     None
+                else
+                    let relativePath = p.EvaluatedInclude
+                    let path = p.GetMetadataValue "FullPath"
 
-            let fullPath = p.GetMetadataValue "FullPath"
+                    let tfms =
+                        if p.HasMetadata "TargetFramework" then
+                            p.GetMetadataValue "TargetFramework"
+                        else
+                            p.GetMetadataValue "TargetFrameworks"
 
-            {
-                Name = name
-                FullPath = fullPath
-                Link = link
-            }
-        )
+                    Some {
+                        RelativePath = relativePath
+                        ProjectFileName = path
+                        TargetFramework = tfms
+                    }
+            )
+            |> Seq.toList
 
-    let getNuGetReferences (LoadedProject project) =
-        project.Items
-        |> Seq.filter (fun p ->
-            p.ItemType = "Reference"
-            && p.GetMetadataValue "NuGetSourceType" = "Package"
-        )
-        |> Seq.map (fun p ->
-            let name = p.GetMetadataValue "NuGetPackageId"
-            let version = p.GetMetadataValue "NuGetPackageVersion"
-            let fullPath = p.GetMetadataValue "FullPath"
+    let getCompileItems (project) =
+        match project with
+        | TraversalProject _ -> Seq.empty
+        | StandardProject p ->
+            p.Items
+            |> Seq.filter (fun p -> p.ItemType = "Compile")
+            |> Seq.map (fun p ->
+                let name = p.EvaluatedInclude
 
-            {
-                Name = name
-                Version = version
-                FullPath = fullPath
-            }
-        )
+                let link =
+                    if p.HasMetadata "Link" then
+                        Some(p.GetMetadataValue "Link")
+                    else
+                        None
 
-    let getProperties (LoadedProject project) (properties: string list) =
-        project.Properties
+                let fullPath = p.GetMetadataValue "FullPath"
+
+                {
+                    Name = name
+                    FullPath = fullPath
+                    Link = link
+                }
+            )
+
+    let getNuGetReferences (project) =
+        match project with
+        | TraversalProject _ -> Seq.empty
+        | StandardProject p ->
+            p.Items
+            |> Seq.filter (fun p ->
+                p.ItemType = "Reference"
+                && p.GetMetadataValue "NuGetSourceType" = "Package"
+            )
+            |> Seq.map (fun p ->
+                let name = p.GetMetadataValue "NuGetPackageId"
+                let version = p.GetMetadataValue "NuGetPackageVersion"
+                let fullPath = p.GetMetadataValue "FullPath"
+
+                {
+                    Name = name
+                    Version = version
+                    FullPath = fullPath
+                }
+            )
+
+    let getProperties (project) (properties: string list) =
+        match project with
+        | TraversalProject _ -> Seq.empty
+        | StandardProject p -> p.Properties
         |> Seq.filter (fun p -> List.contains p.Name properties)
         |> Seq.map (fun p -> {
             Name = p.Name
@@ -1186,7 +1233,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
                     let projects =
                         builtProjects
-                        |> Seq.map (fun p -> p.FullPath, ProjectLoader.getLoadedProjectInfo p.FullPath customProperties (ProjectLoader.LoadedProject p))
+                        |> Seq.map (fun p -> p.FullPath, ProjectLoader.getLoadedProjectInfo p.FullPath customProperties (ProjectLoader.StandardProject p))
 
                         |> Seq.choose (fun (projectPath, projectOptionResult) ->
                             match projectOptionResult with
