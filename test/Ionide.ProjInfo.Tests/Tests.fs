@@ -38,8 +38,7 @@ let pathForProject (test: TestAssetProjInfo) =
     pathForTestAssets test
     / test.ProjectFile
 
-let implAssemblyForProject (test: TestAssetProjInfo) =
-    $"{test.AssemblyName}.dll"
+let implAssemblyForProject (test: TestAssetProjInfo) = $"{test.AssemblyName}.dll"
 
 let refAssemblyForProject (test: TestAssetProjInfo) =
     Path.Combine("ref", implAssemblyForProject test)
@@ -2157,14 +2156,17 @@ let referenceAssemblySupportTest toolsPath prefix (workspaceFactory: ToolsPath -
                 |> Seq.toList
 
             Expect.hasLength parsed 2 "Should have loaded the F# lib and the referenced F# lib"
-            let fsharpProject = parsed |> Seq.find (fun p -> Path.GetFileName(p.ProjectFileName) = Path.GetFileName(childProj.ProjectFile))
+
+            let fsharpProject =
+                parsed
+                |> Seq.find (fun p -> Path.GetFileName(p.ProjectFileName) = Path.GetFileName(childProj.ProjectFile))
+
             let mapped = FCS.mapToFSharpProjectOptions fsharpProject parsed
             let referencedProjects = mapped.ReferencedProjects
             Expect.hasLength referencedProjects 1 "Should have a reference to the F# ProjectReference lib"
 
             match referencedProjects[0] with
-            | FSharpReferencedProject.FSharpReference(targetPath, _) ->
-                Expect.stringContains targetPath  (refAssemblyForProject parentProj) "Should have found the ref assembly for the F# lib"
+            | FSharpReferencedProject.FSharpReference(targetPath, _) -> Expect.stringContains targetPath (refAssemblyForProject parentProj) "Should have found the ref assembly for the F# lib"
             | _ -> failwith "Should have found a F# reference"
         )
 
@@ -2178,6 +2180,25 @@ let testProjectLoadBadData =
             let projFile = Path.Combine(testDir, "n1", "n1.fsproj")
             use proj = new ProjectSystem.Project(projFile, ignore)
             Expect.isNone proj.Response "should have loaded, detected bad data, and defaulted to empty"
+        )
+
+let canLoadMissingImports toolsPath loaderType (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
+    testCase
+        $"Can load projects with missing Imports - {loaderType}"
+        (fun () ->
+            let proj = ``Console app with missing direct Import``
+            let projPath = pathForProject proj
+
+            let loader = workspaceFactory toolsPath
+
+            let parsed =
+                loader.LoadProjects [ projPath ]
+                |> Seq.toList
+
+            Expect.equal parsed.Length 1 "Should have loaded the project"
+            let parsed = parsed[0]
+            Expect.equal 1 parsed.SourceFiles.Length "Should have cracked a single file"
+            Expect.equal "Program.fs" parsed.SourceFiles.[0] "Filename should be Program.fs"
         )
 
 let tests toolsPath =
@@ -2297,7 +2318,10 @@ let tests toolsPath =
         expensiveTests toolsPath WorkspaceLoader.Create
         csharpLibTest toolsPath WorkspaceLoader.Create
 
-        referenceAssemblySupportTest toolsPath (nameof(WorkspaceLoader)) WorkspaceLoader.Create
-        referenceAssemblySupportTest toolsPath (nameof(WorkspaceLoaderViaProjectGraph)) WorkspaceLoaderViaProjectGraph.Create
+        referenceAssemblySupportTest toolsPath (nameof (WorkspaceLoader)) WorkspaceLoader.Create
+        referenceAssemblySupportTest toolsPath (nameof (WorkspaceLoaderViaProjectGraph)) WorkspaceLoaderViaProjectGraph.Create
 
+        // tests that cover our ability to handle missing imports
+        canLoadMissingImports toolsPath (nameof (WorkspaceLoader)) WorkspaceLoader.Create
+        canLoadMissingImports toolsPath (nameof (WorkspaceLoaderViaProjectGraph)) WorkspaceLoaderViaProjectGraph.Create
     ]
