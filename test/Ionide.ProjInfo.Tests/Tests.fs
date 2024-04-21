@@ -1764,12 +1764,14 @@ let testLoadProject toolsPath =
             ]
             |> checkExitCodeZero
 
-            let projResult = ProjectLoader.getProjectInfo projPath [] BinaryLogGeneration.Off []
+            let collection = new Microsoft.Build.Evaluation.ProjectCollection()
 
-            match projResult with
-            | Result.Ok proj -> Expect.equal proj.ProjectFileName projPath "project file names"
+            match ProjectLoader.loadProject projPath BinaryLogGeneration.Off collection with
             | Result.Error err -> failwith $"{err}"
-
+            | Result.Ok proj ->
+                match ProjectLoader.getLoadedProjectInfo projPath [] proj with
+                | Result.Ok proj -> Expect.equal proj.ProjectFileName projPath "project file names"
+                | Result.Error err -> failwith $"{err}"
         )
 
 let testProjectSystem toolsPath workspaceLoader workspaceFactory =
@@ -2190,6 +2192,28 @@ let canLoadMissingImports toolsPath loaderType (workspaceFactory: ToolsPath -> I
             let projPath = pathForProject proj
 
             let loader = workspaceFactory toolsPath
+            let logger = Log.create (sprintf "Test '%s'" $"Can load projects with missing Imports - {loaderType}")
+
+            loader.Notifications.Add(
+                function
+                | WorkspaceProjectState.Failed(projPath, errors) ->
+                    logger.error (
+                        Message.eventX "Failed to load project {project} with {errors}"
+                        >> Message.setField "project" projPath
+                        >> Message.setField "errors" errors
+                    )
+                | WorkspaceProjectState.Loading p ->
+                    logger.info (
+                        Message.eventX "Loading project {project}"
+                        >> Message.setField "project" p
+                    )
+                | WorkspaceProjectState.Loaded(p, knownProjects, fromCache) ->
+                    logger.info (
+                        Message.eventX "Loaded project {project}(fromCache: {fromCache})"
+                        >> Message.setField "project" p
+                        >> Message.setField "fromCache" fromCache
+                    )
+            )
 
             let parsed =
                 loader.LoadProjects [ projPath ]
@@ -2197,8 +2221,8 @@ let canLoadMissingImports toolsPath loaderType (workspaceFactory: ToolsPath -> I
 
             Expect.equal parsed.Length 1 "Should have loaded the project"
             let parsed = parsed[0]
-            Expect.equal 1 parsed.SourceFiles.Length "Should have cracked a single file"
-            Expect.equal "Program.fs" parsed.SourceFiles.[0] "Filename should be Program.fs"
+            Expect.equal 3 parsed.SourceFiles.Length "Should have Program.fs, AssemblyInfo, and AssemblyAttributes"
+            Expect.stringEnds parsed.SourceFiles[2] "Program.fs" "Filename should be Program.fs"
         )
 
 let tests toolsPath =

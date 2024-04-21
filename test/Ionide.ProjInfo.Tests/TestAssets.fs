@@ -306,9 +306,7 @@ let ``NetSDK library referencing ProduceReferenceAssembly library`` = {
 let ``Console app with missing direct Import`` = {
     ProjDir = "missing-import"
     AssemblyName = "missing-import"
-    ProjectFile =
-        "missing-import"
-        / "missing-import.fsproj"
+    ProjectFile = "missing-import.fsproj"
     TargetFrameworks = Map.ofList [ "net6.0", sourceFiles [ "Program.fs" ] ]
     ProjectReferences = []
 }

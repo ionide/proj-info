@@ -331,12 +331,6 @@ module ProjectLoader =
 
     type LoadedProject = internal LoadedProject of ProjectInstance
 
-    [<RequireQualifiedAccess>]
-    type ProjectLoadingStatus =
-        private
-        | Success of LoadedProject
-        | Error of string
-
     let internal msBuildLogger = lazy (LogProvider.getLoggerByName "MsBuild") //lazy because dotnet test wont pickup our logger otherwise
 
     let msBuildToLogProvider () =
@@ -391,9 +385,7 @@ module ProjectLoader =
                 with set (v: LoggerVerbosity): unit = ()
         }
 
-    let getTfm (path: string) readingProps isLegacyFrameworkProj =
-        let pi = ProjectInstance(path, globalProperties = readingProps, toolsVersion = null)
-
+    let getTfm (pi: ProjectInstance) isLegacyFrameworkProj =
         let tfm =
             pi.GetPropertyValue(
                 if isLegacyFrameworkProj then
@@ -413,6 +405,21 @@ module ProjectLoader =
                 | tfms -> Some tfms.[0]
         else
             Some tfm
+
+    let loadProjectAndGetTFM (path: string) projectCollection readingProps isLegacyFrameworkProj =
+        let project =
+            Project(
+                projectFile = path,
+                globalProperties = readingProps,
+                toolsVersion = null,
+                projectCollection = projectCollection,
+                loadSettings =
+                    (ProjectLoadSettings.IgnoreMissingImports
+                     ||| ProjectLoadSettings.IgnoreInvalidImports)
+            )
+
+        let pi = project.CreateProjectInstance()
+        getTfm pi isLegacyFrameworkProj
 
     let createLoggers (paths: string seq) (binaryLogs: BinaryLogGeneration) (sw: StringWriter) =
         let swLogger = stringWriterLogger (sw)
@@ -442,8 +449,8 @@ module ProjectLoader =
                 yield! loggers
             ]
 
-    let getGlobalProps (path: string) (tfm: string option) (globalProperties: (string * string) list) =
-        dict [
+    let getGlobalProps (tfm: string option) (globalProperties: (string * string) list) (propsSetFromParentCollection: Set<string>) =
+        [
             "ProvideCommandLineArgs", "true"
             "DesignTimeBuild", "true"
             "SkipCompilerExecution", "true"
@@ -458,6 +465,9 @@ module ProjectLoader =
             "DotnetProjInfo", "true"
             yield! globalProperties
         ]
+        |> List.filter (fun (ourProp, _) -> not (propsSetFromParentCollection.Contains ourProp))
+        |> dict
+
 
     ///<summary>
     /// These are a list of build targets that are run during a design-time build (mostly).
@@ -504,7 +514,7 @@ module ProjectLoader =
             Init.setupForLegacyFramework msbuildBinaryDir
         | _ -> ()
 
-    let loadProject (path: string) (binaryLogs: BinaryLogGeneration) globalProperties =
+    let loadProject (path: string) (binaryLogs: BinaryLogGeneration) (projectCollection: ProjectCollection) =
         try
             let isLegacyFrameworkProjFile =
                 if
@@ -519,21 +529,26 @@ module ProjectLoader =
                 else
                     false
 
-            let readingProps = getGlobalProps path None globalProperties
+            let collectionProps =
+                projectCollection.GlobalProperties.Keys
+                |> Set.ofSeq
+
+            let readingProps = getGlobalProps None [] collectionProps
 
             if isLegacyFrameworkProjFile then
                 setLegacyMsbuildProperties isLegacyFrameworkProjFile
 
-            let tfm = getTfm path readingProps isLegacyFrameworkProjFile
+            let tfm = loadProjectAndGetTFM path projectCollection readingProps isLegacyFrameworkProjFile
 
-            let globalProperties = getGlobalProps path tfm globalProperties
+            let globalProperties = getGlobalProps tfm [] collectionProps
 
-            use pc = new ProjectCollection(globalProperties)
             let loadSettings =
                 ProjectLoadSettings.RecordEvaluatedItemElements
-                    ||| ProjectLoadSettings.ProfileEvaluation
-                    ||| ProjectLoadSettings.IgnoreMissingImports
-            let project = Project(projectFile = path, globalProperties = globalProperties, toolsVersion = null, projectCollection = pc, loadSettings = loadSettings)
+                ||| ProjectLoadSettings.ProfileEvaluation
+                ||| ProjectLoadSettings.IgnoreMissingImports
+
+            let project =
+                Project(projectFile = path, globalProperties = globalProperties, toolsVersion = null, projectCollection = projectCollection, loadSettings = loadSettings)
 
             use sw = new StringWriter()
 
@@ -544,11 +559,11 @@ module ProjectLoader =
             let build = pi.Build(designTimeBuildTargets isLegacyFrameworkProjFile, loggers)
 
             if build then
-                ProjectLoadingStatus.Success(LoadedProject pi)
+                Ok(LoadedProject pi)
             else
-                ProjectLoadingStatus.Error(sw.ToString())
+                Error(sw.ToString())
         with exc ->
-            ProjectLoadingStatus.Error(exc.Message)
+            Error(exc.Message)
 
     let getFscArgs (LoadedProject project) =
         project.Items
@@ -768,11 +783,21 @@ module ProjectLoader =
             LoadTime = DateTime.Now
             TargetPath =
                 props
-                |> Seq.tryPick (fun n -> if n.Name = "TargetPath" then Some n.Value else None)
+                |> Seq.tryPick (fun n ->
+                    if n.Name = "TargetPath" then
+                        Some n.Value
+                    else
+                        None
+                )
                 |> Option.defaultValue ""
             TargetRefPath =
                 props
-                |> Seq.tryPick (fun n -> if n.Name = "TargetRefPath" then Some n.Value else None)
+                |> Seq.tryPick (fun n ->
+                    if n.Name = "TargetRefPath" then
+                        Some n.Value
+                    else
+                        None
+                )
             ProjectOutputType = outputType
             ProjectSdkInfo = sdkInfo
             Items = compileItems
@@ -835,20 +860,20 @@ module ProjectLoader =
 
             Result.Ok proj
 
-    /// <summary>
-    /// Main entry point for project loading.
-    /// </summary>
-    /// <param name="path">Full path to the `.fsproj` file</param>
-    /// <param name="binaryLogs">describes if and how to generate MsBuild binary logs</param>
-    /// <param name="globalProperties">The global properties to use (e.g. Configuration=Release). Some additional global properties are pre-set by the tool</param>
-    /// <param name="customProperties">List of additional MsBuild properties that you want to obtain.</param>
-    /// <returns>Returns the record instance representing the loaded project or string containing error message</returns>
-    let getProjectInfo (path: string) (globalProperties: (string * string) list) (binaryLogs: BinaryLogGeneration) (customProperties: string list) : Result<Types.ProjectOptions, string> =
-        let loadedProject = loadProject path binaryLogs globalProperties
+// /// <summary>
+// /// Main entry point for project loading.
+// /// </summary>
+// /// <param name="path">Full path to the `.fsproj` file</param>
+// /// <param name="binaryLogs">describes if and how to generate MsBuild binary logs</param>
+// /// <param name="projectCollection">The propertyCollection to load the project into. This will provide global properties by default.</param>
+// /// <param name="customProperties">List of additional MsBuild properties that you want to obtain.</param>
+// /// <returns>Returns the record instance representing the loaded project or string containing error message</returns>
+// let getProjectInfo (path: string) projectCollection (binaryLogs: BinaryLogGeneration) (customProperties: string list) : Result<Types.ProjectOptions, string> =
+//     let loadedProject = loadProject path binaryLogs projectCollection
 
-        match loadedProject with
-        | ProjectLoadingStatus.Success project -> getLoadedProjectInfo path customProperties project
-        | ProjectLoadingStatus.Error e -> Result.Error e
+//     match loadedProject with
+//     | ProjectLoadingStatus.Success project -> getLoadedProjectInfo path customProperties project
+//     | ProjectLoadingStatus.Error e -> Result.Error e
 
 /// A type that turns project files or solution files into deconstructed options.
 /// Use this in conjunction with the other ProjInfo libraries to turn these options into
@@ -896,9 +921,19 @@ module WorkspaceLoaderViaProjectGraph =
 
 type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (string * string) list) =
     let (ToolsPath toolsPath) = toolsPath
-    let globalProperties = defaultArg globalProperties []
     let logger = LogProvider.getLoggerFor<WorkspaceLoaderViaProjectGraph> ()
     let loadingNotification = new Event<Types.WorkspaceProjectState>()
+
+    let projectCollection =
+        new ProjectCollection(
+            globalProperties = dict (defaultArg globalProperties []),
+            loggers = null,
+            remoteLoggers = null,
+            toolsetDefinitionLocations = ToolsetDefinitionLocations.Local,
+            loadProjectsReadOnly = true,
+            maxNodeCount = Environment.ProcessorCount,
+            onlyLogCriticalEvents = false
+        )
 
     let handleProjectGraphFailures f =
         try
@@ -917,11 +952,61 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
             None
 
-    let projectInstanceFactory projectPath (_globalProperties: IDictionary<string, string>) (projectCollection: ProjectCollection) =
-        let tfm = ProjectLoader.getTfm projectPath (dict globalProperties) false
-        //let globalProperties = globalProperties |> Seq.toList |> List.map (fun (KeyValue(k,v)) -> (k,v))
-        let globalProperties = ProjectLoader.getGlobalProps projectPath tfm globalProperties
-        ProjectInstance(projectPath, globalProperties, toolsVersion = null, projectCollection = projectCollection)
+    let projectInstanceFactory projectPath (globalProperties: IDictionary<string, string>) (projectCollection: ProjectCollection) =
+
+        // it's _super_ important that the 'same' project (path + properties) is only created once in a project collection, so we have to check on this here
+        let findOrCreateMatchingProject path (collection: ProjectCollection) globalProps =
+            let createNewProject properties =
+                Project(
+                    projectFile = projectPath,
+                    projectCollection = projectCollection,
+                    globalProperties = properties,
+                    toolsVersion = null,
+                    loadSettings =
+                        (ProjectLoadSettings.IgnoreMissingImports
+                         ||| ProjectLoadSettings.IgnoreInvalidImports)
+                )
+
+            let hasSameGlobalProperties (globalProps: IDictionary<string, string>) (incomingProject: Project) =
+                if
+                    incomingProject.GlobalProperties.Count
+                    <> globalProps.Count
+                then
+                    false
+                else
+                    globalProps
+                    |> Seq.forall (fun (KeyValue(k, v)) ->
+                        incomingProject.GlobalProperties.ContainsKey k
+                        && incomingProject.GlobalProperties.[k] = v
+                    )
+
+            match projectCollection.GetLoadedProjects(path) with
+            | null -> createNewProject globalProps
+            | existingProjects when existingProjects.Count = 0 -> createNewProject globalProps
+            | existingProjects ->
+                existingProjects
+                |> Seq.tryFind (hasSameGlobalProperties globalProps)
+                |> Option.defaultWith (fun _ -> createNewProject globalProps)
+
+        let loadedProject = findOrCreateMatchingProject projectPath projectCollection globalProperties
+
+        let projInstance = loadedProject.CreateProjectInstance()
+        let tfm = ProjectLoader.getTfm projInstance false
+
+        let ourGlobalProperties =
+            ProjectLoader.getGlobalProps
+                tfm
+                []
+                (globalProperties.Keys
+                 |> Set.ofSeq)
+
+        let combined = Dictionary(globalProperties)
+
+        for kvp in ourGlobalProperties do
+            combined.Add(kvp.Key, kvp.Value)
+
+        let tfm_specific_project = findOrCreateMatchingProject projectPath projectCollection combined
+        tfm_specific_project.CreateProjectInstance()
 
     let projectGraphProjects (paths: string seq) =
 
@@ -937,7 +1022,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                 with
                 | [ x ] ->
                     let g: ProjectGraph =
-                        ProjectGraph(x, projectCollection = ProjectCollection.GlobalProjectCollection, projectInstanceFactory = projectInstanceFactory)
+                        ProjectGraph(x, projectCollection = projectCollection, projectInstanceFactory = projectInstanceFactory)
                     // When giving ProjectGraph a singular project, g.EntryPointNodes only contains that project.
                     // To get it to build the Graph with all the dependencies we need to look at all the ProjectNodes
                     // and tell the graph to use all as potentially an entrypoint
@@ -945,7 +1030,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                         g.ProjectNodes
                         |> Seq.map (fun pn -> ProjectGraphEntryPoint pn.ProjectInstance.FullPath)
 
-                    ProjectGraph(nodes, projectCollection = ProjectCollection.GlobalProjectCollection, projectInstanceFactory = projectInstanceFactory)
+                    ProjectGraph(nodes, projectCollection = projectCollection, projectInstanceFactory = projectInstanceFactory)
 
                 | xs ->
                     let entryPoints =
@@ -953,7 +1038,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                         |> Seq.map ProjectGraphEntryPoint
                         |> List.ofSeq
 
-                    ProjectGraph(entryPoints, projectCollection = ProjectCollection.GlobalProjectCollection, projectInstanceFactory = projectInstanceFactory)
+                    ProjectGraph(entryPoints, projectCollection = projectCollection, projectInstanceFactory = projectInstanceFactory)
 
             graph
 
@@ -1033,6 +1118,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                     ProjectLoadSettings.RecordEvaluatedItemElements
                     ||| ProjectLoadSettings.ProfileEvaluation
                     ||| ProjectLoadSettings.IgnoreMissingImports
+                    ||| ProjectLoadSettings.IgnoreInvalidImports
 
                 buildParameters.LogInitialPropertiesAndItems <- true
                 bm.BeginBuild(buildParameters)
@@ -1163,7 +1249,18 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
         WorkspaceLoaderViaProjectGraph(toolsPath, ?globalProperties = globalProperties) :> IWorkspaceLoader
 
 type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string * string) list) =
-    let globalProperties = defaultArg globalProperties []
+
+    let projectCollection =
+        new ProjectCollection(
+            globalProperties = dict (defaultArg globalProperties []),
+            loggers = null,
+            remoteLoggers = null,
+            toolsetDefinitionLocations = ToolsetDefinitionLocations.Local,
+            maxNodeCount = Environment.ProcessorCount,
+            onlyLogCriticalEvents = false,
+            loadProjectsReadOnly = true
+        )
+
     let loadingNotification = new Event<Types.WorkspaceProjectState>()
 
     interface IWorkspaceLoader with
@@ -1180,28 +1277,8 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
                 |> Seq.toList
 
             let rec loadProject p =
-                let res = ProjectLoader.getProjectInfo p globalProperties binaryLogs customProperties
 
-                match res with
-                | Ok project ->
-                    try
-                        cache.Add(p, project)
-
-                        let lst =
-                            project.ReferencedProjects
-                            |> Seq.choose (fun n ->
-                                if cache.ContainsKey n.ProjectFileName then
-                                    None
-                                else
-                                    Some n.ProjectFileName
-                            )
-                            |> Seq.toList
-
-                        let info = Some project
-                        lst, info
-                    with exc ->
-                        loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, exc.Message)))
-                        [], None
+                match ProjectLoader.loadProject p binaryLogs projectCollection with
                 | Error msg when msg.Contains "The project file could not be loaded." ->
                     loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
                     [], None
@@ -1215,6 +1292,32 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
                 | Error msg ->
                     loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg)))
                     [], None
+                | Ok project ->
+                    let mappedProjectInfo = ProjectLoader.getLoadedProjectInfo p customProperties project
+
+                    match mappedProjectInfo with
+                    | Ok project ->
+                        try
+                            cache.Add(p, project)
+
+                            let lst =
+                                project.ReferencedProjects
+                                |> Seq.choose (fun n ->
+                                    if cache.ContainsKey n.ProjectFileName then
+                                        None
+                                    else
+                                        Some n.ProjectFileName
+                                )
+                                |> Seq.toList
+
+                            let info = Some project
+                            lst, info
+                        with exc ->
+                            loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, exc.Message)))
+                            [], None
+                    | Error msg ->
+                        loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg)))
+                        [], None
 
             let rec loadProjectList (projectList: string list) =
                 for p in projectList do
