@@ -2068,7 +2068,7 @@ let addFileToProject (projPath: string) fileName =
 let loadProjfileFromDiskTests toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog
-        $"can load project from disk everytime {workspaceLoader}"
+        $"can load project from disk everytime - {workspaceLoader}"
         (fun logger fs ->
 
             let loader = workspaceFactory toolsPath

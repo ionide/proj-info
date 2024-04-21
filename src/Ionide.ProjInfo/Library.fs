@@ -924,7 +924,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
     let logger = LogProvider.getLoggerFor<WorkspaceLoaderViaProjectGraph> ()
     let loadingNotification = new Event<Types.WorkspaceProjectState>()
 
-    let projectCollection =
+    let projectCollection () =
         new ProjectCollection(
             globalProperties = dict (defaultArg globalProperties []),
             loggers = null,
@@ -1012,6 +1012,8 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
         handleProjectGraphFailures
         <| fun () ->
+            let per_request_collection = projectCollection ()
+
             paths
             |> Seq.iter (fun p -> loadingNotification.Trigger(WorkspaceProjectState.Loading p))
 
@@ -1022,7 +1024,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                 with
                 | [ x ] ->
                     let g: ProjectGraph =
-                        ProjectGraph(x, projectCollection = projectCollection, projectInstanceFactory = projectInstanceFactory)
+                        ProjectGraph(x, projectCollection = per_request_collection, projectInstanceFactory = projectInstanceFactory)
                     // When giving ProjectGraph a singular project, g.EntryPointNodes only contains that project.
                     // To get it to build the Graph with all the dependencies we need to look at all the ProjectNodes
                     // and tell the graph to use all as potentially an entrypoint
@@ -1030,7 +1032,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                         g.ProjectNodes
                         |> Seq.map (fun pn -> ProjectGraphEntryPoint pn.ProjectInstance.FullPath)
 
-                    ProjectGraph(nodes, projectCollection = projectCollection, projectInstanceFactory = projectInstanceFactory)
+                    ProjectGraph(nodes, projectCollection = per_request_collection, projectInstanceFactory = projectInstanceFactory)
 
                 | xs ->
                     let entryPoints =
@@ -1038,7 +1040,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                         |> Seq.map ProjectGraphEntryPoint
                         |> List.ofSeq
 
-                    ProjectGraph(entryPoints, projectCollection = projectCollection, projectInstanceFactory = projectInstanceFactory)
+                    ProjectGraph(entryPoints, projectCollection = per_request_collection, projectInstanceFactory = projectInstanceFactory)
 
             graph
 
@@ -1250,7 +1252,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
 type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string * string) list) =
 
-    let projectCollection =
+    let projectCollection () =
         new ProjectCollection(
             globalProperties = dict (defaultArg globalProperties []),
             loggers = null,
@@ -1270,6 +1272,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
 
         override __.LoadProjects(projects: string list, customProperties, binaryLogs) =
             let cache = Dictionary<string, ProjectOptions>()
+            let per_request_collection = projectCollection ()
 
             let getAllKnown () =
                 cache
@@ -1278,7 +1281,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
 
             let rec loadProject p =
 
-                match ProjectLoader.loadProject p binaryLogs projectCollection with
+                match ProjectLoader.loadProject p binaryLogs per_request_collection with
                 | Error msg when msg.Contains "The project file could not be loaded." ->
                     loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
                     [], None
