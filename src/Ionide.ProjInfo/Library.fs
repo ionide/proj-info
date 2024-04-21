@@ -331,10 +331,10 @@ module ProjectLoader =
 
     type LoadedProject = internal LoadedProject of ProjectInstance
 
-    let internal msBuildLogger = lazy (LogProvider.getLoggerByName "MsBuild") //lazy because dotnet test wont pickup our logger otherwise
+    let internal projectLoaderLogger = LogProvider.getLoggerByName "ProjectLoader"
 
     let msBuildToLogProvider () =
-        let msBuildLogger = msBuildLogger.Value
+        let msBuildLogger = (LogProvider.getLoggerByName "MsBuild") //lazy because dotnet test wont pickup our logger otherwise
 
         { new ILogger with
             member this.Initialize(eventSource: IEventSource) : unit =
@@ -393,6 +393,47 @@ module ProjectLoader =
 
         combined
 
+    type ProjectAlreadyLoaded(projectPath: string, collection: ProjectCollection, properties: IDictionary<string, string>, innerException) =
+        inherit System.Exception("", innerException)
+        let mutable _message = null
+
+        override this.Message =
+            match _message with
+            | null ->
+                // if the project is already loaded throw a nicer message
+                let message = System.Text.StringBuilder()
+
+                message
+                    .AppendLine($"The project '{projectPath}' already exists in the project collection with the same global properties.")
+                    .AppendLine("The global properties requested were:")
+                |> ignore
+
+                for (KeyValue(k, v)) in properties do
+                    message.AppendLine($"  {k} = {v}")
+                    |> ignore
+
+                message.AppendLine()
+                |> ignore
+
+                message.AppendLine("There are projects of the following properties already in the collection:")
+                |> ignore
+
+                for project in collection.GetLoadedProjects(projectPath) do
+                    message.AppendLine($"Evaluation #{project.LastEvaluationId}")
+                    |> ignore
+
+                    for (KeyValue(k, v)) in project.GlobalProperties do
+                        message.AppendLine($"  {k} = {v}")
+                        |> ignore
+
+                    message.AppendLine()
+                    |> ignore
+
+                _message <- message.ToString()
+            | _ -> ()
+
+            _message
+
     // it's _super_ important that the 'same' project (path + properties) is only created once in a project collection, so we have to check on this here
     let findOrCreateMatchingProject path (collection: ProjectCollection) globalProps =
         let createNewProject properties =
@@ -407,37 +448,7 @@ module ProjectLoader =
                          ||| ProjectLoadSettings.IgnoreInvalidImports)
                 )
             with :? System.InvalidOperationException as ex ->
-
-                // if the project is already loaded throw a nicer message
-                let message = System.Text.StringBuilder()
-
-                message
-                    .AppendLine("The project '{path}' already exists in the project collection with the same global properties.")
-                    .AppendLine("The global properties requested were:")
-                |> ignore
-
-                for (KeyValue(k, v)) in properties do
-                    message.AppendLine($"  {k} = {v}")
-                    |> ignore
-
-                message.AppendLine()
-                |> ignore
-
-                message.AppendLine("There are projects of the following properties already in the collection:")
-                |> ignore
-
-                for project in collection.GetLoadedProjects(path) do
-                    message.AppendLine($"Evaluation #{project.LastEvaluationId}")
-                    |> ignore
-
-                    for (KeyValue(k, v)) in project.GlobalProperties do
-                        message.AppendLine($"  {k} = {v}")
-                        |> ignore
-
-                    message.AppendLine()
-                    |> ignore
-
-                failwith (message.ToString())
+                raise (ProjectAlreadyLoaded(path, collection, properties, ex))
 
         let hasSameGlobalProperties (globalProps: IDictionary<string, string>) (incomingProject: Project) =
             if
@@ -626,6 +637,12 @@ module ProjectLoader =
             else
                 Error(sw.ToString())
         with exc ->
+            projectLoaderLogger.error (
+                Log.setMessage "Generic error while loading project {path}"
+                >> Log.addExn exc
+                >> Log.addContextDestructured "path" path
+            )
+
             Error(exc.Message)
 
     let getFscArgs (LoadedProject project) =
@@ -1309,24 +1326,20 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
 
                     match mappedProjectInfo with
                     | Ok project ->
-                        try
-                            cache.Add(p, project)
+                        cache.Add(p, project)
 
-                            let lst =
-                                project.ReferencedProjects
-                                |> Seq.choose (fun n ->
-                                    if cache.ContainsKey n.ProjectFileName then
-                                        None
-                                    else
-                                        Some n.ProjectFileName
-                                )
-                                |> Seq.toList
+                        let lst =
+                            project.ReferencedProjects
+                            |> Seq.choose (fun n ->
+                                if cache.ContainsKey n.ProjectFileName then
+                                    None
+                                else
+                                    Some n.ProjectFileName
+                            )
+                            |> Seq.toList
 
-                            let info = Some project
-                            lst, info
-                        with exc ->
-                            loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, exc.Message)))
-                            [], None
+                        let info = Some project
+                        lst, info
                     | Error msg ->
                         loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg)))
                         [], None
