@@ -74,12 +74,6 @@ jobs:
         env:
           BuildNet7: ${{ matrix.build_net7 }}
 
-      - name: Upload NuGet packages
-        uses: actions/upload-artifact@v2
-        with:
-          name: packages
-          path: src/**/*.nupkg
-
       - name: Archive test results
         uses: actions/upload-artifact@v3
 
