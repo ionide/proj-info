@@ -39,7 +39,6 @@
             "name": "Ionide.ProjInfo.Tests",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "build",
             "program": "${workspaceFolder}/test/Ionide.ProjInfo.Tests/bin/Debug/${input:tfm}/Ionide.ProjInfo.Tests.dll",
             "args": [
                 "--filter",
