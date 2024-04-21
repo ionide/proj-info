@@ -612,12 +612,6 @@ module ProjectLoader =
             let tfm = loadProjectAndGetTFM path projectCollection readingProps isLegacyFrameworkProjFile
 
             let globalProperties = getGlobalProps tfm [] collectionProps
-
-            let loadSettings =
-                ProjectLoadSettings.RecordEvaluatedItemElements
-                ||| ProjectLoadSettings.ProfileEvaluation
-                ||| ProjectLoadSettings.IgnoreMissingImports
-
             let project = findOrCreateMatchingProject path projectCollection globalProperties
             use sw = new StringWriter()
 
@@ -928,21 +922,6 @@ module ProjectLoader =
             let proj = mapToProject path commandLineArgs p2pRefs compileItems nuGetRefs sdkInfo props customProps
 
             Result.Ok proj
-
-// /// <summary>
-// /// Main entry point for project loading.
-// /// </summary>
-// /// <param name="path">Full path to the `.fsproj` file</param>
-// /// <param name="binaryLogs">describes if and how to generate MsBuild binary logs</param>
-// /// <param name="projectCollection">The propertyCollection to load the project into. This will provide global properties by default.</param>
-// /// <param name="customProperties">List of additional MsBuild properties that you want to obtain.</param>
-// /// <returns>Returns the record instance representing the loaded project or string containing error message</returns>
-// let getProjectInfo (path: string) projectCollection (binaryLogs: BinaryLogGeneration) (customProperties: string list) : Result<Types.ProjectOptions, string> =
-//     let loadedProject = loadProject path binaryLogs projectCollection
-
-//     match loadedProject with
-//     | ProjectLoadingStatus.Success project -> getLoadedProjectInfo path customProperties project
-//     | ProjectLoadingStatus.Error e -> Result.Error e
 
 /// A type that turns project files or solution files into deconstructed options.
 /// Use this in conjunction with the other ProjInfo libraries to turn these options into
