@@ -1012,7 +1012,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
         handleProjectGraphFailures
         <| fun () ->
-            let per_request_collection = projectCollection ()
+            use per_request_collection = projectCollection ()
 
             paths
             |> Seq.iter (fun p -> loadingNotification.Trigger(WorkspaceProjectState.Loading p))
@@ -1272,7 +1272,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
 
         override __.LoadProjects(projects: string list, customProperties, binaryLogs) =
             let cache = Dictionary<string, ProjectOptions>()
-            let per_request_collection = projectCollection ()
+            use per_request_collection = projectCollection ()
 
             let getAllKnown () =
                 cache
