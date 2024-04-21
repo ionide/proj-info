@@ -331,10 +331,10 @@ module ProjectLoader =
 
     type LoadedProject = internal LoadedProject of ProjectInstance
 
-    let internal projectLoaderLogger = LogProvider.getLoggerByName "ProjectLoader"
+    let internal projectLoaderLogger = lazy (LogProvider.getLoggerByName "ProjectLoader")
 
     let msBuildToLogProvider () =
-        let msBuildLogger = (LogProvider.getLoggerByName "MsBuild") //lazy because dotnet test wont pickup our logger otherwise
+        let msBuildLogger = LogProvider.getLoggerByName "MsBuild"
 
         { new ILogger with
             member this.Initialize(eventSource: IEventSource) : unit =
@@ -637,7 +637,7 @@ module ProjectLoader =
             else
                 Error(sw.ToString())
         with exc ->
-            projectLoaderLogger.error (
+            projectLoaderLogger.Value.error (
                 Log.setMessage "Generic error while loading project {path}"
                 >> Log.addExn exc
                 >> Log.addContextDestructured "path" path
