@@ -385,6 +385,40 @@ module ProjectLoader =
                 with set (v: LoggerVerbosity): unit = ()
         }
 
+    // it's _super_ important that the 'same' project (path + properties) is only created once in a project collection, so we have to check on this here
+    let findOrCreateMatchingProject path (collection: ProjectCollection) globalProps =
+        let createNewProject properties =
+            Project(
+                projectFile = path,
+                projectCollection = collection,
+                globalProperties = properties,
+                toolsVersion = null,
+                loadSettings =
+                    (ProjectLoadSettings.IgnoreMissingImports
+                     ||| ProjectLoadSettings.IgnoreInvalidImports)
+            )
+
+        let hasSameGlobalProperties (globalProps: IDictionary<string, string>) (incomingProject: Project) =
+            if
+                incomingProject.GlobalProperties.Count
+                <> globalProps.Count
+            then
+                false
+            else
+                globalProps
+                |> Seq.forall (fun (KeyValue(k, v)) ->
+                    incomingProject.GlobalProperties.ContainsKey k
+                    && incomingProject.GlobalProperties.[k] = v
+                )
+
+        match collection.GetLoadedProjects(path) with
+        | null -> createNewProject globalProps
+        | existingProjects when existingProjects.Count = 0 -> createNewProject globalProps
+        | existingProjects ->
+            existingProjects
+            |> Seq.tryFind (hasSameGlobalProperties globalProps)
+            |> Option.defaultWith (fun _ -> createNewProject globalProps)
+
     let getTfm (pi: ProjectInstance) isLegacyFrameworkProj =
         let tfm =
             pi.GetPropertyValue(
@@ -407,17 +441,7 @@ module ProjectLoader =
             Some tfm
 
     let loadProjectAndGetTFM (path: string) projectCollection readingProps isLegacyFrameworkProj =
-        let project =
-            Project(
-                projectFile = path,
-                globalProperties = readingProps,
-                toolsVersion = null,
-                projectCollection = projectCollection,
-                loadSettings =
-                    (ProjectLoadSettings.IgnoreMissingImports
-                     ||| ProjectLoadSettings.IgnoreInvalidImports)
-            )
-
+        let project = findOrCreateMatchingProject path projectCollection readingProps
         let pi = project.CreateProjectInstance()
         getTfm pi isLegacyFrameworkProj
 
@@ -953,42 +977,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
             None
 
     let projectInstanceFactory projectPath (globalProperties: IDictionary<string, string>) (projectCollection: ProjectCollection) =
-
-        // it's _super_ important that the 'same' project (path + properties) is only created once in a project collection, so we have to check on this here
-        let findOrCreateMatchingProject path (collection: ProjectCollection) globalProps =
-            let createNewProject properties =
-                Project(
-                    projectFile = projectPath,
-                    projectCollection = projectCollection,
-                    globalProperties = properties,
-                    toolsVersion = null,
-                    loadSettings =
-                        (ProjectLoadSettings.IgnoreMissingImports
-                         ||| ProjectLoadSettings.IgnoreInvalidImports)
-                )
-
-            let hasSameGlobalProperties (globalProps: IDictionary<string, string>) (incomingProject: Project) =
-                if
-                    incomingProject.GlobalProperties.Count
-                    <> globalProps.Count
-                then
-                    false
-                else
-                    globalProps
-                    |> Seq.forall (fun (KeyValue(k, v)) ->
-                        incomingProject.GlobalProperties.ContainsKey k
-                        && incomingProject.GlobalProperties.[k] = v
-                    )
-
-            match projectCollection.GetLoadedProjects(path) with
-            | null -> createNewProject globalProps
-            | existingProjects when existingProjects.Count = 0 -> createNewProject globalProps
-            | existingProjects ->
-                existingProjects
-                |> Seq.tryFind (hasSameGlobalProperties globalProps)
-                |> Option.defaultWith (fun _ -> createNewProject globalProps)
-
-        let loadedProject = findOrCreateMatchingProject projectPath projectCollection globalProperties
+        let loadedProject = ProjectLoader.findOrCreateMatchingProject projectPath projectCollection globalProperties
 
         let projInstance = loadedProject.CreateProjectInstance()
         let tfm = ProjectLoader.getTfm projInstance false
@@ -1005,7 +994,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
         for kvp in ourGlobalProperties do
             combined.Add(kvp.Key, kvp.Value)
 
-        let tfm_specific_project = findOrCreateMatchingProject projectPath projectCollection combined
+        let tfm_specific_project = ProjectLoader.findOrCreateMatchingProject projectPath projectCollection combined
         tfm_specific_project.CreateProjectInstance()
 
     let projectGraphProjects (paths: string seq) =
