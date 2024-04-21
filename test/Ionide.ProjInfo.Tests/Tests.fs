@@ -365,7 +365,7 @@ let testLegacyFrameworkMultiProject toolsPath workspaceLoader isRelease (workspa
 let testSample2 toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPath * (string * string) list -> IWorkspaceLoader) =
     testCase
     |> withLog
-        (sprintf "can load sample2 - %s - isRelease is %b" workspaceLoader isRelease)
+        (sprintf "can load sample2 - isRelease is %b - %s" isRelease workspaceLoader)
         (fun logger fs ->
             let testDir = inDir fs "load_sample2"
             copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir

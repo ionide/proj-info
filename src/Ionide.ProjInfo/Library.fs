@@ -385,18 +385,59 @@ module ProjectLoader =
                 with set (v: LoggerVerbosity): unit = ()
         }
 
+    let mergeGlobalProperties (collection: ProjectCollection) (otherProperties: IDictionary<string, string>) =
+        let combined = Dictionary(collection.GlobalProperties)
+
+        for kvp in otherProperties do
+            combined.Add(kvp.Key, kvp.Value)
+
+        combined
+
     // it's _super_ important that the 'same' project (path + properties) is only created once in a project collection, so we have to check on this here
     let findOrCreateMatchingProject path (collection: ProjectCollection) globalProps =
         let createNewProject properties =
-            Project(
-                projectFile = path,
-                projectCollection = collection,
-                globalProperties = properties,
-                toolsVersion = null,
-                loadSettings =
-                    (ProjectLoadSettings.IgnoreMissingImports
-                     ||| ProjectLoadSettings.IgnoreInvalidImports)
-            )
+            try
+                Project(
+                    projectFile = path,
+                    projectCollection = collection,
+                    globalProperties = properties,
+                    toolsVersion = null,
+                    loadSettings =
+                        (ProjectLoadSettings.IgnoreMissingImports
+                         ||| ProjectLoadSettings.IgnoreInvalidImports)
+                )
+            with :? System.InvalidOperationException as ex ->
+
+                // if the project is already loaded throw a nicer message
+                let message = System.Text.StringBuilder()
+
+                message
+                    .AppendLine("The project '{path}' already exists in the project collection with the same global properties.")
+                    .AppendLine("The global properties requested were:")
+                |> ignore
+
+                for (KeyValue(k, v)) in properties do
+                    message.AppendLine($"  {k} = {v}")
+                    |> ignore
+
+                message.AppendLine()
+                |> ignore
+
+                message.AppendLine("There are projects of the following properties already in the collection:")
+                |> ignore
+
+                for project in collection.GetLoadedProjects(path) do
+                    message.AppendLine($"Evaluation #{project.LastEvaluationId}")
+                    |> ignore
+
+                    for (KeyValue(k, v)) in project.GlobalProperties do
+                        message.AppendLine($"  {k} = {v}")
+                        |> ignore
+
+                    message.AppendLine()
+                    |> ignore
+
+                failwith (message.ToString())
 
         let hasSameGlobalProperties (globalProps: IDictionary<string, string>) (incomingProject: Project) =
             if
@@ -411,13 +452,19 @@ module ProjectLoader =
                     && incomingProject.GlobalProperties.[k] = v
                 )
 
-        match collection.GetLoadedProjects(path) with
-        | null -> createNewProject globalProps
-        | existingProjects when existingProjects.Count = 0 -> createNewProject globalProps
-        | existingProjects ->
-            existingProjects
-            |> Seq.tryFind (hasSameGlobalProperties globalProps)
-            |> Option.defaultWith (fun _ -> createNewProject globalProps)
+        lock
+            (collection)
+            (fun _ ->
+                match collection.GetLoadedProjects(path) with
+                | null -> createNewProject globalProps
+                | existingProjects when existingProjects.Count = 0 -> createNewProject globalProps
+                | existingProjects ->
+                    let totalGlobalProps = mergeGlobalProperties collection globalProps
+
+                    existingProjects
+                    |> Seq.tryFind (hasSameGlobalProperties totalGlobalProps)
+                    |> Option.defaultWith (fun _ -> createNewProject globalProps)
+            )
 
     let getTfm (pi: ProjectInstance) isLegacyFrameworkProj =
         let tfm =
@@ -985,14 +1032,10 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                 tfm
                 []
                 (globalProperties.Keys
-                 |> Set.ofSeq)
+                 |> Set.ofSeq
+                 |> Set.union (Set.ofSeq projectCollection.GlobalProperties.Keys))
 
-        let combined = Dictionary(globalProperties)
-
-        for kvp in ourGlobalProperties do
-            combined.Add(kvp.Key, kvp.Value)
-
-        let tfm_specific_project = ProjectLoader.findOrCreateMatchingProject projectPath projectCollection combined
+        let tfm_specific_project = ProjectLoader.findOrCreateMatchingProject projectPath projectCollection ourGlobalProperties
         tfm_specific_project.CreateProjectInstance()
 
     let projectGraphProjects (paths: string seq) =
