@@ -571,9 +571,7 @@ module ProjectLoader =
                 ||| ProjectLoadSettings.ProfileEvaluation
                 ||| ProjectLoadSettings.IgnoreMissingImports
 
-            let project =
-                Project(projectFile = path, globalProperties = globalProperties, toolsVersion = null, projectCollection = projectCollection, loadSettings = loadSettings)
-
+            let project = findOrCreateMatchingProject path projectCollection globalProperties
             use sw = new StringWriter()
 
             let loggers = createLoggers [ path ] binaryLogs sw
