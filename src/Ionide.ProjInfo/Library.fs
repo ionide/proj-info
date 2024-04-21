@@ -329,7 +329,10 @@ type BinaryLogGeneration =
 /// </summary>
 module ProjectLoader =
 
-    type LoadedProject = internal LoadedProject of ProjectInstance
+    type LoadedProject =
+        internal
+        | StandardProject of ProjectInstance
+        | TraversalProject of ProjectInstance
 
     let internal projectLoaderLogger = lazy (LogProvider.getLoggerByName "ProjectLoader")
 
@@ -630,12 +633,22 @@ module ProjectLoader =
 
             let pi = project.CreateProjectInstance()
 
-            let build = pi.Build(designTimeBuildTargets isLegacyFrameworkProjFile, loggers)
+            let doDesignTimeBuild () =
+                let build = pi.Build(designTimeBuildTargets isLegacyFrameworkProjFile, loggers)
 
-            if build then
-                Ok(LoadedProject pi)
-            else
-                Error(sw.ToString())
+                if build then
+                    Ok(StandardProject pi)
+                else
+                    Error(sw.ToString())
+
+            let yieldTraversalProject () = Ok(TraversalProject pi)
+
+            // do traversal project detection here
+            match pi.GetProperty "IsTraversal" with
+            | null -> doDesignTimeBuild ()
+            | p when Boolean.Parse(p.EvaluatedValue) = false -> doDesignTimeBuild ()
+            | _ -> yieldTraversalProject ()
+
         with exc ->
             projectLoaderLogger.Value.error (
                 Log.setMessage "Generic error while loading project {path}"
@@ -645,38 +658,67 @@ module ProjectLoader =
 
             Error(exc.Message)
 
-    let getFscArgs (LoadedProject project) =
-        project.Items
+    let getFscArgs (p: ProjectInstance) =
+        p.Items
         |> Seq.filter (fun p -> p.ItemType = "FscCommandLineArgs")
         |> Seq.map (fun p -> p.EvaluatedInclude)
 
-    let getCscArgs (LoadedProject project) =
-        project.Items
+    let getCscArgs (p: ProjectInstance) =
+        p.Items
         |> Seq.filter (fun p -> p.ItemType = "CscCommandLineArgs")
         |> Seq.map (fun p -> p.EvaluatedInclude)
 
-    let getP2PRefs (LoadedProject project) =
-        project.Items
-        |> Seq.filter (fun p -> p.ItemType = "_MSBuildProjectReferenceExistent")
-        |> Seq.map (fun p ->
-            let relativePath = p.EvaluatedInclude
-            let path = p.GetMetadataValue "FullPath"
+    let getP2PRefs (project) =
+        match project with
+        | TraversalProject p ->
+            let references =
+                p.Items
+                |> Seq.filter (fun p -> p.ItemType = "ProjectReference")
+                |> Seq.toList
 
-            let tfms =
-                if p.HasMetadata "TargetFramework" then
-                    p.GetMetadataValue "TargetFramework"
+            let mappedItems = ResizeArray()
+
+            for item in references do
+                let relativePath = item.EvaluatedInclude
+                let fullPath = Path.GetFullPath(relativePath, item.Project.Directory)
+
+                {
+                    RelativePath = relativePath
+                    ProjectFileName = fullPath
+                    TargetFramework = ""
+                }
+                |> mappedItems.Add
+
+            Seq.toList mappedItems
+
+        | StandardProject p ->
+            p.Items
+            |> Seq.choose (fun p ->
+                if
+                    p.ItemType
+                    <> "_MSBuildProjectReferenceExistent"
+                then
+                    None
                 else
-                    p.GetMetadataValue "TargetFrameworks"
+                    let relativePath = p.EvaluatedInclude
+                    let path = p.GetMetadataValue "FullPath"
 
-            {
-                RelativePath = relativePath
-                ProjectFileName = path
-                TargetFramework = tfms
-            }
-        )
+                    let tfms =
+                        if p.HasMetadata "TargetFramework" then
+                            p.GetMetadataValue "TargetFramework"
+                        else
+                            p.GetMetadataValue "TargetFrameworks"
 
-    let getCompileItems (LoadedProject project) =
-        project.Items
+                    Some {
+                        RelativePath = relativePath
+                        ProjectFileName = path
+                        TargetFramework = tfms
+                    }
+            )
+            |> Seq.toList
+
+    let getCompileItems (p: ProjectInstance) =
+        p.Items
         |> Seq.filter (fun p -> p.ItemType = "Compile")
         |> Seq.map (fun p ->
             let name = p.EvaluatedInclude
@@ -696,8 +738,8 @@ module ProjectLoader =
             }
         )
 
-    let getNuGetReferences (LoadedProject project) =
-        project.Items
+    let getNuGetReferences (p: ProjectInstance) =
+        p.Items
         |> Seq.filter (fun p ->
             p.ItemType = "Reference"
             && p.GetMetadataValue "NuGetSourceType" = "Package"
@@ -714,8 +756,8 @@ module ProjectLoader =
             }
         )
 
-    let getProperties (LoadedProject project) (properties: string list) =
-        project.Properties
+    let getProperties (p: ProjectInstance) (properties: string list) =
+        p.Properties
         |> Seq.filter (fun p -> List.contains p.Name properties)
         |> Seq.map (fun p -> {
             Name = p.Name
@@ -888,57 +930,66 @@ module ProjectLoader =
 
         project
 
+    [<RequireQualifiedAccess>]
+    type LoadedProjectInfo =
+        | StandardProjectInfo of ProjectOptions
+        | TraversalProjectInfo of ProjectReference list
 
-    let getLoadedProjectInfo (path: string) customProperties project =
+    let getLoadedProjectInfo (path: string) customProperties project : Result<LoadedProjectInfo, string> =
         // let (LoadedProject p) = project
         // let path = p.FullPath
 
-        let properties = [
-            "OutputType"
-            "IsTestProject"
-            "TargetPath"
-            "Configuration"
-            "IsPackable"
-            "TargetFramework"
-            "TargetFrameworkIdentifier"
-            "TargetFrameworkVersion"
-            "MSBuildAllProjects"
-            "ProjectAssetsFile"
-            "RestoreSuccess"
-            "Configurations"
-            "TargetFrameworks"
-            "RunArguments"
-            "RunCommand"
-            "IsPublishable"
-            "BaseIntermediateOutputPath"
-            "IntermediateOutputPath"
-            "TargetPath"
-            "TargetRefPath"
-            "IsCrossTargetingBuild"
-            "TargetFrameworks"
-        ]
+        match project with
+        | LoadedProject.TraversalProject t ->
+            LoadedProjectInfo.TraversalProjectInfo(getP2PRefs project)
+            |> Ok
+        | LoadedProject.StandardProject p ->
+            let properties = [
+                "OutputType"
+                "IsTestProject"
+                "TargetPath"
+                "Configuration"
+                "IsPackable"
+                "TargetFramework"
+                "TargetFrameworkIdentifier"
+                "TargetFrameworkVersion"
+                "MSBuildAllProjects"
+                "ProjectAssetsFile"
+                "RestoreSuccess"
+                "Configurations"
+                "TargetFrameworks"
+                "RunArguments"
+                "RunCommand"
+                "IsPublishable"
+                "BaseIntermediateOutputPath"
+                "IntermediateOutputPath"
+                "TargetPath"
+                "TargetRefPath"
+                "IsCrossTargetingBuild"
+                "TargetFrameworks"
+            ]
 
-        let p2pRefs = getP2PRefs project
+            let p2pRefs = getP2PRefs project
 
-        let commandLineArgs =
-            if path.EndsWith ".fsproj" then
-                getFscArgs project
+            let commandLineArgs =
+                if path.EndsWith ".fsproj" then
+                    getFscArgs p
+                else if path.EndsWith ".csproj" then
+                    getCscArgs p
+                else
+                    Seq.empty
+
+            let compileItems = getCompileItems p
+            let nuGetRefs = getNuGetReferences p
+            let props = getProperties p properties
+            let sdkInfo = getSdkInfo props
+            let customProps = getProperties p customProperties
+
+            if not sdkInfo.RestoreSuccess then
+                Error "not restored"
             else
-                getCscArgs project
-
-        let compileItems = getCompileItems project
-        let nuGetRefs = getNuGetReferences project
-        let props = getProperties project properties
-        let sdkInfo = getSdkInfo props
-        let customProps = getProperties project customProperties
-
-        if not sdkInfo.RestoreSuccess then
-            Result.Error "not restored"
-        else
-
-            let proj = mapToProject path commandLineArgs p2pRefs compileItems nuGetRefs sdkInfo props customProps
-
-            Result.Ok proj
+                let proj = mapToProject path commandLineArgs p2pRefs compileItems nuGetRefs sdkInfo props customProps
+                Ok(LoadedProjectInfo.StandardProjectInfo proj)
 
 /// A type that turns project files or solution files into deconstructed options.
 /// Use this in conjunction with the other ProjInfo libraries to turn these options into
@@ -1056,7 +1107,19 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                     // and tell the graph to use all as potentially an entrypoint
                     let nodes =
                         g.ProjectNodes
-                        |> Seq.map (fun pn -> ProjectGraphEntryPoint pn.ProjectInstance.FullPath)
+                        |> Seq.choose (fun pn ->
+                            match pn.ProjectInstance.GetProperty("IsTraversal") with
+                            | null ->
+                                ProjectGraphEntryPoint pn.ProjectInstance.FullPath
+                                |> Some
+                            | p ->
+                                match bool.TryParse(p.EvaluatedValue) with
+                                | true, true -> None
+                                | true, false ->
+                                    ProjectGraphEntryPoint pn.ProjectInstance.FullPath
+                                    |> Some
+                                | false, _ -> None
+                        )
 
                     ProjectGraph(nodes, projectCollection = per_request_collection, projectInstanceFactory = projectInstanceFactory)
 
@@ -1186,7 +1249,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
                     let projects =
                         builtProjects
-                        |> Seq.map (fun p -> p.FullPath, ProjectLoader.getLoadedProjectInfo p.FullPath customProperties (ProjectLoader.LoadedProject p))
+                        |> Seq.map (fun p -> p.FullPath, ProjectLoader.getLoadedProjectInfo p.FullPath customProperties (ProjectLoader.StandardProject p))
 
                         |> Seq.choose (fun (projectPath, projectOptionResult) ->
                             match projectOptionResult with
@@ -1207,24 +1270,32 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                         projects
                         |> Seq.toList
 
-                    allProjectOptions
-                    |> Seq.iter (fun po ->
-                        logger.info (
-                            Log.setMessage "Project loaded {project}"
-                            >> Log.addContextDestructured "project" po.ProjectFileName
+                    let allStandardProjects =
+                        allProjectOptions
+                        |> List.choose (
+                            function
+                            | ProjectLoader.LoadedProjectInfo.StandardProjectInfo p -> Some p
+                            | _ -> None
                         )
 
-                        loadingNotification.Trigger(
-                            WorkspaceProjectState.Loaded(
-                                po,
-                                allProjectOptions
-                                |> Seq.toList,
-                                false
+                    allProjectOptions
+                    |> List.iter (fun po ->
+                        match po with
+                        | ProjectLoader.LoadedProjectInfo.TraversalProjectInfo p ->
+                            logger.info (
+                                Log.setMessage "Traversal project loaded and contained the following references: {references}"
+                                >> Log.addContextDestructured "references" p
                             )
-                        )
+                        | ProjectLoader.LoadedProjectInfo.StandardProjectInfo po ->
+                            logger.info (
+                                Log.setMessage "Project loaded {project}"
+                                >> Log.addContextDestructured "project" po.ProjectFileName
+                            )
+
+                            loadingNotification.Trigger(WorkspaceProjectState.Loaded(po, allStandardProjects, false))
                     )
 
-                    allProjectOptions :> seq<_>
+                    allStandardProjects :> seq<_>
         with e ->
             handleError "" e
 
@@ -1297,12 +1368,16 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
         override __.Notifications = loadingNotification.Publish
 
         override __.LoadProjects(projects: string list, customProperties, binaryLogs) =
-            let cache = Dictionary<string, ProjectOptions>()
+            let cache = Dictionary<string, ProjectLoader.LoadedProjectInfo>()
             use per_request_collection = projectCollection ()
 
             let getAllKnown () =
                 cache
-                |> Seq.map (fun n -> n.Value)
+                |> Seq.choose (fun (KeyValue(k, v)) ->
+                    match v with
+                    | ProjectLoader.LoadedProjectInfo.StandardProjectInfo p -> Some p
+                    | _ -> None
+                )
                 |> Seq.toList
 
             let rec loadProject p =
@@ -1328,8 +1403,13 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
                     | Ok project ->
                         cache.Add(p, project)
 
+                        let referencedProjects =
+                            match project with
+                            | ProjectLoader.LoadedProjectInfo.StandardProjectInfo p -> p.ReferencedProjects
+                            | ProjectLoader.LoadedProjectInfo.TraversalProjectInfo p -> p
+
                         let lst =
-                            project.ReferencedProjects
+                            referencedProjects
                             |> Seq.choose (fun n ->
                                 if cache.ContainsKey n.ProjectFileName then
                                     None
@@ -1338,7 +1418,11 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
                             )
                             |> Seq.toList
 
-                        let info = Some project
+                        let info =
+                            match project with
+                            | ProjectLoader.LoadedProjectInfo.StandardProjectInfo p -> Some p
+                            | ProjectLoader.LoadedProjectInfo.TraversalProjectInfo p -> None
+
                         lst, info
                     | Error msg ->
                         loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg)))
@@ -1349,10 +1433,19 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
                     let newList, toTrigger =
                         if cache.ContainsKey p then
                             let project = cache.[p]
-                            loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, getAllKnown (), true)) //TODO: Should it even notify here?
+
+                            match project with
+                            | ProjectLoader.LoadedProjectInfo.StandardProjectInfo p -> loadingNotification.Trigger(WorkspaceProjectState.Loaded(p, getAllKnown (), true))
+
+                            | ProjectLoader.LoadedProjectInfo.TraversalProjectInfo p -> ()
+
+                            let referencedProjects =
+                                match project with
+                                | ProjectLoader.LoadedProjectInfo.StandardProjectInfo p -> p.ReferencedProjects
+                                | ProjectLoader.LoadedProjectInfo.TraversalProjectInfo p -> p
 
                             let lst =
-                                project.ReferencedProjects
+                                referencedProjects
                                 |> Seq.choose (fun n ->
                                     if cache.ContainsKey n.ProjectFileName then
                                         None
@@ -1369,13 +1462,13 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
 
                     loadProjectList newList
 
+
                     toTrigger
                     |> Option.iter (fun project -> loadingNotification.Trigger(WorkspaceProjectState.Loaded(project, getAllKnown (), false)))
 
             loadProjectList projects
 
-            cache
-            |> Seq.map (fun n -> n.Value)
+            getAllKnown ()
 
         override this.LoadProjects(projects) =
             this.LoadProjects(projects, [], BinaryLogGeneration.Off)
