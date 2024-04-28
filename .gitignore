@@ -246,3 +246,6 @@ msbuild.binlog
 .fake
 .ionide
 obj2
+
+# Rider
+.idea/
