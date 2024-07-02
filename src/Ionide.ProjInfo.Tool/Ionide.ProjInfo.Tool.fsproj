@@ -17,5 +17,14 @@
         <ProjectReference Include="..\Ionide.ProjInfo.ProjectSystem\Ionide.ProjInfo.ProjectSystem.fsproj" />
     </ItemGroup>
 
-    <Import Project="..\..\.paket\Paket.Restore.targets" />
+    <Target Name="RemoveDllsAfterBuild" AfterTargets="Build">
+      <ItemGroup>
+        <FilesToDelete Include="$(TargetDir)\Microsoft.Build.dll"/>
+        <FilesToDelete Include="$(TargetDir)\Microsoft.Build.Framework.dll"/>
+      </ItemGroup>
+
+      <Delete Files="@(FilesToDelete)"/>
+    </Target>
+
+    <Import Project="..\..\.paket\Paket.Restore.targets"/>
 </Project>
