@@ -26,7 +26,7 @@ module SdkDiscovery =
         Path: DirectoryInfo
     }
 
-    let internal execDotnet (cwd: DirectoryInfo) (binaryFullPath: FileInfo) args =
+    let internal execDotnet (failOnError: bool) (cwd: DirectoryInfo) (binaryFullPath: FileInfo) args =
         let info = ProcessStartInfo()
         info.WorkingDirectory <- cwd.FullName
         info.FileName <- binaryFullPath.FullName
@@ -45,8 +45,15 @@ module SdkDiscovery =
             |> Seq.toArray
 
         p.WaitForExit()
-        output
-
+        if p.ExitCode = 0 then
+            output
+        elif failOnError then
+            let output = output |> String.concat "\n"
+            failwith $"`{binaryFullPath.FullName} {args}` failed with exit code %i{p.ExitCode}. Output: %s{output}"
+        else
+            // for the legacy VS flow, whose behaviour is harder to test, we maintain compatibility with how proj-info
+            // used to work before the above error handling was added
+            output
 
     let private (|SemVer|_|) version =
         match SemanticVersioning.Version.TryParse version with
@@ -75,7 +82,7 @@ module SdkDiscovery =
     /// Given the DOTNET_ROOT, that is the directory where the `dotnet` binary is present and the sdk/runtimes/etc are,
     /// enumerates the available runtimes in descending version order
     let runtimes (dotnetBinaryPath: FileInfo) : DotnetRuntimeInfo[] =
-        execDotnet dotnetBinaryPath.Directory dotnetBinaryPath [ "--list-runtimes" ]
+        execDotnet true dotnetBinaryPath.Directory dotnetBinaryPath [ "--list-runtimes" ]
         |> Seq.choose (fun line ->
             match line with
             | RuntimeParts(runtimeName, SemVer version, SdkOutputDirectory path) ->
@@ -98,7 +105,7 @@ module SdkDiscovery =
     /// Given the DOTNET_sROOT, that is the directory where the `dotnet` binary is present and the sdk/runtimes/etc are,
     /// enumerates the available SDKs in descending version order
     let sdks (dotnetBinaryPath: FileInfo) : DotnetSdkInfo[] =
-        execDotnet dotnetBinaryPath.Directory dotnetBinaryPath [ "--list-sdks" ]
+        execDotnet true dotnetBinaryPath.Directory dotnetBinaryPath [ "--list-sdks" ]
         |> Seq.choose (fun line ->
             match line with
             | SdkParts(SemVer sdkVersion, SdkOutputDirectory path) ->
@@ -115,7 +122,7 @@ module SdkDiscovery =
     /// performs a `dotnet --version` command at the given directory to get the version of the
     /// SDK active at that location.
     let versionAt (cwd: DirectoryInfo) (dotnetBinaryPath: FileInfo) =
-        execDotnet cwd dotnetBinaryPath [ "--version" ]
+        execDotnet true cwd dotnetBinaryPath [ "--version" ]
         |> Seq.head
         |> function
             | version ->
@@ -159,7 +166,7 @@ module LegacyFrameworkDiscovery =
                      failwith $"\"{vsWhereExe}\" does not exist. It is a expected to be present in '<ProgramFilesX86>/Microsoft Visual Studio/Installer' when resolving the MsBuild for legacy projects."
 
                  let msbuildExe =
-                     SdkDiscovery.execDotnet vsWhereDir vsWhereExe [
+                     SdkDiscovery.execDotnet false vsWhereDir vsWhereExe [
                          "-find"
                          "MSBuild\**\Bin\MSBuild.exe"
                      ]
