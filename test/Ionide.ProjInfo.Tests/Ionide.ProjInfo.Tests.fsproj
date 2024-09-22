@@ -21,6 +21,15 @@
       Include="..\..\src\Ionide.ProjInfo.ProjectSystem\Ionide.ProjInfo.ProjectSystem.fsproj" />
   </ItemGroup>
 
+  <ItemGroup>
+   <PackageReference Include="Expecto" />
+   <PackageReference Include="Expecto.Diff" />
+   <PackageReference Include="Expecto.TestResults" />
+   <PackageReference Include="YoloDev.Expecto.TestSdk" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="MedallionShell" />
+  </ItemGroup>
+
   <!-- This is a workaround for the test framework using Microsoft.Build dependencies and our
   project uses it's own set of Microsoft.Build dependencies which causes loading conflicts -->
   <Target
@@ -31,6 +40,4 @@
       DestinationFolder="$(OutputPath)"
       ContinueOnError="false" />
   </Target>
-
-  <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
