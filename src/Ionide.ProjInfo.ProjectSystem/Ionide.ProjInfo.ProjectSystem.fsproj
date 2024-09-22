@@ -22,11 +22,15 @@
     <ProjectReference Include="..\Ionide.ProjInfo.Sln\Ionide.ProjInfo.Sln.csproj" />
   </ItemGroup>
 
+ <ItemGroup>
+  <PackageReference Include="Newtonsoft.Json" />
+ <PackageReference Include="FSharp.Control.Reactive"  />
+ </ItemGroup>
+
   <ItemGroup>
     <!-- This lets us directly instanciate Projects in the tests -->
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>Ionide.ProjInfo.Tests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
-  <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

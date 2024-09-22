@@ -5,31 +5,6 @@ source https://api.nuget.org/v3/index.json
 storage: none
 framework: net6.0, net7.0
 
-nuget FSharp.Core
-nuget FSharp.Compiler.Service >= 7.0.400
-nuget Argu
-
-# copy_local: true because this is a build-time dependency only
-nuget Dotnet.ReproducibleBuilds copy_local: true
-nuget GitHubActionsTestLogger
-nuget Ionide.KeepAChangelog.Tasks copy_local:true
-
-nuget Expecto
-nuget Expecto.Diff
-nuget Expecto.TestResults
-nuget MedallionShell ~> 1.5.0
-
-# copy_local: false excludes runtime assets (desired for msbuild)
-nuget Microsoft.Build copy_local: false
-nuget Microsoft.Build.Framework copy_local: false
-nuget Microsoft.Build.Utilities.Core copy_local: false
-nuget Microsoft.Build.Tasks.Core copy_local: false
-nuget Microsoft.NET.Test.Sdk
-nuget Newtonsoft.Json
-nuget Fsharp.Control.Reactive
-nuget SemanticVersioning
-nuget YoloDev.Expecto.TestSdk
-
 // [ FAKE GROUP ]
 group Build
   source https://api.nuget.org/v3/index.json

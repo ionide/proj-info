@@ -1,0 +1,8 @@
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))"
+          Condition="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../')) != ''" />
+
+  <ItemGroup Label="Testing packages">
+   <PackageReference Include="GitHubActionsTestLogger" />
+  </ItemGroup>
+</Project>
