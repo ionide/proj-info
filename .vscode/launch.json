@@ -40,10 +40,10 @@
             "type": "coreclr",
             "request": "launch",
             "program": "${workspaceFolder}/test/Ionide.ProjInfo.Tests/bin/Debug/${input:tfm}/Ionide.ProjInfo.Tests.dll",
-            "args": [
-                "--filter",
-                "Main tests.${input:testName} - ${input:loader}"
-            ],
+            // "args": [
+            //     "--filter",
+            //     "Main tests.${input:testName} - ${input:loader}"
+            // ],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
             "console": "internalConsole"

@@ -1,18 +1,15 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="MSTest.Sdk/3.6.0">
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
     <TargetFrameworks>net6.0</TargetFrameworks>
     <TargetFrameworks Condition="'$(BuildNet7)' == 'true'">$(TargetFrameworks);net7.0</TargetFrameworks>
-    <IsPackable>false</IsPackable>
-    <IsTestProject>true</IsTestProject>
-    <GenerateProgramFile>false</GenerateProgramFile>
+    <!-- MSTest SDK and CPM don't play nicely -->
+    <CentralPackageVersionOverrideEnabled>true</CentralPackageVersionOverrideEnabled>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="FileUtils.fs" />
+    <Compile Include="MSTestLogger.fs" />
     <Compile Include="TestAssets.fs" />
     <Compile Include="Tests.fs" />
-    <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Ionide.ProjInfo\Ionide.ProjInfo.fsproj" />
@@ -22,12 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
-   <PackageReference Include="Expecto" />
-   <PackageReference Include="Expecto.Diff" />
-   <PackageReference Include="Expecto.TestResults" />
-   <PackageReference Include="YoloDev.Expecto.TestSdk" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="MedallionShell" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
   </ItemGroup>
 
   <!-- This is a workaround for the test framework using Microsoft.Build dependencies and our
