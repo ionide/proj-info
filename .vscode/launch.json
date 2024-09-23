@@ -55,9 +55,9 @@
             "description": "The TFM of the test to run",
             "options": [
                 "net6.0",
-                "net7.0"
+                "net8.0"
             ],
-            "default": "net7.0",
+            "default": "net8.0",
             "type": "pickString"
         },
         {

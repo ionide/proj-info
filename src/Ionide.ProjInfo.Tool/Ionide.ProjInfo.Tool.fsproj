@@ -1,26 +1,27 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <OutputType>Exe</OutputType>
-    <TargetFrameworks>net6.0</TargetFrameworks>
-    <TargetFrameworks Condition="'$(BuildNet7)' == 'true'">$(TargetFrameworks);net7.0</TargetFrameworks>
-        <PackAsTool>true</PackAsTool>
-        <ToolCommandName>proj-info</ToolCommandName>
-        <RollForward>LatestMajor</RollForward>
-    </PropertyGroup>
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>proj-info</ToolCommandName>
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
 
-    <ItemGroup>
-        <Compile Include="Program.fs" />
-    </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Program.fs" />
+  </ItemGroup>
 
-    <ItemGroup>
-        <ProjectReference Include="..\Ionide.ProjInfo.ProjectSystem\Ionide.ProjInfo.ProjectSystem.fsproj" />
-    </ItemGroup>
+  <ItemGroup>
+    <ProjectReference
+      Include="..\Ionide.ProjInfo.ProjectSystem\Ionide.ProjInfo.ProjectSystem.fsproj" />
+  </ItemGroup>
 
-   <ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.Build" ExcludeAssets="runtime" IncludeAssets="compile" />
-    <PackageReference Include="Microsoft.Build.Framework" ExcludeAssets="runtime" IncludeAssets="compile" />
-   <PackageReference Include="Argu"/>
-   </ItemGroup>
+    <PackageReference Include="Microsoft.Build.Framework" ExcludeAssets="runtime"
+      IncludeAssets="compile" />
+    <PackageReference Include="Argu" />
+  </ItemGroup>
 
 </Project>

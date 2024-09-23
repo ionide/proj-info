@@ -1,7 +1,6 @@
 ﻿<Project Sdk="MSTest.Sdk/3.6.0">
   <PropertyGroup>
-    <TargetFrameworks>net6.0</TargetFrameworks>
-    <TargetFrameworks Condition="'$(BuildNet7)' == 'true'">$(TargetFrameworks);net7.0</TargetFrameworks>
+    <TargetFrameworks>net6.0;net8.0;</TargetFrameworks>
     <!-- MSTest SDK and CPM don't play nicely -->
     <CentralPackageVersionOverrideEnabled>true</CentralPackageVersionOverrideEnabled>
   </PropertyGroup>
