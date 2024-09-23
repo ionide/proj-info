@@ -19,7 +19,7 @@ type MSTestLogger(logs: ChannelWriter<string>, categoryName: string) =
             true
 
         member this.Log(logLevel: LogLevel, eventId: EventId, state: 'TState, e: exn, formatter: Func<'TState,exn,string>): unit =
-            logs.TryWrite($"{logLevel}: {categoryName} [{eventId}] - {formatter.Invoke(state, e)}")
+            logs.TryWrite($"{formatter.Invoke(state, e)}")
             |> ignore<bool>
 
             if e <> null

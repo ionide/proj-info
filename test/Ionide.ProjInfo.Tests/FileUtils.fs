@@ -60,8 +60,8 @@ type FileUtils(logger: ILogger) =
             logger.LogDebug ("-> copy file '{from}' '{toPath}'", newPath, toFilePath)
             File.Copy(newPath, toFilePath, true)
 
-    member _.shellExecRun workDir cmd (args: string list) =
-        logger.LogDebug ("executing: '{cmd}' '{args}'", cmd, (args |> String.concat " "), workDir)
+    member _.shellExecRun cmd (args: string list) =
+        logger.LogDebug ("executing: '{cmd}' '{args}'", cmd, (args |> String.concat " "), currentDirectory)
 
         let cmd =
             Medallion.Shell.Command.Run(
@@ -71,7 +71,7 @@ type FileUtils(logger: ILogger) =
                 |> Array.map box,
                 options =
                     (fun opt ->
-                        opt.WorkingDirectory(workDir)
+                        opt.WorkingDirectory(currentDirectory)
                         |> ignore
                     )
             )
@@ -90,12 +90,11 @@ type FileUtils(logger: ILogger) =
         logger.LogDebug ("cd '{directory}'", dir)
         currentDirectory <- dir
 
-    member x.shellExecRunNET workDir cmd (args: string list) =
+    member x.shellExecRunNET cmd (args: string list) =
         if (isWindows ()) then
-            x.shellExecRun workDir cmd args
+            x.shellExecRun cmd args
         else
             x.shellExecRun
-                workDir
                 "mono"
                 (cmd
                 :: args)

@@ -9,14 +9,13 @@ open Medallion.Shell
 open System
 open System.Collections.Generic
 open System.IO
-open System.Threading
-open System.Xml.Linq
-open System.Linq
 open Microsoft.VisualStudio.TestTools.UnitTesting
 open System.Runtime.CompilerServices
+open System.Runtime.InteropServices
 
 #nowarn "25"
 open Microsoft.Extensions.Logging
+open Microsoft.VisualStudio.TestTools.UnitTesting
 
 let RepoDir =
     (__SOURCE_DIRECTORY__
@@ -73,7 +72,7 @@ let findByPath path parsed =
 
 type AssertionExtensions =
   [<Extension>]
-  static member IsSome(_a: Assert, o: _ option, [<CallerMemberName>] name: string) =
+  static member IsSome(_a: Assert, o: _ option, [<CallerMemberName; OptionalAttribute; DefaultParameterValueAttribute("")>] name: string) =
     match o with
     | Some _ -> ()
     | None -> raise (AssertFailedException($"Expected the value of {name} to be Some, but was None"))
@@ -213,6 +212,14 @@ module ExpectNotification =
 
 let mutable toolsPath: ToolsPath = Unchecked.defaultof<_>
 
+type LoaderScenario =
+| Workspace
+| Graph
+  member x.Loader =
+    match x with
+    | Workspace -> fun (toolsPath, props) -> WorkspaceLoader.Create(toolsPath, props)
+    | Graph -> fun (toolsPath, props) -> WorkspaceLoaderViaProjectGraph.Create(toolsPath, props)
+
 [<TestClass>]
 type MSBuildInitializer() =
     [<AssemblyInitialize>]
@@ -234,6 +241,7 @@ type EvaluationTestBase() =
         member x.Dispose() =
             x.LoggerFactory.Dispose()
 
+[<TestClass>]
 type LoadLegacyProjectTests() =
     inherit EvaluationTestBase()
 
@@ -371,75 +379,79 @@ type LoadLegacyProjectTests() =
         Assert.AreEqual<ProjectOptions>(l2Loaded, l2Parsed)
         Assert.AreEqual<ProjectOptions>(n1Loaded, n1Parsed)
 
-// let testSample2 toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPath * (string * string) list -> IWorkspaceLoader) =
-//     testCase
-//     |> withLog
-//         (sprintf "can load sample2 - isRelease is %b - %s" isRelease workspaceLoader)
-//         (fun logger fs ->
-//             let testDir = inDir fs "load_sample2"
-//             copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
+[<TestClass>]
+type NetStandardProjectTests() =
+    inherit EvaluationTestBase()
 
-//             let projPath =
-//                 testDir
-//                 / (``sample2 NetSdk library``.ProjectFile)
+    static member DefaultConfigurationsAcrossLoaders: IEnumerable<obj[]> =
+        seq {
+            for config in [ "Debug"; "Release" ] do
+                for scenario in [ LoaderScenario.Workspace; LoaderScenario.Graph ] do
+                    yield [| config; scenario |]
+        }
 
-//             let projDir = Path.GetDirectoryName projPath
+    [<TestMethod>]
+    [<DynamicData(nameof NetStandardProjectTests.DefaultConfigurationsAcrossLoaders)>]
+    member x.CanLoadSample2(configuration: string, scenario: LoaderScenario) =
+        let logger = x.Logger
+        let fs = x.FileSystem
+        let testDir = inDir fs "load_sample2"
+        copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
 
-//             dotnet fs [
-//                 "restore"
-//                 projPath
-//             ]
-//             |> checkExitCodeZero
+        let projPath =
+            testDir
+            / (``sample2 NetSdk library``.ProjectFile)
 
-//             let config =
-//                 if isRelease then
-//                     "Release"
-//                 else
-//                     "Debug"
+        let projDir = Path.GetDirectoryName projPath
 
-//             let props = [ ("Configuration", config) ]
-//             let loader = workspaceFactory (toolsPath, props)
+        dotnet fs [
+            "restore"
+            projPath
+        ]
+        |> checkExitCodeZero
 
-//             let watcher = watchNotifications logger loader
+        let props = [ ("Configuration", configuration) ]
+        let loader = scenario.Loader (toolsPath, props)
 
-//             let parsed =
-//                 loader.LoadProjects [ projPath ]
-//                 |> Seq.toList
+        let watcher = watchNotifications logger loader
 
-//             [
-//                 loading "n1.fsproj"
-//                 loaded "n1.fsproj"
-//             ]
-//             |> expectNotifications (watcher.Notifications)
+        let parsed =
+            loader.LoadProjects [ projPath ]
+            |> Seq.toList
 
-//             let [ _; WorkspaceProjectState.Loaded(n1Loaded, _, _) ] = watcher.Notifications
+        [
+            loading "n1.fsproj"
+            loaded "n1.fsproj"
+        ]
+        |> expectNotifications (watcher.Notifications)
 
-//             let n1Parsed =
-//                 parsed
-//                 |> expectFind projPath "first is a lib"
+        let [ _; WorkspaceProjectState.Loaded(n1Loaded, _, _) ] = watcher.Notifications
 
-//             let expectedSources =
-//                 [
-//                     projDir
-//                     / ("obj/"
-//                        + config
-//                        + "/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs")
-//                     projDir
-//                     / ("obj/"
-//                        + config
-//                        + "/netstandard2.0/n1.AssemblyInfo.fs")
-//                     projDir
-//                     / "Library.fs"
-//                     if isRelease then
-//                         projDir
-//                         / "Other.fs"
-//                 ]
-//                 |> List.map Path.GetFullPath
+        let n1Parsed =
+            parsed
+            |> expectFind projPath "first is a lib"
 
-//             Expect.equal parsed.Length 1 "console and lib"
-//             Expect.equal n1Parsed n1Loaded "notificaton and parsed should be the same"
-//             Expect.equal n1Parsed.SourceFiles expectedSources "check sources"
-//         )
+        let expectedSources =
+            [
+                projDir
+                / ("obj/"
+                    + configuration
+                    + "/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs")
+                projDir
+                / ("obj/"
+                    + configuration
+                    + "/netstandard2.0/n1.AssemblyInfo.fs")
+                projDir
+                / "Library.fs"
+                if configuration = "Release" then
+                    projDir
+                    / "Other.fs"
+            ]
+            |> List.map Path.GetFullPath
+
+        Assert.AreEqual<int>(parsed.Length, 1)
+        Assert.AreEqual<ProjectOptions>(n1Loaded, n1Parsed)
+        Assert.That.HasSources(n1Parsed, expectedSources)
 
 // let testSample3 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) expected =
 //     testCase
