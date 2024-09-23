@@ -40,10 +40,10 @@
             "type": "coreclr",
             "request": "launch",
             "program": "${workspaceFolder}/test/Ionide.ProjInfo.Tests/bin/Debug/${input:tfm}/Ionide.ProjInfo.Tests.dll",
-            "args": [
-                "--filter",
-                "Main tests.${input:testName} - ${input:loader}"
-            ],
+            // "args": [
+            //     "--filter",
+            //     "Main tests.${input:testName} - ${input:loader}"
+            // ],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
             "console": "internalConsole"
@@ -55,9 +55,9 @@
             "description": "The TFM of the test to run",
             "options": [
                 "net6.0",
-                "net7.0"
+                "net8.0"
             ],
-            "default": "net7.0",
+            "default": "net8.0",
             "type": "pickString"
         },
         {

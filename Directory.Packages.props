@@ -21,13 +21,9 @@
     <PackageVersion Include="Microsoft.Build.Framework" Version="$(MicrosoftBuildPackageVersion)" />
 
     <!-- Test packages -->
-     <PackageVersion Include="Expecto" Version="10.2.1" />
-     <PackageVersion Include="Expecto.TestResults" Version="8.13.2" />
-     <PackageVersion Include="Expecto.Diff" Version="10.2.1" />
-     <PackageVersion Include="YoloDev.Expecto.TestSdk" Version="0.14.3" />
-     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
      <PackageVersion Include="GitHubActionsTestLogger" Version="2.4.1" />
      <PackageVersion Include="MedallionShell" Version="1.6.2" />
+     <PackageVersion Include="Microsoft.Extensions.Logging" Version="8.0.0" />
 
     <!-- CI/Build-related packages -->
     <PackageVersion Include="DotNet.ReproducibleBuilds" Version="1.2.25" />
