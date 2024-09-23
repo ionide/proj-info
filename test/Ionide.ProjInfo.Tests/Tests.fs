@@ -1,5 +1,7 @@
 module Tests
 
+#nowarn "25"
+
 open DotnetProjInfo.TestAssets
 open FileUtils
 open FSharp.Compiler.CodeAnalysis
@@ -12,10 +14,7 @@ open System.IO
 open Microsoft.VisualStudio.TestTools.UnitTesting
 open System.Runtime.CompilerServices
 open System.Runtime.InteropServices
-
-#nowarn "25"
 open Microsoft.Extensions.Logging
-open Microsoft.VisualStudio.TestTools.UnitTesting
 
 let RepoDir =
     (__SOURCE_DIRECTORY__
@@ -95,8 +94,6 @@ let inDir (fs: FileUtils) dirName =
         TestRunDir
         / dirName
 
-    fs.rm_rf outDir
-    fs.mkdir_p outDir
     fs.cd outDir
     outDir
 
@@ -111,16 +108,6 @@ let copyDirFromAssets (fs: FileUtils) source outDir =
     ()
 
 let dotnet (fs: FileUtils) args = fs.shellExecRun "dotnet" args
-
-// let withLog name f test =
-//     test
-//         name
-//         (fun () ->
-
-//             let logger = Log.create (sprintf "Test '%s'" name)
-//             let fs = FileUtils(logger)
-//             f logger fs
-//         )
 
 let renderOf sampleProj sources = {
     ProjectViewerTree.Name =
@@ -210,6 +197,7 @@ module ExpectNotification =
     let watchNotifications logger loader =
         NotificationWatcher(loader, logNotification logger)
 
+// TODO: test context/assembly init?
 let mutable toolsPath: ToolsPath = Unchecked.defaultof<_>
 
 type LoaderScenario =
@@ -249,7 +237,7 @@ type LoadLegacyProjectTests() =
     member x.LoadLegacyProject() =
         let logger = x.Logger
         let fs = x.FileSystem
-        let testDir = inDir fs "a"
+        let testDir = inDir fs x.TestContext.TestRunDirectory
         copyDirFromAssets fs ``sample7 legacy framework project``.ProjDir testDir
 
         let projPath =
@@ -296,7 +284,7 @@ type LoadLegacyProjectTests() =
         let logger = x.Logger
         let fs = x.FileSystem
 
-        let testDir = inDir fs "load_sample7"
+        let testDir = inDir fs x.TestContext.TestRunDirectory
         copyDirFromAssets fs ``sample7 legacy framework multi-project``.ProjDir testDir
 
         let projPath =
@@ -395,7 +383,7 @@ type NetStandardProjectTests() =
     member x.CanLoadSample2(configuration: string, scenario: LoaderScenario) =
         let logger = x.Logger
         let fs = x.FileSystem
-        let testDir = inDir fs "load_sample2"
+        let testDir = inDir fs x.TestContext.DeploymentDirectory
         copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
 
         let projPath =
@@ -453,117 +441,121 @@ type NetStandardProjectTests() =
         Assert.AreEqual<ProjectOptions>(n1Loaded, n1Parsed)
         Assert.That.HasSources(n1Parsed, expectedSources)
 
-// let testSample3 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) expected =
-//     testCase
-//     |> withLog
-//         (sprintf "can load sample3 - %s" workspaceLoader)
-//         (fun logger fs ->
-//             let testDir = inDir fs "load_sample3"
-//             copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
+    static member Sample3Scenarios: IEnumerable<obj[]> =
+        seq {
+            yield [| LoaderScenario.Workspace; [ ExpectNotification.loading "c1.fsproj"
+                                                 ExpectNotification.loading "l1.csproj"
+                                                 ExpectNotification.loaded "l1.csproj"
+                                                 ExpectNotification.loading "l2.fsproj"
+                                                 ExpectNotification.loaded "l2.fsproj"
+                                                 ExpectNotification.loaded "c1.fsproj" ] |]
+            yield [| LoaderScenario.Graph; [ ExpectNotification.loading "c1.fsproj"
+                                             ExpectNotification.loaded "c1.fsproj" ] |]
+        }
 
-//             let projPath =
-//                 testDir
-//                 / (``sample3 Netsdk projs``.ProjectFile)
+    [<TestMethod>]
+    [<DynamicData(nameof NetStandardProjectTests.Sample3Scenarios)>]
+    member x.CanLoadSample3(scenario: LoaderScenario, expected) =
+        let logger = x.Logger
+        let fs = x.FileSystem
+        let testDir = inDir fs x.TestContext.TestRunDirectory
+        copyDirFromAssets fs ``sample3 Netsdk projs``.ProjDir testDir
 
-//             let projDir = Path.GetDirectoryName projPath
+        let projPath =
+            testDir
+            / (``sample3 Netsdk projs``.ProjectFile)
 
-//             let [ (l1, l1Dir); (l2, l2Dir) ] =
-//                 ``sample3 Netsdk projs``.ProjectReferences
-//                 |> List.map (fun p2p ->
-//                     testDir
-//                     / p2p.ProjectFile
-//                 )
-//                 |> List.map Path.GetFullPath
-//                 |> List.map (fun path -> path, Path.GetDirectoryName(path))
+        let projDir = Path.GetDirectoryName projPath
 
-//             dotnet fs [
-//                 "build"
-//                 projPath
-//             ]
-//             |> checkExitCodeZero
+        let [ (l1, l1Dir); (l2, l2Dir) ] =
+            ``sample3 Netsdk projs``.ProjectReferences
+            |> List.map (fun p2p ->
+                testDir
+                / p2p.ProjectFile
+            )
+            |> List.map Path.GetFullPath
+            |> List.map (fun path -> path, Path.GetDirectoryName(path))
 
-//             let loader = workspaceFactory toolsPath
+        dotnet fs [
+            "build"
+            projPath
+        ]
+        |> checkExitCodeZero
 
-//             let watcher = watchNotifications logger loader
+        let loader = scenario.Loader (toolsPath, [])
 
-//             let parsed =
-//                 loader.LoadProjects [ projPath ]
-//                 |> Seq.toList
+        let watcher = watchNotifications logger loader
 
-//             expected
-//             |> expectNotifications (watcher.Notifications)
+        let parsed =
+            loader.LoadProjects [ projPath ]
+            |> Seq.toList
 
-
-//             let [ _; _; WorkspaceProjectState.Loaded(l1Loaded, _, _); _; WorkspaceProjectState.Loaded(l2Loaded, _, _); WorkspaceProjectState.Loaded(c1Loaded, _, _) ] =
-//                 watcher.Notifications
-
-
-//             let l1Parsed =
-//                 parsed
-//                 |> expectFind l1 "the C# lib"
-
-//             let l1ExpectedSources =
-//                 [
-//                     l1Dir
-//                     / "Class1.cs"
-//                     l1Dir
-//                     / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.cs"
-//                     l1Dir
-//                     / "obj/Debug/netstandard2.0/l1.AssemblyInfo.cs"
-//                 ]
-//                 |> List.map Path.GetFullPath
-
-//             // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
-//             // Expect.equal l1Parsed.SourceFiles l1ExpectedSources "check sources"
-
-//             let l2Parsed =
-//                 parsed
-//                 |> expectFind l2 "the F# lib"
-
-//             let l2ExpectedSources =
-//                 [
-//                     l2Dir
-//                     / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
-//                     l2Dir
-//                     / "obj/Debug/netstandard2.0/l2.AssemblyInfo.fs"
-//                     l2Dir
-//                     / "Library.fs"
-//                 ]
-//                 |> List.map Path.GetFullPath
+        expected
+        |> expectNotifications (watcher.Notifications)
 
 
-//             let c1Parsed =
-//                 parsed
-//                 |> expectFind projPath "the F# console"
+        let [ _; _; WorkspaceProjectState.Loaded(l1Loaded, _, _); _; WorkspaceProjectState.Loaded(l2Loaded, _, _); WorkspaceProjectState.Loaded(c1Loaded, _, _) ] =
+            watcher.Notifications
 
 
-//             let c1ExpectedSources =
-//                 [
-//                     projDir
-//                     / "obj/Debug/netcoreapp2.1/.NETCoreApp,Version=v2.1.AssemblyAttributes.fs"
-//                     projDir
-//                     / "obj/Debug/netcoreapp2.1/c1.AssemblyInfo.fs"
-//                     projDir
-//                     / "Program.fs"
-//                 ]
-//                 |> List.map Path.GetFullPath
+        let l1Parsed =
+            parsed
+            |> expectFind l1 "the C# lib"
 
-//             Expect.equal
-//                 parsed.Length
-//                 3
-//                 (sprintf
-//                     "console (F#) and lib (F#) and lib (C#), but was %A"
-//                     (parsed
-//                      |> List.map (fun x -> x.ProjectFileName)))
+        let l1ExpectedSources =
+            [
+                l1Dir
+                / "Class1.cs"
+                l1Dir
+                / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.cs"
+                l1Dir
+                / "obj/Debug/netstandard2.0/l1.AssemblyInfo.cs"
+            ]
+            |> List.map Path.GetFullPath
 
-//             Expect.equal c1Parsed.SourceFiles c1ExpectedSources "check sources - C1"
-//             Expect.equal l1Parsed.SourceFiles l1ExpectedSources "check sources - L1"
-//             Expect.equal l2Parsed.SourceFiles l2ExpectedSources "check sources - L2"
+        // TODO C# doesnt have OtherOptions or SourceFiles atm. it should
+        // Expect.equal l1Parsed.SourceFiles l1ExpectedSources "check sources"
 
-//             Expect.equal l1Parsed l1Loaded "l1 notificaton and parsed should be the same"
-//             Expect.equal l2Parsed l2Loaded "l2 notificaton and parsed should be the same"
-//             Expect.equal c1Parsed c1Loaded "c1 notificaton and parsed should be the same"
-//         )
+        let l2Parsed =
+            parsed
+            |> expectFind l2 "the F# lib"
+
+        let l2ExpectedSources =
+            [
+                l2Dir
+                / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
+                l2Dir
+                / "obj/Debug/netstandard2.0/l2.AssemblyInfo.fs"
+                l2Dir
+                / "Library.fs"
+            ]
+            |> List.map Path.GetFullPath
+
+
+        let c1Parsed =
+            parsed
+            |> expectFind projPath "the F# console"
+
+
+        let c1ExpectedSources =
+            [
+                projDir
+                / "obj/Debug/netcoreapp2.1/.NETCoreApp,Version=v2.1.AssemblyAttributes.fs"
+                projDir
+                / "obj/Debug/netcoreapp2.1/c1.AssemblyInfo.fs"
+                projDir
+                / "Program.fs"
+            ]
+            |> List.map Path.GetFullPath
+
+        Assert.AreEqual<int>(3, parsed.Length)
+        Assert.That.HasSources(c1Parsed, c1ExpectedSources)
+        Assert.That.HasSources(l1Parsed, l1ExpectedSources)
+        Assert.That.HasSources(l2Parsed, l2ExpectedSources)
+
+        Assert.AreEqual<ProjectOptions>(l1Loaded, l1Parsed)
+        Assert.AreEqual<ProjectOptions>(l2Loaded, l2Parsed)
+        Assert.AreEqual<ProjectOptions>(c1Loaded, c1Parsed)
 
 // let testSample4 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
 //     testCase
@@ -2273,20 +2265,6 @@ type NetStandardProjectTests() =
 //         )
 
 // let tests toolsPath =
-//     let testSample3WorkspaceLoaderExpected = [
-//         ExpectNotification.loading "c1.fsproj"
-//         ExpectNotification.loading "l1.csproj"
-//         ExpectNotification.loaded "l1.csproj"
-//         ExpectNotification.loading "l2.fsproj"
-//         ExpectNotification.loaded "l2.fsproj"
-//         ExpectNotification.loaded "c1.fsproj"
-//     ]
-
-//     let testSample3GraphExpected = [
-//         ExpectNotification.loading "c1.fsproj"
-//         ExpectNotification.loaded "c1.fsproj"
-//     ]
-
 //     let testSlnExpected = [
 //         ExpectNotification.loading "c1.fsproj"
 //         ExpectNotification.loading "l2.fsproj"
@@ -2309,10 +2287,6 @@ type NetStandardProjectTests() =
 
 //     testSequenced
 //     <| testList "Main tests" [
-//         testSample2 toolsPath "WorkspaceLoader" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
-//         testSample2 toolsPath "WorkspaceLoader" true (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
-//         testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" false (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))
-//         testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" true (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))
 //         //   testSample3 toolsPath "WorkspaceLoader" WorkspaceLoader.Create testSample3WorkspaceLoaderExpected //- Sample 3 having issues, was also marked pending on old test suite
 //         //   testSample3 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create testSample3GraphExpected //- Sample 3 having issues, was also marked pending on old test suite
 //         testSample4 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
