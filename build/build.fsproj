@@ -8,5 +8,11 @@
   <ItemGroup>
     <Compile Include="Program.fs" />
   </ItemGroup>
-  <Import Project="..\.paket\Paket.Restore.targets" />
+
+  <ItemGroup>
+    <PackageReference Include="Fake.Core.Target" />
+    <PackageReference Include="Fake.DotNet.Cli" />
+    <PackageReference Include="Fake.Core.UserInput" />
+
+  </ItemGroup>
 </Project>

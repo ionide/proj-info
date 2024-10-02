@@ -236,7 +236,6 @@ _Pvt_Extensions
 # Repo-specific files
 
 .dotnetsdk
-/paket-files/
 /test/testrun/
 /test/testrun_ws/
 msbuild.binlog

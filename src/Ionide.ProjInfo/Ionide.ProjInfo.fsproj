@@ -15,5 +15,9 @@
   <ItemGroup>
     <ProjectReference Include="..\Ionide.ProjInfo.Sln\Ionide.ProjInfo.Sln.csproj" />
   </ItemGroup>
-  <Import Project="..\..\.paket\Paket.Restore.targets" />
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Build" ExcludeAssets="runtime" />
+    <PackageReference Include="FSharp.Core" />
+    <PackageReference Include="SemanticVersioning" />
+  </ItemGroup>
 </Project>

@@ -6,6 +6,4 @@
     <DefineConstants>FULL_SLN_PARSER;STANDALONEBUILD;$(DefineConstants)</DefineConstants>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
-
-  <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

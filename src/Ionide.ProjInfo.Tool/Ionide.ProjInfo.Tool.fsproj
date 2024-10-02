@@ -17,5 +17,10 @@
         <ProjectReference Include="..\Ionide.ProjInfo.ProjectSystem\Ionide.ProjInfo.ProjectSystem.fsproj" />
     </ItemGroup>
 
-    <Import Project="..\..\.paket\Paket.Restore.targets" />
+   <ItemGroup>
+    <PackageReference Include="Microsoft.Build" ExcludeAssets="runtime" IncludeAssets="compile" />
+    <PackageReference Include="Microsoft.Build.Framework" ExcludeAssets="runtime" IncludeAssets="compile" />
+   <PackageReference Include="Argu"/>
+   </ItemGroup>
+
 </Project>

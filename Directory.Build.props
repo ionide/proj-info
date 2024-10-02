@@ -1,0 +1,7 @@
+<Project>
+ <!-- All projects need repro builds + versioning -->
+  <ItemGroup Label="Build-data packages">
+    <PackageReference Include="DotNet.ReproducibleBuilds" IncludeAssets="build;buildMultiTargeting" />
+    <PackageReference Include="Ionide.KeepAChangelog.Tasks" IncludeAssets="build;buildMultiTargeting"/>
+ </ItemGroup>
+</Project>
