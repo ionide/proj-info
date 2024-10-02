@@ -48,7 +48,7 @@ module Types =
         | Exe
         | Custom of string
 
-    type ProjectItem = Compile of name: string * fullpath: string
+    type ProjectItem = Compile of name: string * fullpath: string * metadata: Map<string, string> option
 
     type ProjectOptions = {
         ProjectId: string option
@@ -75,10 +75,37 @@ module Types =
         member x.ResolvedTargetPath =
             defaultArg x.TargetRefPath x.TargetPath
 
+    /// Represents a `<Compile>` node within an fsproj file.
     type CompileItem = {
+        /// The `Compile` node's Include contents, after MSBuild has finished evaluation.
+        /// For example:
+        ///   * `<Compile Include="Foo.fs"/>` would have this set to "Foo.fs";
+        ///   * `<Compile Include="Bar/Baz.fs"/>` would have `"Bar/Baz.fs"`;
+        ///   * (contrived): `<Compile Include="$(IsPackable).fs"/>` might have `true.fs` or `false.fs`, for example.
         Name: string
+        /// Full path on disk to the F# file this `Compile` node is telling MsBuild to compile.
         FullPath: string
+        /// Value of the `<Link />` sub-node, if one exists.
+        /// For example, `<Compile Include="Foo.fs"><Link>../bar.fs</Link></Compile` would set this to
+        /// "../bar.fs" (no further path resolution takes place).
         Link: string option
+        /// All the other metadata in the project file associated with this Compile node.
+        /// This is a map of "name of metadata key" to "contents of that key".
+        /// Recall that according to MsBuild, those contents are not actually unrestricted XML, although they sure do look like it!
+        /// If you try and put XML as a metadata value, MsBuild will just give it to you as a string, or will fail to load the
+        /// project at all.
+        ///
+        /// For example:
+        ///   * `<Compile Include="Foo.fs"><Something>hello</Something></Compile>` sets the metadata key "Something" to the value "hello".
+        ///   * `<Compile Include="Foo.fs"><Blah Baz="hi" /></Compile>` fails at project load time.
+        ///   * `<Compile Include="Foo.fs"><Blah></Blah></Compile>` sets the metadata key "Blah" to the empty string.
+        ///   * `<Compile Include="Foo.fs"><Blah><Quux></Quux></Blah></Compile>` sets the metadata key "Blah" to the string "<Quux></Quux>".
+        ///
+        /// This map includes the `Link` value, if it exists, which was also extracted for convenience into the `Link` field
+        /// of this CompileItem.
+        ///
+        /// If you specify the same metadata key multiple times, the last value wins. (This is MsBuild's decision, not ours.)
+        Metadata: Map<string, string>
     }
 
     type ToolsPath = ToolsPath of string
