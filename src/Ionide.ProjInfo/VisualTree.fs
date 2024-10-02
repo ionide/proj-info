@@ -75,11 +75,11 @@ module VisualTree =
                 projPath
                 |> getVisualPath None (Some sourceFile) sourceFile
 
-            ProjectItem.Compile(name, fullpath)
+            ProjectItem.Compile(name, fullpath, None)
         | Some p ->
 
             let (name, fullpath) =
                 projPath
                 |> getVisualPath p.Link (Some p.FullPath) p.Name
 
-            ProjectItem.Compile(name, fullpath)
+            ProjectItem.Compile(name, fullpath, Some p.Metadata)

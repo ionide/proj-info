@@ -742,6 +742,10 @@ module ProjectLoader =
                 Name = name
                 FullPath = fullPath
                 Link = link
+                Metadata =
+                    p.Metadata
+                    |> Seq.map (fun pm -> pm.Name, pm.EvaluatedValue)
+                    |> Map.ofSeq
             }
         )
 
@@ -1587,7 +1591,7 @@ module ProjectViewer =
             sources
             |> List.choose (
                 function
-                | ProjectItem.Compile(name, fullPath) -> Some(name, fullPath)
+                | ProjectItem.Compile(name, fullPath, _) -> Some(name, fullPath)
             )
             |> List.filter (fun (_, p) -> includeSourceFile p)
 
