@@ -45,10 +45,14 @@ module SdkDiscovery =
             |> Seq.toArray
 
         p.WaitForExit()
+
         if p.ExitCode = 0 then
             output
         elif failOnError then
-            let output = output |> String.concat "\n"
+            let output =
+                output
+                |> String.concat "\n"
+
             failwith $"`{binaryFullPath.FullName} {args}` failed with exit code %i{p.ExitCode}. Output: %s{output}"
         else
             // for the legacy VS flow, whose behaviour is harder to test, we maintain compatibility with how proj-info
@@ -750,22 +754,40 @@ module ProjectLoader =
         )
 
     let getNuGetReferences (p: ProjectInstance) =
-        p.Items
-        |> Seq.filter (fun p ->
-            p.ItemType = "Reference"
-            && p.GetMetadataValue "NuGetSourceType" = "Package"
-        )
-        |> Seq.map (fun p ->
-            let name = p.GetMetadataValue "NuGetPackageId"
-            let version = p.GetMetadataValue "NuGetPackageVersion"
-            let fullPath = p.GetMetadataValue "FullPath"
+        let references =
+            p.Items
+            |> Seq.filter (fun p ->
+                p.ItemType = "Reference"
+                && p.GetMetadataValue "NuGetSourceType" = "Package"
+            )
+            |> Seq.map (fun p ->
+                let name = p.GetMetadataValue "NuGetPackageId"
+                let version = p.GetMetadataValue "NuGetPackageVersion"
+                let fullPath = p.GetMetadataValue "FullPath"
 
-            {
-                Name = name
-                Version = version
-                FullPath = fullPath
-            }
-        )
+                {
+                    Name = name
+                    Version = version
+                    FullPath = fullPath
+                }
+            )
+
+        let packageReferences =
+            p.Items
+            |> Seq.filter (fun p -> p.ItemType = "PackageReference")
+            |> Seq.map (fun p ->
+                let name = p.EvaluatedInclude
+                let version = p.GetMetadataValue "Version"
+                let fullPath = p.GetMetadataValue "FullPath"
+
+                {
+                    Name = name
+                    Version = version
+                    FullPath = fullPath
+                }
+            )
+
+        Seq.append packageReferences references
 
     let getProperties (p: ProjectInstance) (properties: string list) =
         p.Properties
