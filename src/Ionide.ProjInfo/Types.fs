@@ -1,6 +1,7 @@
 namespace Ionide.ProjInfo
 
 open System
+open System.Collections.Generic
 
 module Types =
 
@@ -38,9 +39,16 @@ module Types =
     type Property = { Name: string; Value: string }
 
     type PackageReference = {
+        /// Name of the NuGet package, e.g. "FSharp.Core".
         Name: string
+        /// Version of the NuGet package, e.g. "8.0.400".
         Version: string
+        /// Path to the DLL on disk whose import is implied by this PackageReference.
+        /// This is likely somewhere within the local NuGet cache.
+        ///
+        /// E.g. "/Users/user/.nuget/packages/fsharp.core/6.0.1/lib/netstandard2.1/FSharp.Core.dll".
         FullPath: string
+        Metadata: IReadOnlyDictionary<string, string>
     }
 
     type ProjectOutputType =
@@ -69,11 +77,11 @@ module Types =
         Properties: Property list
         CustomProperties: Property list
     } with
+
         /// ResolvedTargetPath is the path to the primary reference assembly for this project.
         /// For projects that produce ReferenceAssemblies, this is the path to the reference assembly.
         /// For other projects, this is the same as TargetPath.
-        member x.ResolvedTargetPath =
-            defaultArg x.TargetRefPath x.TargetPath
+        member x.ResolvedTargetPath = defaultArg x.TargetRefPath x.TargetPath
 
     /// Represents a `<Compile>` node within an fsproj file.
     type CompileItem = {
