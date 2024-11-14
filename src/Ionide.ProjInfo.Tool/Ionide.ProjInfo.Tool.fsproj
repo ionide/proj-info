@@ -1,21 +1,22 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <OutputType>Exe</OutputType>
-    <TargetFrameworks>net6.0</TargetFrameworks>
-    <TargetFrameworks Condition="'$(BuildNet7)' == 'true'">$(TargetFrameworks);net7.0</TargetFrameworks>
-        <PackAsTool>true</PackAsTool>
-        <ToolCommandName>proj-info</ToolCommandName>
-        <RollForward>LatestMajor</RollForward>
-    </PropertyGroup>
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net8.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(BuildNet9)' == 'true'">$(TargetFrameworks);net9.0</TargetFrameworks>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>proj-info</ToolCommandName>
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
 
-    <ItemGroup>
-        <Compile Include="Program.fs" />
-    </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Program.fs" />
+  </ItemGroup>
 
-    <ItemGroup>
-        <ProjectReference Include="..\Ionide.ProjInfo.ProjectSystem\Ionide.ProjInfo.ProjectSystem.fsproj" />
-    </ItemGroup>
+  <ItemGroup>
+    <ProjectReference
+      Include="..\Ionide.ProjInfo.ProjectSystem\Ionide.ProjInfo.ProjectSystem.fsproj" />
+  </ItemGroup>
 
-    <Import Project="..\..\.paket\Paket.Restore.targets" />
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

@@ -19,21 +19,21 @@ jobs:
             dotnet-version: ""
             include-prerelease: false
             label: "repo global.json"
-            build_net7: false
+            build_net9: false
             globaljson-command: "dotnet new globaljson --sdk-version 6.0.400"
           # latest 6.0 stable
           - global-json-file: "global.json"
             dotnet-version: "6.0.x"
             include-prerelease: false
             label: "6.0 stable"
-            build_net7: false
+            build_net9: false
             globaljson-command: "dotnet new globaljson --sdk-version 6.0.0 --roll-forward latestMinor"
           # latest 7.0 preview
           - global-json-file: "global.json"
             dotnet-version: "7.0.x"
             include-prerelease: true
             label: "7.0 preview"
-            build_net7: true
+            build_net9: true
             globaljson-command: "dotnet new globaljson --sdk-version 7.0.0 --roll-forward latestMinor"
       fail-fast: false # we have timing issues on some OS, so we want them all to run
     runs-on: ${{ matrix.os }}
@@ -72,7 +72,7 @@ jobs:
       - name: Run build and test
         run: dotnet run --project build
         env:
-          BuildNet7: ${{ matrix.build_net7 }}
+          BuildNet9: ${{ matrix.build_net9 }}
 
       - name: Archive test results
         uses: actions/upload-artifact@v3

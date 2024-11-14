@@ -1,28 +1,24 @@
 STORAGE: NONE
-RESTRICTION: || (== net6.0) (== net7.0)
+RESTRICTION: || (== net8.0) (== net9.0)
 NUGET
   remote: https://api.nuget.org/v3/index.json
-    Argu (6.1.1)
-      FSharp.Core (>= 4.3.2)
+    Argu (6.2.4)
+      FSharp.Core (>= 6.0.7)
       System.Configuration.ConfigurationManager (>= 4.4)
     DiffPlex (1.7.1)
-    DotNet.ReproducibleBuilds (1.1.1) - copy_local: true
-      Microsoft.SourceLink.AzureRepos.Git (>= 1.1.1)
-      Microsoft.SourceLink.Bitbucket.Git (>= 1.1.1)
-      Microsoft.SourceLink.GitHub (>= 1.1.1)
-      Microsoft.SourceLink.GitLab (>= 1.1.1)
-    Expecto (9.0.4)
-      FSharp.Core (>= 4.6)
-      Mono.Cecil (>= 0.11.3)
-    Expecto.Diff (9.0.4)
-      DiffPlex (>= 1.6.3)
-      Expecto (>= 9.0.4)
-      FSharp.Core (>= 4.6)
+    DotNet.ReproducibleBuilds (1.2.25) - copy_local: true
+    Expecto (10.2.1)
+      FSharp.Core (>= 7.0.200)
+      Mono.Cecil (>= 0.11.4 < 1.0)
+    Expecto.Diff (10.2.1)
+      DiffPlex (>= 1.7.1 < 2.0)
+      Expecto (>= 10.2.1)
+      FSharp.Core (>= 7.0.200)
     Expecto.TestResults (8.13.2)
       Expecto (>= 8.13.2)
       FSharp.Core (>= 4.6)
-    FSharp.Compiler.Service (43.8.400)
-      FSharp.Core (8.0.400)
+    FSharp.Compiler.Service (43.9.100)
+      FSharp.Core (9.0.100)
       System.Buffers (>= 4.5.1)
       System.Collections.Immutable (>= 8.0)
       System.Diagnostics.DiagnosticSource (>= 8.0)
@@ -33,109 +29,88 @@ NUGET
     FSharp.Control.Reactive (5.0.5)
       FSharp.Core (>= 4.7.2)
       System.Reactive (>= 5.0 < 6.0)
-    FSharp.Core (8.0.400)
-    GitHubActionsTestLogger (2.0.1)
-      Microsoft.TestPlatform.ObjectModel (>= 17.2)
+    FSharp.Core (9.0.100)
+    GitHubActionsTestLogger (2.4.1)
+      Microsoft.TestPlatform.ObjectModel (>= 17.10)
     Ionide.KeepAChangelog.Tasks (0.1.8) - copy_local: true
     MedallionShell (1.5.1)
       NETStandard.Library (>= 1.6)
       System.Diagnostics.Process (>= 4.1)
-    Microsoft.Build (17.2) - copy_local: false
-      Microsoft.Build.Framework (>= 17.2)
-      Microsoft.NET.StringTools (>= 1.0)
-      Microsoft.Win32.Registry (>= 4.3)
-      System.Collections.Immutable (>= 5.0)
-      System.Configuration.ConfigurationManager (>= 4.7)
-      System.Reflection.Metadata (>= 1.6)
-      System.Security.Principal.Windows (>= 4.7)
-      System.Text.Encoding.CodePages (>= 4.0.1)
-      System.Text.Json (>= 6.0)
-      System.Threading.Tasks.Dataflow (>= 6.0)
-    Microsoft.Build.Framework (17.2) - copy_local: false
-      Microsoft.Win32.Registry (>= 4.3)
-      System.Security.Permissions (>= 4.7)
-    Microsoft.Build.Tasks.Core (17.2) - copy_local: false
-      Microsoft.Build.Framework (>= 17.2)
-      Microsoft.Build.Utilities.Core (>= 17.2)
-      Microsoft.NET.StringTools (>= 1.0)
-      Microsoft.Win32.Registry (>= 4.3)
-      System.CodeDom (>= 4.4)
-      System.Collections.Immutable (>= 5.0)
-      System.Reflection.Metadata (>= 1.6)
-      System.Resources.Extensions (>= 4.6)
-      System.Security.Cryptography.Pkcs (>= 4.7)
-      System.Security.Cryptography.Xml (>= 4.7)
-      System.Security.Permissions (>= 4.7)
-      System.Threading.Tasks.Dataflow (>= 6.0)
-    Microsoft.Build.Tasks.Git (1.1.1) - copy_local: true
-    Microsoft.Build.Utilities.Core (17.2) - copy_local: false
-      Microsoft.Build.Framework (>= 17.2)
-      Microsoft.NET.StringTools (>= 1.0)
-      Microsoft.Win32.Registry (>= 4.3)
-      System.Collections.Immutable (>= 5.0)
-      System.Configuration.ConfigurationManager (>= 4.7)
-    Microsoft.CodeCoverage (17.5)
-    Microsoft.NET.StringTools (1.0) - copy_local: false
-      System.Memory (>= 4.5.4)
-      System.Runtime.CompilerServices.Unsafe (>= 5.0)
-    Microsoft.NET.Test.Sdk (17.5)
-      Microsoft.CodeCoverage (>= 17.5)
-      Microsoft.TestPlatform.TestHost (>= 17.5)
+    Microsoft.Bcl.Cryptography (9.0) - copy_local: false, restriction: || (== net8.0) (&& (== net9.0) (>= net462)) (&& (== net9.0) (< net8.0)) (&& (== net9.0) (< netstandard2.1))
+      System.Formats.Asn1 (>= 9.0) - restriction: || (== net8.0) (&& (== net9.0) (>= net462)) (&& (== net9.0) (< net8.0))
+    Microsoft.Build (17.8.3) - copy_local: false
+      Microsoft.Build.Framework (>= 17.8.3)
+      Microsoft.NET.StringTools (>= 17.8.3)
+      System.Collections.Immutable (>= 7.0)
+      System.Configuration.ConfigurationManager (>= 7.0)
+      System.Reflection.Metadata (>= 7.0)
+      System.Reflection.MetadataLoadContext (>= 7.0)
+      System.Security.Principal.Windows (>= 5.0)
+      System.Threading.Tasks.Dataflow (>= 7.0)
+    Microsoft.Build.Framework (17.8.3) - copy_local: false
+    Microsoft.Build.Tasks.Core (17.8.3) - copy_local: false
+      Microsoft.Build.Framework (>= 17.8.3)
+      Microsoft.Build.Utilities.Core (>= 17.8.3)
+      Microsoft.NET.StringTools (>= 17.8.3)
+      Microsoft.VisualStudio.Setup.Configuration.Interop (>= 3.2.2146)
+      System.CodeDom (>= 7.0)
+      System.Collections.Immutable (>= 7.0)
+      System.Configuration.ConfigurationManager (>= 7.0)
+      System.Resources.Extensions (>= 7.0)
+      System.Security.Cryptography.Pkcs (>= 7.0.2)
+      System.Security.Cryptography.Xml (>= 7.0.1)
+    Microsoft.Build.Utilities.Core (17.8.3) - copy_local: false
+      Microsoft.Build.Framework (>= 17.8.3)
+      Microsoft.NET.StringTools (>= 17.8.3)
+      Microsoft.VisualStudio.Setup.Configuration.Interop (>= 3.2.2146)
+      System.Collections.Immutable (>= 7.0)
+      System.Configuration.ConfigurationManager (>= 7.0)
+    Microsoft.CodeCoverage (17.11.1)
+    Microsoft.NET.StringTools (17.12.6) - copy_local: false
+      System.Memory (>= 4.5.5) - restriction: || (== net8.0) (&& (== net9.0) (>= net472))
+      System.Runtime.CompilerServices.Unsafe (>= 6.0) - restriction: || (== net8.0) (&& (== net9.0) (>= net472))
+    Microsoft.NET.Test.Sdk (17.11.1)
+      Microsoft.CodeCoverage (>= 17.11.1)
+      Microsoft.TestPlatform.TestHost (>= 17.11.1)
     Microsoft.NETCore.Platforms (6.0.2)
     Microsoft.NETCore.Targets (5.0)
-    Microsoft.SourceLink.AzureRepos.Git (1.1.1) - copy_local: true
-      Microsoft.Build.Tasks.Git (>= 1.1.1)
-      Microsoft.SourceLink.Common (>= 1.1.1)
-    Microsoft.SourceLink.Bitbucket.Git (1.1.1) - copy_local: true
-      Microsoft.Build.Tasks.Git (>= 1.1.1)
-      Microsoft.SourceLink.Common (>= 1.1.1)
-    Microsoft.SourceLink.Common (1.1.1) - copy_local: true
-    Microsoft.SourceLink.GitHub (1.1.1) - copy_local: true
-      Microsoft.Build.Tasks.Git (>= 1.1.1)
-      Microsoft.SourceLink.Common (>= 1.1.1)
-    Microsoft.SourceLink.GitLab (1.1.1) - copy_local: true
-      Microsoft.Build.Tasks.Git (>= 1.1.1)
-      Microsoft.SourceLink.Common (>= 1.1.1)
-    Microsoft.TestPlatform.ObjectModel (17.5)
-      NuGet.Frameworks (>= 5.11)
+    Microsoft.TestPlatform.ObjectModel (17.11.1)
       System.Reflection.Metadata (>= 1.6)
-    Microsoft.TestPlatform.TestHost (17.5)
-      Microsoft.TestPlatform.ObjectModel (>= 17.5)
+    Microsoft.TestPlatform.TestHost (17.11.1)
+      Microsoft.TestPlatform.ObjectModel (>= 17.11.1)
       Newtonsoft.Json (>= 13.0.1)
+    Microsoft.VisualStudio.Setup.Configuration.Interop (3.12.2149) - copy_local: false
     Microsoft.Win32.Primitives (4.3)
       Microsoft.NETCore.Platforms (>= 1.1)
       Microsoft.NETCore.Targets (>= 1.1)
       System.Runtime (>= 4.3)
-    Microsoft.Win32.Registry (5.0) - copy_local: false
+    Microsoft.Win32.Registry (5.0)
       System.Security.AccessControl (>= 5.0)
       System.Security.Principal.Windows (>= 5.0)
-    Microsoft.Win32.SystemEvents (6.0) - copy_local: false
     Mono.Cecil (0.11.4)
     NETStandard.Library (2.0.3)
       Microsoft.NETCore.Platforms (>= 1.1)
-    Newtonsoft.Json (13.0.1)
-    NuGet.Frameworks (6.4)
+    Newtonsoft.Json (13.0.3)
     runtime.native.System (4.3.1)
       Microsoft.NETCore.Platforms (>= 1.1.1)
       Microsoft.NETCore.Targets (>= 1.1.3)
     SemanticVersioning (2.0.2)
     System.Buffers (4.5.1)
-    System.CodeDom (6.0) - copy_local: false
+    System.CodeDom (9.0) - copy_local: false
     System.Collections (4.3)
       Microsoft.NETCore.Platforms (>= 1.1)
       Microsoft.NETCore.Targets (>= 1.1)
       System.Runtime (>= 4.3)
     System.Collections.Immutable (8.0)
-      System.Runtime.CompilerServices.Unsafe (>= 6.0) - restriction: || (== net6.0) (&& (== net7.0) (>= net462)) (&& (== net7.0) (< net6.0))
-    System.Configuration.ConfigurationManager (6.0) - copy_local: false
-      System.Security.Cryptography.ProtectedData (>= 6.0)
-      System.Security.Permissions (>= 6.0)
+    System.Configuration.ConfigurationManager (9.0) - copy_local: false
+      System.Diagnostics.EventLog (>= 9.0)
+      System.Security.Cryptography.ProtectedData (>= 9.0)
     System.Diagnostics.Debug (4.3)
       Microsoft.NETCore.Platforms (>= 1.1)
       Microsoft.NETCore.Targets (>= 1.1)
       System.Runtime (>= 4.3)
     System.Diagnostics.DiagnosticSource (8.0.1)
-      System.Runtime.CompilerServices.Unsafe (>= 6.0) - restriction: || (== net6.0) (&& (== net7.0) (>= net462)) (&& (== net7.0) (< net6.0))
+    System.Diagnostics.EventLog (9.0) - copy_local: false
     System.Diagnostics.Process (4.3)
       Microsoft.NETCore.Platforms (>= 1.1)
       Microsoft.Win32.Primitives (>= 4.3)
@@ -158,9 +133,7 @@ NUGET
       System.Threading.Tasks (>= 4.3)
       System.Threading.Thread (>= 4.3)
       System.Threading.ThreadPool (>= 4.3)
-    System.Drawing.Common (6.0) - copy_local: false
-      Microsoft.Win32.SystemEvents (>= 6.0)
-    System.Formats.Asn1 (6.0) - copy_local: false
+    System.Formats.Asn1 (9.0) - copy_local: false, restriction: || (== net8.0) (&& (== net9.0) (< net8.0)) (&& (== net9.0) (< netstandard2.1))
     System.Globalization (4.3)
       Microsoft.NETCore.Platforms (>= 1.1)
       Microsoft.NETCore.Targets (>= 1.1)
@@ -193,11 +166,12 @@ NUGET
     System.Reflection.Emit (4.7)
     System.Reflection.Metadata (8.0)
       System.Collections.Immutable (>= 8.0)
+    System.Reflection.MetadataLoadContext (8.0.1) - copy_local: false
     System.Reflection.Primitives (4.3)
       Microsoft.NETCore.Platforms (>= 1.1)
       Microsoft.NETCore.Targets (>= 1.1)
       System.Runtime (>= 4.3)
-    System.Resources.Extensions (6.0) - copy_local: false
+    System.Resources.Extensions (8.0) - copy_local: false
     System.Resources.ResourceManager (4.3)
       Microsoft.NETCore.Platforms (>= 1.1)
       Microsoft.NETCore.Targets (>= 1.1)
@@ -223,33 +197,24 @@ NUGET
       System.Reflection.Primitives (>= 4.3)
       System.Runtime (>= 4.3)
       System.Runtime.Handles (>= 4.3)
-    System.Security.AccessControl (6.0) - copy_local: false
-    System.Security.Cryptography.Pkcs (6.0) - copy_local: false
-      System.Formats.Asn1 (>= 6.0)
-    System.Security.Cryptography.ProtectedData (6.0) - copy_local: false
-    System.Security.Cryptography.Xml (6.0) - copy_local: false
-      System.Security.AccessControl (>= 6.0)
-      System.Security.Cryptography.Pkcs (>= 6.0)
-    System.Security.Permissions (6.0) - copy_local: false
-      System.Security.AccessControl (>= 6.0)
-      System.Windows.Extensions (>= 6.0)
+    System.Security.AccessControl (6.0)
+    System.Security.Cryptography.Pkcs (9.0) - copy_local: false
+      Microsoft.Bcl.Cryptography (>= 9.0) - restriction: || (== net8.0) (&& (== net9.0) (>= net462)) (&& (== net9.0) (< net8.0)) (&& (== net9.0) (< netstandard2.1))
+      System.Formats.Asn1 (>= 9.0) - restriction: || (== net8.0) (&& (== net9.0) (< net8.0)) (&& (== net9.0) (< netstandard2.1))
+    System.Security.Cryptography.ProtectedData (9.0) - copy_local: false
+    System.Security.Cryptography.Xml (9.0) - copy_local: false
+      Microsoft.Bcl.Cryptography (>= 9.0) - restriction: || (== net8.0) (&& (== net9.0) (>= net462)) (&& (== net9.0) (< net8.0))
+      System.Security.Cryptography.Pkcs (>= 9.0)
     System.Security.Principal.Windows (5.0) - copy_local: false
     System.Text.Encoding (4.3)
       Microsoft.NETCore.Platforms (>= 1.1)
       Microsoft.NETCore.Targets (>= 1.1)
       System.Runtime (>= 4.3)
-    System.Text.Encoding.CodePages (6.0) - copy_local: false
-      System.Runtime.CompilerServices.Unsafe (>= 6.0)
     System.Text.Encoding.Extensions (4.3)
       Microsoft.NETCore.Platforms (>= 1.1)
       Microsoft.NETCore.Targets (>= 1.1)
       System.Runtime (>= 4.3)
       System.Text.Encoding (>= 4.3)
-    System.Text.Encodings.Web (6.0) - copy_local: false
-      System.Runtime.CompilerServices.Unsafe (>= 6.0)
-    System.Text.Json (6.0.5) - copy_local: false
-      System.Runtime.CompilerServices.Unsafe (>= 6.0)
-      System.Text.Encodings.Web (>= 6.0)
     System.Threading (4.3)
       System.Runtime (>= 4.3)
       System.Threading.Tasks (>= 4.3)
@@ -257,17 +222,15 @@ NUGET
       Microsoft.NETCore.Platforms (>= 1.1)
       Microsoft.NETCore.Targets (>= 1.1)
       System.Runtime (>= 4.3)
-    System.Threading.Tasks.Dataflow (6.0) - copy_local: false
+    System.Threading.Tasks.Dataflow (9.0) - copy_local: false
     System.Threading.Thread (4.3)
       System.Runtime (>= 4.3)
     System.Threading.ThreadPool (4.3)
       System.Runtime (>= 4.3)
       System.Runtime.Handles (>= 4.3)
-    System.Windows.Extensions (6.0) - copy_local: false
-      System.Drawing.Common (>= 6.0)
-    YoloDev.Expecto.TestSdk (0.13.3)
-      Expecto (>= 9.0 < 10.0)
-      FSharp.Core (>= 4.6.2)
+    YoloDev.Expecto.TestSdk (0.14.3)
+      Expecto (>= 10.0 < 11.0)
+      FSharp.Core (>= 7.0.200)
       System.Collections.Immutable (>= 6.0)
 
 GROUP Build

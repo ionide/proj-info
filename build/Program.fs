@@ -34,9 +34,9 @@ let DoNothing = ignore
 let init args =
     initializeContext args
 
-    let buildNet7 =
+    let buildNet9 =
         match
-            System.Environment.GetEnvironmentVariable("BuildNet7")
+            System.Environment.GetEnvironmentVariable("BuildNet9")
             |> bool.TryParse
         with
         | true, v -> v
@@ -76,16 +76,16 @@ let init args =
 
     Target.create "Test" DoNothing
 
-    Target.create "Test:net6.0" (fun _ -> testTFM "net6.0")
-    Target.create "Test:net7.0" (fun _ -> testTFM "net7.0")
+    Target.create "Test:net8.0" (fun _ -> testTFM "net8.0")
+    Target.create "Test:net9.0" (fun _ -> testTFM "net9.0")
 
     "Build"
-    =?> ("Test:net6.0", not buildNet7)
+    =?> ("Test:net8.0", not buildNet9)
     =?> ("Test", not ignoreTests)
     |> ignore
 
     "Build"
-    =?> ("Test:net7.0", buildNet7)
+    =?> ("Test:net9.0", buildNet9)
     =?> ("Test", not ignoreTests)
     |> ignore
 

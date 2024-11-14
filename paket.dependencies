@@ -3,10 +3,10 @@ source https://api.nuget.org/v3/index.json
 # source https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3/index.json
 
 storage: none
-framework: net6.0, net7.0
+framework: net8.0, net9.0
 
 nuget FSharp.Core
-nuget FSharp.Compiler.Service >= 7.0.400
+nuget FSharp.Compiler.Service >= 43.9.100
 nuget Argu
 
 # copy_local: true because this is a build-time dependency only
@@ -20,10 +20,10 @@ nuget Expecto.TestResults
 nuget MedallionShell ~> 1.5.0
 
 # copy_local: false excludes runtime assets (desired for msbuild)
-nuget Microsoft.Build copy_local: false
-nuget Microsoft.Build.Framework copy_local: false
-nuget Microsoft.Build.Utilities.Core copy_local: false
-nuget Microsoft.Build.Tasks.Core copy_local: false
+nuget Microsoft.Build = 17.8.3 copy_local: false
+nuget Microsoft.Build.Framework = 17.8.3 copy_local: false
+nuget Microsoft.Build.Utilities.Core = 17.8.3  copy_local: false
+nuget Microsoft.Build.Tasks.Core = 17.8.3 copy_local: false
 nuget Microsoft.NET.Test.Sdk
 nuget Newtonsoft.Json
 nuget Fsharp.Control.Reactive

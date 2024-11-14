@@ -1204,11 +1204,10 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
                 let gbr =
                     GraphBuildRequestData(
-                        projects,
-                        ProjectLoader.designTimeBuildTargets false,
-                        null,
-                        BuildRequestDataFlags.ReplaceExistingProjectInstance
-                        ||| BuildRequestDataFlags.ClearCachesAfterBuild
+                        projectGraph = projects,
+                        targetsToBuild=ProjectLoader.designTimeBuildTargets false,
+                        hostServices=null,
+                        flags= (BuildRequestDataFlags.ReplaceExistingProjectInstance ||| BuildRequestDataFlags.ClearCachesAfterBuild)
                     )
 
                 let bm = BuildManager.DefaultBuildManager
