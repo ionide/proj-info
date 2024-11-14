@@ -8,5 +8,19 @@
   <ItemGroup>
     <Compile Include="Program.fs" />
   </ItemGroup>
-  <Import Project="..\.paket\Paket.Restore.targets" />
+  <ItemGroup>
+    <PackageReference Include="FSharp.Core" VersionOverride="8.0.301" />
+    <PackageReference Include="Fake.Core.Target" />
+    <PackageReference Include="Fake.Core.Process" />
+    <PackageReference Include="Fake.DotNet.Cli" />
+    <PackageReference Include="Fake.Core.ReleaseNotes" />
+    <PackageReference Include="Fake.DotNet.AssemblyInfoFile" />
+    <PackageReference Include="Fake.DotNet.Paket" />
+    <PackageReference Include="Fake.Tools.Git" />
+    <PackageReference Include="Fake.Core.Environment" />
+    <PackageReference Include="Fake.Core.UserInput" />
+    <PackageReference Include="Fake.IO.FileSystem" />
+    <PackageReference Include="Fake.DotNet.MsBuild" />
+    <PackageReference Include="Fake.Api.GitHub" />
+  </ItemGroup>
 </Project>

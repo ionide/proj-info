@@ -12,5 +12,10 @@
   <ItemGroup>
     <ProjectReference Include="..\Ionide.ProjInfo\Ionide.ProjInfo.fsproj" />
   </ItemGroup>
-  <Import Project="..\..\.paket\Paket.Restore.targets" />
+  <ItemGroup>
+    <PackageReference Include="Dotnet.ReproducibleBuilds" PrivateAssets="All" />
+    <PackageReference Include="Ionide.KeepAChangelog.Tasks" PrivateAssets="All" />
+    <PackageReference Include="FSharp.Core" VersionOverride="$(FSharpCoreCompilerVersion)" />
+    <PackageReference Include="FSharp.Compiler.Service" />
+  </ItemGroup>
 </Project>
