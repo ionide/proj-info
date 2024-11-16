@@ -32,9 +32,14 @@ let initializeContext args =
 let getBuildParam = Environment.environVar
 let DoNothing = ignore
 
+
 let init args =
     initializeContext args
 
+    let configuration =
+        match getBuildParam "CONFIGURATION" with
+        | s when not (isNullOrWhiteSpace s) -> s
+        | _ -> "Release"
 
     let ignoreTests =
         match
@@ -60,6 +65,7 @@ let init args =
                 opts.MSBuildParams with
                     DisableInternalBinLog = true
             }
+            Configuration = DotNet.BuildConfiguration.fromString configuration
     }
 
     Target.create "Build" (fun _ -> DotNet.build buildOpts "")
@@ -82,7 +88,7 @@ let init args =
 
             exec
                 "dotnet"
-                $"test --blame --blame-hang-timeout 60s --framework {tfm} --logger trx --logger GitHubActions -c Release .\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj"
+                $"test --blame --blame-hang-timeout 60s --framework {tfm} --logger trx --logger GitHubActions -c {configuration} .\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj"
                 "test"
                 (Map.ofSeq [ "BuildNet9", tfmToBuildNet9Map.[tfm].ToString() ])
             |> ignore

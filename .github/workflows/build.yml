@@ -10,8 +10,6 @@ jobs:
   build:
     strategy:
       matrix:
-        # Builds for Debug and Release configurations
-        configuration: [Debug, Release]
         # Builds for Ubuntu, Windows, and macOS
         os: [ubuntu-latest, windows-latest, macOS-latest]
       fail-fast: false
@@ -20,14 +18,11 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # setup .NET per the repo global.json
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-
-      # setup .NET per test session
+      # setup .NET SDK
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
+          global-json-file: 'global.json'
           dotnet-version: |
             8.x
             9.x
