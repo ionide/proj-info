@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net6.0</TargetFrameworks>
-    <TargetFrameworks Condition="'$(BuildNet7)' == 'true'">$(TargetFrameworks);net7.0</TargetFrameworks>
+    <TargetFrameworks>net8.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(BuildNet9)' == 'true'">$(TargetFrameworks);net9.0</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,9 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Ionide.ProjInfo\Ionide.ProjInfo.fsproj" />
     <ProjectReference Include="..\Ionide.ProjInfo.FCS\Ionide.ProjInfo.FCS.fsproj" />
-    <ProjectReference Include="..\Ionide.ProjInfo.Sln\Ionide.ProjInfo.Sln.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,5 +26,9 @@
       <_Parameter1>Ionide.ProjInfo.Tests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
-  <Import Project="..\..\.paket\Paket.Restore.targets" />
+
+  <ItemGroup>
+    <PackageReference Include="Fsharp.Control.Reactive" />
+    <PackageReference Include="Newtonsoft.Json" />
+  </ItemGroup>
 </Project>

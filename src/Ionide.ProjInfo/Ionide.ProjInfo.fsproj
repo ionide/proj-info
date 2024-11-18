@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net6.0</TargetFrameworks>
-    <TargetFrameworks Condition="'$(BuildNet7)' == 'true'">$(TargetFrameworks);net7.0</TargetFrameworks>
+    <TargetFrameworks>net8.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(BuildNet9)' == 'true'">$(TargetFrameworks);net9.0</TargetFrameworks>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="FsLibLog.fs" />
@@ -15,5 +15,11 @@
   <ItemGroup>
     <ProjectReference Include="..\Ionide.ProjInfo.Sln\Ionide.ProjInfo.Sln.csproj" />
   </ItemGroup>
-  <Import Project="..\..\.paket\Paket.Restore.targets" />
+
+  <ItemGroup>
+    <PackageReference Include="FSharp.Core" />
+    <PackageReference Include="SemanticVersioning" />
+    <PackageReference Include="Microsoft.Build" IncludeAssets="compile" ExcludeAssets="runtime" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Build.Framework" IncludeAssets="compile" ExcludeAssets="runtime" PrivateAssets="all" />
+  </ItemGroup>
 </Project>

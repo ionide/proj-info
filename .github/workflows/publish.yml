@@ -12,12 +12,11 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Setup .NET Core
-        uses: actions/setup-dotnet@v2
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
-            6.0.x
-            7.0.x
-          include-prerelease: true
+            8.0.x
+            9.0.x
       # since we're packaging for net7 now...
       - name: remove global.json
         run: rm global.json
@@ -28,11 +27,11 @@ jobs:
       - name: Run build
         run: dotnet run --project build
         env:
-          BuildNet7: true
+          BuildNet9: true
           IgnoreTests: true
       - name: Get Changelog Entry
         id: changelog_reader
-        uses: mindsers/changelog-reader-action@v1.1.0
+        uses: mindsers/changelog-reader-action@v2
         with:
           version: ${{ github.ref }}
           path: ./CHANGELOG.md
@@ -48,7 +47,7 @@ jobs:
           draft: false
           prerelease: false
       - name: Upload binaries to release
-        uses: svenstaro/upload-release-action@v1-release
+        uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: src/**/*.nupkg

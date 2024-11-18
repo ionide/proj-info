@@ -1,4 +1,4 @@
-<Project ToolsVersion="15.0">
+<Project>
     <PropertyGroup>
         <PublishRepositoryUrl>true</PublishRepositoryUrl>
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
@@ -13,5 +13,15 @@
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageDescription>MSBuild evaluation, fsproj file loading, and project system for F# tooling</PackageDescription>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <PackageReadmeFile Condition="Exists('$(MSBuildProjectDirectory)/README.md')">README.md</PackageReadmeFile>
     </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Dotnet.ReproducibleBuilds" ExcludeAssets="runtime" PrivateAssets="all" />
+      <PackageReference Include="Ionide.KeepAChangelog.Tasks" ExcludeAssets="runtime" PrivateAssets="all" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Include="$(MSBuildProjectDirectory)/README.md" Condition="Exists('$(MSBuildProjectDirectory)/README.md')" Pack="true" PackagePath="./README.md" />
+    </ItemGroup>
 </Project>

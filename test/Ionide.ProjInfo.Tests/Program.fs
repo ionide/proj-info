@@ -18,11 +18,12 @@ let tests = Tests.tests toolsPath
 let main argv =
     let toolsPath = Init.init (IO.DirectoryInfo Environment.CurrentDirectory) None
 
-    Tests.runTestsWithArgs
-        {
-            defaultConfig with
-                printer = TestPrinters.summaryPrinter defaultConfig.printer
-                verbosity = LogLevel.Verbose
-        }
+    let args = [
+        CLIArguments.Printer (TestPrinters.summaryPrinter defaultConfig.printer)
+        CLIArguments.Verbosity LogLevel.Verbose
+    ]
+
+    Tests.runTestsWithCLIArgs
+        args
         argv
         tests

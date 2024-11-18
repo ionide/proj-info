@@ -414,11 +414,11 @@ let testSample2 toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPath
                     projDir
                     / ("obj/"
                        + config
-                       + "/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs")
+                       + "/netstandard2.0/n1.AssemblyInfo.fs")
                     projDir
                     / ("obj/"
                        + config
-                       + "/netstandard2.0/n1.AssemblyInfo.fs")
+                       + "/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs")
                     projDir
                     / "Library.fs"
                     if isRelease then
@@ -596,9 +596,9 @@ let testSample4 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
             let m1ExpectedSources =
                 [
                     projDir
-                    / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
-                    projDir
                     / "obj/Debug/netstandard2.0/m1.AssemblyInfo.fs"
+                    projDir
+                    / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
                     projDir
                     / "LibraryA.fs"
                 ]
@@ -880,9 +880,9 @@ let testSample9 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
             let expectedSources =
                 [
                     projDir
-                    / "obj2/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
-                    projDir
                     / "obj2/Debug/netstandard2.0/n1.AssemblyInfo.fs"
+                    projDir
+                    / "obj2/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
                     projDir
                     / "Library.fs"
                 ]
@@ -945,11 +945,11 @@ let testSample10 toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPat
                     projDir
                     / ("obj/"
                        + config
-                       + "/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs")
+                       + "/netstandard2.0/n1.AssemblyInfo.fs")
                     projDir
                     / ("obj/"
                        + config
-                       + "/netstandard2.0/n1.AssemblyInfo.fs")
+                       + "/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs")
                     projDir
                     / "BeforeBuild.fs"
                     projDir
@@ -1615,9 +1615,9 @@ let testSample2WithBinLog toolsPath workspaceLoader (workspaceFactory: ToolsPath
             let expectedSources =
                 [
                     projDir
-                    / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
-                    projDir
                     / "obj/Debug/netstandard2.0/n1.AssemblyInfo.fs"
+                    projDir
+                    / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
                     projDir
                     / "Library.fs"
                 ]
