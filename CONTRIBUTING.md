@@ -16,7 +16,7 @@ So if you set global.json to a 9.0.xxx SDK, you'll _always_ use the 9.x MSBuild 
 
 ### Against LTS (net8.0)
 1. Run tests with `dotnet run --project .\build\ -- -t Test`
-    1. This should chose the `Test:net9.0` target and run against that runtime
+    1. This should chose the `Test:net8.0` target and run against that runtime
 
 
 ### Against STS (net9.0)
