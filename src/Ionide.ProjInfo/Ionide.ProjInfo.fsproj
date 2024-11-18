@@ -17,11 +17,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Dotnet.ReproducibleBuilds" PrivateAssets="All" />
-    <PackageReference Include="Ionide.KeepAChangelog.Tasks" PrivateAssets="All" />
     <PackageReference Include="FSharp.Core" />
     <PackageReference Include="SemanticVersioning" />
-    <PackageReference Include="Microsoft.Build" PrivateAssets="All" />
-    <PackageReference Include="Microsoft.Build.Framework" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.Build" IncludeAssets="compile" ExcludeAssets="runtime" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Build.Framework" IncludeAssets="compile" ExcludeAssets="runtime" PrivateAssets="all" />
   </ItemGroup>
 </Project>

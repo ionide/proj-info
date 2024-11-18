@@ -7,12 +7,4 @@
     <DefineConstants>FULL_SLN_PARSER;STANDALONEBUILD;$(DefineConstants)</DefineConstants>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
-
-  <ItemGroup>
-
-    <PackageReference Include="Dotnet.ReproducibleBuilds" PrivateAssets="All" />
-    <PackageReference Include="Ionide.KeepAChangelog.Tasks" PrivateAssets="All" />
-
-  </ItemGroup>
-
 </Project>

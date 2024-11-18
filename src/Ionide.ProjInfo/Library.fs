@@ -102,7 +102,7 @@ module SdkDiscovery =
         Path: DirectoryInfo
     }
 
-    /// Given the DOTNET_sROOT, that is the directory where the `dotnet` binary is present and the sdk/runtimes/etc are,
+    /// Given the DOTNET_ROOT, that is the directory where the `dotnet` binary is present and the sdk/runtimes/etc are,
     /// enumerates the available SDKs in descending version order
     let sdks (dotnetBinaryPath: FileInfo) : DotnetSdkInfo[] =
         execDotnet true dotnetBinaryPath.Directory dotnetBinaryPath [ "--list-sdks" ]

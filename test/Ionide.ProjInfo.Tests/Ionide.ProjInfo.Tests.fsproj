@@ -39,9 +39,9 @@
     <PackageReference Include="YoloDev.Expecto.TestSdk" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="GitHubActionsTestLogger" />
-    <PackageReference Include="Microsoft.Build" ExcludeAssets="runtime" />
-    <PackageReference Include="Microsoft.Build.Framework" ExcludeAssets="runtime" />
-    <PackageReference Include="Microsoft.Build.Utilities.Core" ExcludeAssets="runtime" />
-    <PackageReference Include="Microsoft.Build.Tasks.Core" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.Build" ExcludeAssets="runtime" IncludeAssets="compile" />
+    <PackageReference Include="Microsoft.Build.Framework" ExcludeAssets="runtime" IncludeAssets="compile" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" ExcludeAssets="runtime" IncludeAssets="compile"  />
+    <PackageReference Include="Microsoft.Build.Tasks.Core" ExcludeAssets="runtime" IncludeAssets="compile" />
   </ItemGroup>
 </Project>
