@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.68.0] - 2024-11-18
+
+### Added
+
+* [Support for F# 9 and .NET 9](https://github.com/ionide/proj-info/pull/219)
+
+### Removed
+
+* [Support for .NET 6 and 7 targets](https://github.com/ionide/proj-info/pull/219)
+
+
 ## [0.67.0] - 2024-10-02
 
 * [Add CompileItem metadata to types](https://github.com/ionide/proj-info/pull/213) (thanks @Smaug123)
