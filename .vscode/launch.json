@@ -2,10 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch Tool 6.0 graph resolver",
+            "name": "Launch Tool 8.0 graph resolver",
             "type": "coreclr",
             "request": "launch",
-            "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net6.0/Ionide.ProjInfo.Tool.dll",
+            "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net8.0/Ionide.ProjInfo.Tool.dll",
             "args": [
                 "--project",
                 "<your project>",
@@ -17,10 +17,10 @@
             "justMyCode": true,
         },
         {
-            "name": "Launch Tool 6.0 normal resolver",
+            "name": "Launch Tool 8.0 normal resolver",
             "type": "coreclr",
             "request": "launch",
-            "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net6.0/Ionide.ProjInfo.Tool.dll",
+            "program": "${workspaceFolder}/src/Ionide.ProjInfo.Tool/bin/Debug/net8.0/Ionide.ProjInfo.Tool.dll",
             "args": [
                 "--project",
                 "<your project>",
@@ -54,8 +54,8 @@
             "id": "tfm",
             "description": "The TFM of the test to run",
             "options": [
-                "net6.0",
-                "net7.0"
+                "net8.0",
+                "net9.0"
             ],
             "default": "net7.0",
             "type": "pickString"
