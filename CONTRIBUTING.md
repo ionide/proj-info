@@ -14,12 +14,24 @@ Our current algorithm is
 
 So if you set global.json to a 9.0.xxx SDK, you'll _always_ use the 9.x MSBuild libraries, which will require the 9.0 runtime to load.  If you want to test while loading older MSBuilds, you'll need to somehow constraint the tests to 8.0.xxx SDKs, and the easiest way to do this is to make a global.json with a 8.0.xxx version and a  `rollForward: latestPatch` constraint on it.
 
-### Against LTS (net8.0)
-1. Run tests with `dotnet run --project .\build\ -- -t Test`
-    1. This should chose the `Test:net8.0` target and run against that runtime
+### Running tests from FAKE
+
+Our FAKE build project will handle creating/deleting a temporary `global.json` file in the `test` directory for you.
+
+1. `dotnet run --project .\build\ -- -t Test`
+    1. This should chose the `Test:net8.0` and `Test:net9.0` targets and run against that respective runtime.
+
+### Manually invoking dotnet test
+
+If you want to run `dotnet test` directly, you'll need to set the `global.json` file and environment variables yourself.
+
+#### Against LTS (net8.0)
+1. Move to the test project
+    1. `cd test/Ionide.ProjInfo.Tests`
+2. Run tests with `dotnet test`
 
 
-### Against STS (net9.0)
+#### Against STS (net9.0)
 1. Change global.json to use net9.0
     ```json
         "sdk": {
@@ -28,11 +40,16 @@ So if you set global.json to a 9.0.xxx SDK, you'll _always_ use the 9.x MSBuild 
             "allowPrerelease": true
         }
     ```
-2. Set environment variable `BuildNet9` to `true`
+1. Move to the test project
+    1. `cd test/Ionide.ProjInfo.Tests`
+3. Set environment variable `BuildNet9` to `true`
     1. Bash: `export BuildNet9=true`
     2. PowerShell: `$env:BuildNet9 = "true"`
-3. Run tests with `dotnet run --project .\build\ -- -t Test`
-    1. This should chose the `Test:net9.0` target and run against that runtime
+4. Run tests with `dotnet test`
+
+
+
+
 
 ## Release
 

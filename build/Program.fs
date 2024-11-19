@@ -11,10 +11,11 @@ System.Environment.CurrentDirectory <- (Path.combine __SOURCE_DIRECTORY__ "..")
 // --------------------------------------------------------------------------------------
 let isNullOrWhiteSpace = System.String.IsNullOrWhiteSpace
 
-let exec cmd args dir =
+let exec cmd args dir env =
     let proc =
         CreateProcess.fromRawCommandLine cmd args
         |> CreateProcess.ensureExitCodeWithMessage (sprintf "Error while running '%s' with args: %s" cmd args)
+        |> CreateProcess.withEnvironment (Map.toList env)
 
     (if isNullOrWhiteSpace dir then
          proc
@@ -31,16 +32,14 @@ let initializeContext args =
 let getBuildParam = Environment.environVar
 let DoNothing = ignore
 
+
 let init args =
     initializeContext args
 
-    let buildNet9 =
-        match
-            System.Environment.GetEnvironmentVariable("BuildNet9")
-            |> bool.TryParse
-        with
-        | true, v -> v
-        | _ -> false
+    let configuration =
+        match getBuildParam "CONFIGURATION" with
+        | s when not (isNullOrWhiteSpace s) -> s
+        | _ -> "Release"
 
     let ignoreTests =
         match
@@ -66,13 +65,35 @@ let init args =
                 opts.MSBuildParams with
                     DisableInternalBinLog = true
             }
+            Configuration = DotNet.BuildConfiguration.fromString configuration
     }
 
     Target.create "Build" (fun _ -> DotNet.build buildOpts "")
 
+    let tfmToSdkMap =
+        Map.ofSeq [
+            "net8.0", "8.0.100"
+            "net9.0", "9.0.100"
+        ]
+
+    let tfmToBuildNet9Map =
+        Map.ofSeq [
+            "net8.0", false
+            "net9.0", true
+        ]
+
     let testTFM tfm =
-        exec "dotnet" $"test --blame --blame-hang-timeout 60s --no-build --framework {tfm} --logger trx --logger GitHubActions -c Release .\\test\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj" "."
-        |> ignore
+        try
+            exec "dotnet" $"new globaljson --force --sdk-version {tfmToSdkMap.[tfm]} --roll-forward LatestMinor" "test" Map.empty
+
+            exec
+                "dotnet"
+                $"test --blame --blame-hang-timeout 60s --framework {tfm} --logger trx --logger GitHubActions -c {configuration} .\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj"
+                "test"
+                (Map.ofSeq [ "BuildNet9", tfmToBuildNet9Map.[tfm].ToString() ])
+            |> ignore
+        finally
+            System.IO.File.Delete "test\\global.json"
 
     Target.create "Test" DoNothing
 
@@ -80,12 +101,12 @@ let init args =
     Target.create "Test:net9.0" (fun _ -> testTFM "net9.0")
 
     "Build"
-    =?> ("Test:net8.0", not buildNet9)
+    ==> ("Test:net8.0")
     =?> ("Test", not ignoreTests)
     |> ignore
 
     "Build"
-    =?> ("Test:net9.0", buildNet9)
+    ==> ("Test:net9.0")
     =?> ("Test", not ignoreTests)
     |> ignore
 
