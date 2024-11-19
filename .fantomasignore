@@ -1,2 +1,3 @@
 test/examples
 obj/**/*.fs
+test/testrun_ws/
