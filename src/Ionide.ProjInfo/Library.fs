@@ -1509,7 +1509,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
 
     member this.LoadSln(sln, customProperties: string list, binaryLogs) =
         match InspectSln.tryParseSln sln with
-        | Ok(_, slnData) ->
+        | Ok(slnData) ->
             let solutionProjects = InspectSln.loadingBuildOrder slnData
             this.LoadProjects(solutionProjects, customProperties, binaryLogs)
         | Error d -> failwithf "Cannot load the sln: %A" d

@@ -12,13 +12,11 @@
     <Compile Include="InspectSln.fs" />
     <Compile Include="Library.fs" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Ionide.ProjInfo.Sln\Ionide.ProjInfo.Sln.csproj" />
-  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="FSharp.Core" />
     <PackageReference Include="SemanticVersioning" />
+    <PackageReference Include="Microsoft.VisualStudio.SolutionPersistence" />
     <PackageReference Include="Microsoft.Build" IncludeAssets="compile" ExcludeAssets="runtime" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Build.Framework" IncludeAssets="compile" ExcludeAssets="runtime" PrivateAssets="all" />
   </ItemGroup>

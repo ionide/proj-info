@@ -816,7 +816,7 @@ let testParseSln toolsPath =
             let actualProjects =
                 InspectSln.loadingBuildOrder (
                     match p with
-                    | Ok(_, data) -> data
+                    | Ok(data) -> data
                     | _ -> failwith "unreachable"
                 )
                 |> List.map Path.GetFullPath
@@ -1999,12 +1999,6 @@ let debugTests toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
         (fun logger fs ->
 
             let loader = workspaceFactory toolsPath
-
-            // let projPath = @"D:\Programowanie\Projekty\Ionide\dotnet-proj-info\src\Ionide.ProjInfo.Sln\Ionide.ProjInfo.Sln.csproj"
-            // let parsedProjs = loader.LoadProjects [ projPath ] |> Seq.toList
-
-            // printfn "%A" parsedProjs
-
             let slnPath =
                 @"C:\Users\JimmyByrd\Documents\Repositories\public\TheAngryByrd\FsToolkit.ErrorHandling\FsToolkit.ErrorHandling.sln"
 
