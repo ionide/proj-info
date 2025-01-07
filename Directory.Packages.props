@@ -14,7 +14,7 @@
     <NuGetAuditMode>direct</NuGetAuditMode>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Packaing Dependencies -->
+    <!-- Packaging Dependencies -->
     <PackageVersion Include="Dotnet.ReproducibleBuilds" Version="1.2.25" PrivateAssets="All" />
     <PackageVersion Include="Ionide.KeepAChangelog.Tasks" Version="0.1.8" PrivateAssets="All" />
     <!-- Main Project Dependencies -->
@@ -24,18 +24,16 @@
     <PackageVersion Include="Fsharp.Control.Reactive" Version="5.0.5" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageVersion Include="Argu" Version="6.2.4" />
+    <!-- Solution-parser library. Important question: since this is also usable my MSbuild, is it subject to the same PrivateAssets stuff? -->
+    <PackageVersion Include="Microsoft.VisualStudio.SolutionPersistence" Version="1.0.28" />
     <!-- MSBuild dependency - important: this should always be ExcludeAssets="runtime", and it
     should be kept low based
       on the SDK versions we want to support. See https://aka.ms/dotnet/matrixofpaine for version
     details.  -->
-    <PackageVersion Include="Microsoft.Build" Version="$(MicrosoftBuildPackageVersion)"
-      PrivateAssets="All" />
-    <PackageVersion Include="Microsoft.Build.Framework" Version="$(MicrosoftBuildPackageVersion)"
-      PrivateAssets="All" />
-    <PackageVersion Include="Microsoft.Build.Utilities.Core"
-      Version="$(MicrosoftBuildPackageVersion)" PrivateAssets="All" />
-    <PackageVersion Include="Microsoft.Build.Tasks.Core" Version="$(MicrosoftBuildPackageVersion)"
-      PrivateAssets="All" />
+    <PackageVersion Include="Microsoft.Build" Version="$(MicrosoftBuildPackageVersion)" PrivateAssets="All" />
+    <PackageVersion Include="Microsoft.Build.Framework" Version="$(MicrosoftBuildPackageVersion)" PrivateAssets="All" />
+    <PackageVersion Include="Microsoft.Build.Utilities.Core" Version="$(MicrosoftBuildPackageVersion)" PrivateAssets="All" />
+    <PackageVersion Include="Microsoft.Build.Tasks.Core" Version="$(MicrosoftBuildPackageVersion)" PrivateAssets="All" />
     <!-- Test Project Dependencies -->
     <PackageVersion Include="Expecto" Version="$(ExpectoVersion)" />
     <PackageVersion Include="Expecto.Diff" Version="$(ExpectoVersion)" />

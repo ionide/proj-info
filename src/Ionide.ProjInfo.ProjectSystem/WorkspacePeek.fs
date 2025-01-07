@@ -20,7 +20,12 @@ module WorkspacePeek =
         | FsProj
         | Sln
         | Slnf
+        | Slnx
         | Fsx
+
+    [<return:Struct>]
+    let inline (|HasExt|_|) (ext: string) (file: FileInfo) =
+        if file.Extension = ext then ValueSome() else ValueNone
 
     let private partitionByChoice3 =
         let foldBy (a, b, c) t =
@@ -76,26 +81,11 @@ module WorkspacePeek =
                 topLevelFiles
                 |> Seq.choose (fun s ->
                     match s with
-                    | x when
-                        x
-                        |> hasExt ".sln"
-                        ->
-                        Some(UsefulFile.Sln, x)
-                    | x when
-                        x
-                        |> hasExt ".slnf"
-                        ->
-                        Some(UsefulFile.Slnf, x)
-                    | x when
-                        x
-                        |> hasExt ".fsx"
-                        ->
-                        Some(UsefulFile.Fsx, x)
-                    | x when
-                        x
-                        |> hasExt ".fsproj"
-                        ->
-                        Some(UsefulFile.FsProj, x)
+                    | HasExt ".sln" -> Some(UsefulFile.Sln, s)
+                    | HasExt ".slnf" -> Some(UsefulFile.Slnf, s)
+                    | HasExt ".fsx" -> Some(UsefulFile.Fsx, s)
+                    | HasExt ".fsproj" -> Some(UsefulFile.FsProj, s)
+                    | HasExt ".slnx" -> Some(UsefulFile.Slnx, s)
                     | _ -> None
                 )
                 |> Seq.toArray
@@ -141,20 +131,14 @@ module WorkspacePeek =
             let getInfo (t, (f: FileInfo)) =
                 match t with
                 | UsefulFile.Sln
-                | UsefulFile.Slnf ->
+                | UsefulFile.Slnf
+                | UsefulFile.Slnx ->
                     match InspectSln.tryParseSln f.FullName with
-                    | Ok(p, d) -> Some(Choice1Of3(p, d))
+                    | Ok(d) -> Some(Choice1Of3(f.FullName, d))
                     | Error e ->
-                        let addInfo l =
-                            match e with
-                            | :? Ionide.ProjInfo.Sln.Exceptions.InvalidProjectFileException as ipfe -> Log.addContextDestructured "data" ipfe l
-
-                            | _ -> l
-
                         logger.warn (
                             Log.setMessage "Failed to load file: {filePath} : {data}"
                             >> Log.addContext "filePath" f.FullName
-                            >> addInfo
                             >> Log.addExn e
                         )
 
