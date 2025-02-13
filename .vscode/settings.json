@@ -8,7 +8,9 @@
         "test/examples",
         "packages"
     ],
-    "editor.formatOnSave": true,
+    "[fsharp]": {
+        "editor.formatOnSave": true,
+    },
     "cSpell.words": [
         "binlog",
         "inheritdoc",
