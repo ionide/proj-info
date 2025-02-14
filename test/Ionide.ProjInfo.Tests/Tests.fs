@@ -43,6 +43,11 @@ let implAssemblyForProject (test: TestAssetProjInfo) = $"{test.AssemblyName}.dll
 let refAssemblyForProject (test: TestAssetProjInfo) =
     Path.Combine("ref", implAssemblyForProject test)
 
+let getResult (r: Result<_, _>) =
+    match r with
+    | Ok x -> x
+    | Result.Error e -> failwithf "%A" e
+
 let TestRunDir =
     RepoDir
     / "test"
@@ -1999,6 +2004,7 @@ let debugTests toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
         (fun logger fs ->
 
             let loader = workspaceFactory toolsPath
+
             let slnPath =
                 @"C:\Users\JimmyByrd\Documents\Repositories\public\TheAngryByrd\FsToolkit.ErrorHandling\FsToolkit.ErrorHandling.sln"
 
@@ -2245,6 +2251,28 @@ let traversalProjectTest toolsPath loaderType workspaceFactory =
 
         )
 
+let sample11OtherProjectsTest toolsPath loaderType workspaceFactory =
+    testCase
+        $"Can load sample11 with other projects like shproj in sln - {loaderType}"
+        (fun () ->
+
+            let projPath = pathForProject ``sample 11 sln with other project types``
+
+            let projPaths =
+                // using Inspectsln emulates what we do in FsAutocomplete for gathering projects to load
+                InspectSln.tryParseSln projPath
+                |> getResult
+                |> InspectSln.loadingBuildOrder
+
+            let loader: IWorkspaceLoader = workspaceFactory toolsPath
+
+            let parsed =
+                loader.LoadProjects projPaths
+                |> Seq.toList
+
+            Expect.hasLength parsed 1 "Should have fsproj"
+        )
+
 let tests toolsPath =
     let testSample3WorkspaceLoaderExpected = [
         ExpectNotification.loading "c1.fsproj"
@@ -2371,4 +2399,7 @@ let tests toolsPath =
 
         traversalProjectTest toolsPath (nameof (WorkspaceLoader)) WorkspaceLoader.Create
         traversalProjectTest toolsPath (nameof (WorkspaceLoaderViaProjectGraph)) WorkspaceLoaderViaProjectGraph.Create
+
+        sample11OtherProjectsTest toolsPath (nameof (WorkspaceLoader)) WorkspaceLoader.Create
+        sample11OtherProjectsTest toolsPath (nameof (WorkspaceLoaderViaProjectGraph)) WorkspaceLoaderViaProjectGraph.Create
     ]
