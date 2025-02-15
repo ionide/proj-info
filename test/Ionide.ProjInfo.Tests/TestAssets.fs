@@ -321,3 +321,11 @@ let ``traversal project`` = {
         yield! ``sample3 Netsdk projs``.ProjectReferences
     ]
 }
+
+let ``sample 11 sln with other project types`` = {
+    ProjDir = "sample11-solution-with-other-projects"
+    AssemblyName = ""
+    ProjectFile = "sample11-solution-with-other-projects.sln"
+    TargetFrameworks = Map.empty
+    ProjectReferences = []
+}

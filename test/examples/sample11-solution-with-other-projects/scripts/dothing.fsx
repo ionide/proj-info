@@ -1,0 +1,2 @@
+open System
+let lol = ()

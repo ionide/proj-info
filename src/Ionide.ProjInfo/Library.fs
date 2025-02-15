@@ -45,10 +45,14 @@ module SdkDiscovery =
             |> Seq.toArray
 
         p.WaitForExit()
+
         if p.ExitCode = 0 then
             output
         elif failOnError then
-            let output = output |> String.concat "\n"
+            let output =
+                output
+                |> String.concat "\n"
+
             failwith $"`{binaryFullPath.FullName} {args}` failed with exit code %i{p.ExitCode}. Output: %s{output}"
         else
             // for the legacy VS flow, whose behaviour is harder to test, we maintain compatibility with how proj-info
@@ -340,6 +344,20 @@ module ProjectLoader =
         internal
         | StandardProject of ProjectInstance
         | TraversalProject of ProjectInstance
+        /// This could be things like shproj files, or other things that aren't standard projects
+        | Other of ProjectInstance
+
+    let (|IsTraversal|_|) (p: ProjectInstance) =
+        match p.GetProperty "IsTraversal" with
+        | null -> None
+        | p when Boolean.TryParse(p.EvaluatedValue) = (true, false) -> None
+        | _ -> Some()
+
+    let (|DesignTimeCapable|_|) (targets: string seq) (p: ProjectInstance) =
+        if Seq.forall p.Targets.ContainsKey targets then
+            Some()
+        else
+            None
 
     let internal projectLoaderLogger = lazy (LogProvider.getLoggerByName "ProjectLoader")
 
@@ -411,11 +429,12 @@ module ProjectLoader =
             match _message with
             | null ->
                 // if the project is already loaded throw a nicer message
-                let message = System.Text.StringBuilder()
+                let message = Text.StringBuilder()
+                let appendLine (t: string) (sb: Text.StringBuilder) = sb.AppendLine t
 
                 message
-                    .AppendLine($"The project '{projectPath}' already exists in the project collection with the same global properties.")
-                    .AppendLine("The global properties requested were:")
+                |> appendLine $"The project '{projectPath}' already exists in the project collection with the same global properties."
+                |> appendLine "The global properties requested were:"
                 |> ignore
 
                 for (KeyValue(k, v)) in properties do
@@ -617,7 +636,7 @@ module ProjectLoader =
                     let lines: seq<string> = File.ReadLines path
 
                     (Seq.tryFind (fun (line: string) -> line.Contains legacyProjFormatXmlns) lines)
-                        .IsSome
+                    |> Option.isSome
                 else
                     false
 
@@ -639,22 +658,20 @@ module ProjectLoader =
             let loggers = createLoggers [ path ] binaryLogs sw
 
             let pi = project.CreateProjectInstance()
+            let designTimeTargets = designTimeBuildTargets isLegacyFrameworkProjFile
 
             let doDesignTimeBuild () =
-                let build = pi.Build(designTimeBuildTargets isLegacyFrameworkProjFile, loggers)
+                let build = pi.Build(designTimeTargets, loggers)
 
                 if build then
                     Ok(StandardProject pi)
                 else
                     Error(sw.ToString())
 
-            let yieldTraversalProject () = Ok(TraversalProject pi)
-
-            // do traversal project detection here
-            match pi.GetProperty "IsTraversal" with
-            | null -> doDesignTimeBuild ()
-            | p when Boolean.Parse(p.EvaluatedValue) = false -> doDesignTimeBuild ()
-            | _ -> yieldTraversalProject ()
+            match pi with
+            | IsTraversal -> Ok(TraversalProject pi)
+            | DesignTimeCapable designTimeTargets -> doDesignTimeBuild ()
+            | _ -> Ok(Other pi)
 
         with exc ->
             projectLoaderLogger.Value.error (
@@ -723,6 +740,7 @@ module ProjectLoader =
                     }
             )
             |> Seq.toList
+        | Other(_) -> List.empty
 
     let getCompileItems (p: ProjectInstance) =
         p.Items
@@ -945,6 +963,7 @@ module ProjectLoader =
     type LoadedProjectInfo =
         | StandardProjectInfo of ProjectOptions
         | TraversalProjectInfo of ProjectReference list
+        | OtherProjectInfo of ProjectInstance
 
     let getLoadedProjectInfo (path: string) customProperties project : Result<LoadedProjectInfo, string> =
         // let (LoadedProject p) = project
@@ -1001,6 +1020,7 @@ module ProjectLoader =
             else
                 let proj = mapToProject path commandLineArgs p2pRefs compileItems nuGetRefs sdkInfo props customProps
                 Ok(LoadedProjectInfo.StandardProjectInfo proj)
+        | LoadedProject.Other p -> Ok(LoadedProjectInfo.OtherProjectInfo p)
 
 /// A type that turns project files or solution files into deconstructed options.
 /// Use this in conjunction with the other ProjInfo libraries to turn these options into
@@ -1105,42 +1125,32 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
             paths
             |> Seq.iter (fun p -> loadingNotification.Trigger(WorkspaceProjectState.Loading p))
 
+            let designTimeTargets = ProjectLoader.designTimeBuildTargets false
+
             let graph =
-                match
+                let entryPoints =
                     paths
+                    |> Seq.map ProjectGraphEntryPoint
                     |> List.ofSeq
-                with
-                | [ x ] ->
-                    let g: ProjectGraph =
-                        ProjectGraph(x, projectCollection = per_request_collection, projectInstanceFactory = projectInstanceFactory)
-                    // When giving ProjectGraph a singular project, g.EntryPointNodes only contains that project.
-                    // To get it to build the Graph with all the dependencies we need to look at all the ProjectNodes
-                    // and tell the graph to use all as potentially an entrypoint
-                    let nodes =
-                        g.ProjectNodes
-                        |> Seq.choose (fun pn ->
-                            match pn.ProjectInstance.GetProperty("IsTraversal") with
-                            | null ->
-                                ProjectGraphEntryPoint pn.ProjectInstance.FullPath
-                                |> Some
-                            | p ->
-                                match bool.TryParse(p.EvaluatedValue) with
-                                | true, true -> None
-                                | true, false ->
-                                    ProjectGraphEntryPoint pn.ProjectInstance.FullPath
-                                    |> Some
-                                | false, _ -> None
-                        )
 
-                    ProjectGraph(nodes, projectCollection = per_request_collection, projectInstanceFactory = projectInstanceFactory)
-
-                | xs ->
-                    let entryPoints =
-                        paths
-                        |> Seq.map ProjectGraphEntryPoint
-                        |> List.ofSeq
-
+                let g: ProjectGraph =
                     ProjectGraph(entryPoints, projectCollection = per_request_collection, projectInstanceFactory = projectInstanceFactory)
+                // When giving ProjectGraph a singular project, g.EntryPointNodes only contains that project.
+                // To get it to build the Graph with all the dependencies we need to look at all the ProjectNodes
+                // and tell the graph to use all as potentially an entrypoint
+                // Additionally, we need to filter out any projects that are not design time capable
+                let nodes =
+                    g.ProjectNodes
+                    |> Seq.choose (fun pn ->
+                        match pn.ProjectInstance with
+                        | ProjectLoader.DesignTimeCapable designTimeTargets ->
+
+                            ProjectGraphEntryPoint pn.ProjectInstance.FullPath
+                            |> Some
+                        | _ -> None
+                    )
+
+                ProjectGraph(nodes, projectCollection = per_request_collection, projectInstanceFactory = projectInstanceFactory)
 
             graph
 
@@ -1205,9 +1215,11 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                 let gbr =
                     GraphBuildRequestData(
                         projectGraph = projects,
-                        targetsToBuild=ProjectLoader.designTimeBuildTargets false,
-                        hostServices=null,
-                        flags= (BuildRequestDataFlags.ReplaceExistingProjectInstance ||| BuildRequestDataFlags.ClearCachesAfterBuild)
+                        targetsToBuild = ProjectLoader.designTimeBuildTargets false,
+                        hostServices = null,
+                        flags =
+                            (BuildRequestDataFlags.ReplaceExistingProjectInstance
+                             ||| BuildRequestDataFlags.ClearCachesAfterBuild)
                     )
 
                 let bm = BuildManager.DefaultBuildManager
@@ -1260,7 +1272,6 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                     let projects =
                         builtProjects
                         |> Seq.map (fun p -> p.FullPath, ProjectLoader.getLoadedProjectInfo p.FullPath customProperties (ProjectLoader.StandardProject p))
-
                         |> Seq.choose (fun (projectPath, projectOptionResult) ->
                             match projectOptionResult with
                             | Ok projectOptions ->
@@ -1303,6 +1314,12 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                             )
 
                             loadingNotification.Trigger(WorkspaceProjectState.Loaded(po, allStandardProjects, false))
+                        | ProjectLoader.LoadedProjectInfo.OtherProjectInfo p ->
+                            logger.info (
+                                Log.setMessage "Other project loaded {project}"
+                                >> Log.addContextDestructured "project" p.FullPath
+                            )
+
                     )
 
                     allStandardProjects :> seq<_>
@@ -1417,6 +1434,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
                             match project with
                             | ProjectLoader.LoadedProjectInfo.StandardProjectInfo p -> p.ReferencedProjects
                             | ProjectLoader.LoadedProjectInfo.TraversalProjectInfo p -> p
+                            | ProjectLoader.LoadedProjectInfo.OtherProjectInfo p -> []
 
                         let lst =
                             referencedProjects
@@ -1432,6 +1450,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
                             match project with
                             | ProjectLoader.LoadedProjectInfo.StandardProjectInfo p -> Some p
                             | ProjectLoader.LoadedProjectInfo.TraversalProjectInfo p -> None
+                            | ProjectLoader.LoadedProjectInfo.OtherProjectInfo p -> None
 
                         lst, info
                     | Error msg ->
@@ -1446,13 +1465,14 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
 
                             match project with
                             | ProjectLoader.LoadedProjectInfo.StandardProjectInfo p -> loadingNotification.Trigger(WorkspaceProjectState.Loaded(p, getAllKnown (), true))
-
                             | ProjectLoader.LoadedProjectInfo.TraversalProjectInfo p -> ()
+                            | ProjectLoader.LoadedProjectInfo.OtherProjectInfo p -> ()
 
                             let referencedProjects =
                                 match project with
                                 | ProjectLoader.LoadedProjectInfo.StandardProjectInfo p -> p.ReferencedProjects
                                 | ProjectLoader.LoadedProjectInfo.TraversalProjectInfo p -> p
+                                | ProjectLoader.LoadedProjectInfo.OtherProjectInfo p -> []
 
                             let lst =
                                 referencedProjects
