@@ -532,7 +532,7 @@ module ProjectLoader =
         let pi = project.CreateProjectInstance()
         getTfm pi isLegacyFrameworkProj
 
-    let createLoggers (paths: string seq) (binaryLogs: BinaryLogGeneration) (sw: StringWriter) =
+    let createLoggers (path: string) (binaryLogs: BinaryLogGeneration) (sw: StringWriter) =
         let swLogger = stringWriterLogger (sw)
         let msBuildLogger = msBuildToLogProvider ()
 
@@ -541,24 +541,14 @@ module ProjectLoader =
             let logFileName = Path.ChangeExtension(projectFileName, ".binlog")
             Path.Combine(dir.FullName, logFileName)
 
-        match binaryLogs with
-        | BinaryLogGeneration.Off -> [
+        [
             swLogger
             msBuildLogger
-          ]
-        | BinaryLogGeneration.Within dir ->
-            let loggers =
-                paths
-                |> Seq.map (fun path ->
-                    let logPath = logFilePath (dir, path)
-                    Microsoft.Build.Logging.BinaryLogger(Parameters = logPath) :> ILogger
-                )
+            match binaryLogs with
+            | BinaryLogGeneration.Off -> ()
+            | BinaryLogGeneration.Within dir -> Microsoft.Build.Logging.BinaryLogger(Parameters = logFilePath (dir, path)) :> ILogger
 
-            [
-                swLogger
-                msBuildLogger
-                yield! loggers
-            ]
+        ]
 
     let getGlobalProps (tfm: string option) (globalProperties: (string * string) list) (propsSetFromParentCollection: Set<string>) =
         [
@@ -655,7 +645,7 @@ module ProjectLoader =
             let project = findOrCreateMatchingProject path projectCollection globalProperties
             use sw = new StringWriter()
 
-            let loggers = createLoggers [ path ] binaryLogs sw
+            let loggers = createLoggers path binaryLogs sw
 
             let pi = project.CreateProjectInstance()
             let designTimeTargets = designTimeBuildTargets isLegacyFrameworkProjFile
@@ -1224,7 +1214,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
                 let bm = BuildManager.DefaultBuildManager
                 use sw = new StringWriter()
-                let loggers = ProjectLoader.createLoggers allKnownNames binaryLogs sw
+                let loggers = ProjectLoader.createLoggers "graph-build" binaryLogs sw
                 let buildParameters = BuildParameters(Loggers = loggers)
 
                 buildParameters.ProjectLoadSettings <-
