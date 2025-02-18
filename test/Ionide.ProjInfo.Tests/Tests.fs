@@ -1577,7 +1577,7 @@ let testFCSmapManyProjCheckCaching =
             Expect.equal distinctOptionsCount projectsInLayers.Length "Mapping should reuse instances of FSharpProjectOptions and only create one per project"
         )
 
-let testSample2WithBinLog toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
+let testSample2WithBinLog binLogFile toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog
         (sprintf "can load sample2 with bin log - %s" workspaceLoader)
@@ -1630,7 +1630,7 @@ let testSample2WithBinLog toolsPath workspaceLoader (workspaceFactory: ToolsPath
 
             let blPath =
                 projDir
-                / "n1.binlog"
+                / binLogFile
 
             let blExists = File.Exists blPath
 
@@ -2364,8 +2364,8 @@ let tests toolsPath =
         loadProjfileFromDiskTests toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
 
         //Binlog test
-        testSample2WithBinLog toolsPath "WorkspaceLoader" WorkspaceLoader.Create
-        testSample2WithBinLog toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
+        testSample2WithBinLog "n1.binlog" toolsPath "WorkspaceLoader" WorkspaceLoader.Create
+        testSample2WithBinLog "graph-build.binlog" toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
         test "can get runtimes" {
             let runtimes =
                 SdkDiscovery.runtimes (
