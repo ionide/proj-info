@@ -433,13 +433,14 @@ let ``loader2-cancel-slow`` = {
         "classlibf1"
         / "classlibf1.fsproj"
     ]
-    Expects = fun projectsAfterBuild -> ()
-// Expect.equal (Seq.length projectsAfterBuild) 1 "projects count"
+    Expects = ignore
+}
 
-// let classlibf1 =
-//     projectsAfterBuild
-//     |> Seq.head
-
-// Expect.equal classlibf1.SourceFiles.Length 3 "classlibf1 source files"
-// Expect.equal classlibf1.TargetFramework "net8.0" "classlibf1 target framework"
+let ``loader2-concurrent`` = {
+    ProjDir = "loader2-concurrent"
+    EntryPoints = [
+        "classlibf1"
+        / "classlibf1.fsproj"
+    ]
+    Expects = ignore
 }
