@@ -23,6 +23,7 @@ open Microsoft.Build.Execution
 open Microsoft.Build.Graph
 open System.Threading.Tasks
 open Microsoft.Build.Evaluation
+open Ionide.ProjInfo.ProjectLoader
 
 let RepoDir =
     (__SOURCE_DIRECTORY__
@@ -553,6 +554,7 @@ let testSample3 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
             Expect.equal l2Parsed l2Loaded "l2 notificaton and parsed should be the same"
             Expect.equal c1Parsed c1Loaded "c1 notificaton and parsed should be the same"
         )
+
 
 let testSample4 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
@@ -1383,62 +1385,136 @@ let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
 
         )
 
+module Task =
+    let RunSynchronously (task: Task<'T>) = task.GetAwaiter().GetResult()
+
+type BinlogCleaner(binlog: FileInfo) =
+    let sw = new StringWriter()
+    let errorLogger = ErrorLogger()
+    let loggers = ProjectLoader.createLoggers binlog.Name (BinaryLogGeneration.Within(binlog.Directory)) sw (Some errorLogger)
+
+    member x.ErrorLogger = errorLogger
+    member x.Loggers = loggers
+    member val ShouldClean = true with get, set
+
+    member x.Directory = binlog.Directory
+    member x.File = binlog
+
+    interface IDisposable with
+        member this.Dispose() =
+            sw.Dispose()
+
+            if this.ShouldClean then
+                binlog.Delete()
+
+let currentPath = Path.Combine(__SOURCE_DIRECTORY__, "testBinLogs")
+
+let testWithBinLog name f test =
+    test
+        name
+        (fun () ->
+            let binlog = new FileInfo(Path.Combine(currentPath, $"{name}.binlog"))
+            use blc = new BinlogCleaner(binlog)
+            let logger = Log.create (sprintf "Test '%s'" name)
+            let fs = FileUtils(logger)
+
+            try
+                f logger fs blc
+            with e ->
+                blc.ShouldClean <- false
+
+                logger.error (
+                    Message.eventX "{name} binlog path {binlog}"
+                    >> Message.setField "name" name
+                    >> Message.setField "binlog" binlog.FullName
+                )
+
+                reraise ()
+        )
+
+let projectCollection (loggers) =
+    new ProjectCollection(
+        globalProperties = Map.ofSeq (ProjectLoader.defaultGlobalProps),
+        loggers = loggers,
+        remoteLoggers = null,
+        toolsetDefinitionLocations = ToolsetDefinitionLocations.Local,
+        maxNodeCount = Environment.ProcessorCount,
+        onlyLogCriticalEvents = false,
+        loadProjectsReadOnly = true
+    )
+
+type IWorkspaceLoader2 =
+    abstract member Load: paths: string list * ct: CancellationToken -> Task<seq<Result<BuildResult, BuildResult * ErrorLogger>>>
+
+
 let buildManagerSessionTests toolsPath =
-    ftestList "buildManagerSessionTests" [
-        testCase
-        |> withLog
+    testList "buildManagerSessionTests" [
+        ftestCase
+        |> testWithBinLog
             "Happy Path"
-            (fun logger fs ->
+            (fun logger fs blc ->
                 let path =
-                    [ @"C:\Users\jimmy\Repositories\public\TheAngryByrd\FAKE\Fake.sln" ]
+                    // [ @"C:\Users\jimmy\Repositories\public\TheAngryByrd\FAKE\Fake.sln" ]
+                    [ @"C:\Users\jimmy\Repositories\public\TheAngryByrd\IcedTasks2\IcedTasks.sln" ]
+                    // [ @"C:\Users\jimmy\Repositories\private\motivity\Motivity.sln" ]
                     |> List.map ProjectGraphEntryPoint
 
+
                 // Evaluation
-                let pc = new ProjectCollection(ProjectLoader.defaultGlobalProperties)
-                let graph = ProjectLoader2.EvalutateAsGraph(path, pc)
+                use pc = projectCollection blc.Loggers
+                let graph = ProjectLoader2.EvaluateAsGraphDesignTime(path, pc)
 
                 // Execution
-                let bp = BuildParameters(ProjectLoadSettings = ProjectLoadSettings.FailOnUnresolvedSdk, EnableNodeReuse = true)
+                let bp = BuildParameters(Loggers = blc.Loggers)
+
                 let bm = new BuildManagerSession(buildParameters = bp)
 
                 let result =
                     ProjectLoader2.Execution(bm, graph)
-                    |> Async.RunSynchronously
-
-                let result =
-                    match result with
-                    | Result.Error e -> failtest "%s" e
-                    | Result.Ok v -> v
+                    |> Task.RunSynchronously
 
                 // Parse
                 let projectsAfterBuild =
                     ProjectLoader2.Parse result
-                    |> Array.map (
+                    |> Seq.choose (
                         function
-                        | Ok v -> v
-                        | Result.Error e -> failtest "%s" e
+                        | Ok(Ok(LoadedProjectInfo.StandardProjectInfo x)) -> Some x
+                        | _ -> None
                     )
+
+                let grouped =
+                    projectsAfterBuild
+                    |> Seq.groupBy (fun v -> v.ProjectFileName)
+                    |> Map
+                    |> Map.map (fun _ v -> Set.ofSeq v)
+
+                ignore grouped
+                ignore blc.ErrorLogger
 
                 let emptyPackageReferences =
                     projectsAfterBuild
-                    |> Array.filter (fun v -> v.PackageReferences.Length = 0)
+                    |> Seq.filter (fun v -> v.PackageReferences.Length = 0)
 
                 Expect.isEmpty emptyPackageReferences "Should have no empty PackageReferences"
-                ()
             )
 
         testCase
         |> withLog
-            "Concurrency - new graph  everytime"
+            "Concurrency - new graph every time"
             (fun logger fs ->
                 let path =
                     [ @"C:\Users\jimmy\Repositories\public\TheAngryByrd\FAKE\Fake.sln" ]
                     |> List.map ProjectGraphEntryPoint
 
                 use sw = new StringWriter()
-                let pc = new ProjectCollection(ProjectLoader.defaultGlobalProperties)
 
-                let loggers = ProjectLoader.createLoggers [] BinaryLogGeneration.Off sw
+                let pc =
+                    new ProjectCollection(
+                        ProjectLoader.defaultGlobalProps
+                        |> Map.ofSeq
+                    )
+
+                let loggers = ProjectLoader.createLoggers "" BinaryLogGeneration.Off sw None
 
                 let bp =
                     BuildParameters(ProjectLoadSettings = ProjectLoadSettings.FailOnUnresolvedSdk, EnableNodeReuse = true, Loggers = loggers)
@@ -1448,11 +1524,14 @@ let buildManagerSessionTests toolsPath =
                 let work =
                     async {
                         // Evaluation
-                        let graph = ProjectLoader2.EvalutateAsGraph(path, pc)
+                        let graph = ProjectLoader2.EvaluateAsGraph(path, pc)
+                        let! ct = Async.CancellationToken
 
                         // Execution
 
-                        return! ProjectLoader2.Execution(bm, graph)
+                        return!
+                            ProjectLoader2.Execution(bm, graph, ct = ct)
+                            |> Async.AwaitTask
                     }
 
                 // Should be throttled so concurrent builds won't fail
@@ -1482,18 +1561,31 @@ let buildManagerSessionTests toolsPath =
 
 
                 // Evaluation
-                let pc = new ProjectCollection(ProjectLoader.defaultGlobalProperties)
-                let graph = ProjectLoader2.EvalutateAsGraph(path, pc)
+                let pc =
+                    new ProjectCollection(
+                        ProjectLoader.defaultGlobalProps
+                        |> Map.ofSeq
+                    )
+
+                let graph = ProjectLoader2.EvaluateAsGraph(path, pc)
 
                 // Execution
                 let bp = BuildParameters(ProjectLoadSettings = ProjectLoadSettings.FailOnUnresolvedSdk, EnableNodeReuse = true)
-                let  bm = new BuildManagerSession(buildParameters = bp)
+                let bm = new BuildManagerSession(buildParameters = bp)
 
                 Expect.throwsT<TaskCanceledException>
                     (fun () ->
                         use cts = new CancellationTokenSource()
                         cts.CancelAfter(TimeSpan.FromSeconds(1.))
-                        let build = ProjectLoader2.Execution(bm, graph)
+
+                        let build =
+                            async {
+                                let! ct = Async.CancellationToken
+
+                                return!
+                                    ProjectLoader2.Execution(bm, graph, ct = ct)
+                                    |> Async.AwaitTask
+                            }
 
                         Async.RunSynchronously(build, cancellationToken = cts.Token)
                         |> ignore
