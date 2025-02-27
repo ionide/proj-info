@@ -25,6 +25,12 @@ open System.Threading.Tasks
 open Microsoft.Build.Evaluation
 open Ionide.ProjInfo.ProjectLoader
 
+module Exception =
+    open System.Runtime.ExceptionServices
+
+    let inline reraiseAny (e: exn) =
+        ExceptionDispatchInfo.Capture(e).Throw()
+
 let RepoDir =
     (__SOURCE_DIRECTORY__
      / ".."
@@ -1469,50 +1475,51 @@ let testWithEnv name (data: TestAssetProjInfo2) f test =
     test
         name
         (fun () ->
+            task {
+                let logger = Log.create (sprintf "Test '%s'" name)
+                let fs = FileUtils logger
 
-            let logger = Log.create (sprintf "Test '%s'" name)
-            let fs = FileUtils logger
+                let testDir = inDir fs data.ProjDir
+                copyDirFromAssets fs data.ProjDir testDir
 
-            let testDir = inDir fs data.ProjDir
-            copyDirFromAssets fs data.ProjDir testDir
+                let entrypoints =
+                    data.EntryPoints
+                    |> Seq.map (fun x ->
+                        testDir
+                        / x
+                    )
 
-            let entrypoints =
-                data.EntryPoints
-                |> Seq.map (fun x ->
-                    testDir
-                    / x
+                entrypoints
+                |> Seq.iter (fun x ->
+                    dotnet fs [
+                        "restore"
+                        x
+                    ]
+                    |> checkExitCodeZero
                 )
 
-            entrypoints
-            |> Seq.iter (fun x ->
-                dotnet fs [
-                    "restore"
-                    x
-                ]
-                |> checkExitCodeZero
-            )
+                let binlog = new FileInfo(Path.Combine(testDir, $"{name}.binlog"))
+                use blc = new Binlogs(binlog)
 
-            let binlog = new FileInfo(Path.Combine(testDir, $"{name}.binlog"))
-            use blc = new Binlogs(binlog)
+                let env = {
+                    Logger = logger
+                    FS = fs
+                    Binlog = blc
+                    Data = data
+                    Entrypoints = entrypoints
+                }
 
-            let env = {
-                Logger = logger
-                FS = fs
-                Binlog = blc
-                Data = data
-                Entrypoints = entrypoints
+                try
+                    do! f env
+                with e ->
+
+                    logger.error (
+                        Message.eventX "binlog path {binlog}"
+                        >> Message.setField "binlog" binlog.FullName
+                    )
+
+                    Exception.reraiseAny e
             }
-
-            try
-                f env
-            with e ->
-
-                logger.error (
-                    Message.eventX "binlog path {binlog}"
-                    >> Message.setField "binlog" binlog.FullName
-                )
-
-                reraise ()
         )
 
 let projectCollection () =
@@ -1531,119 +1538,124 @@ type IWorkspaceLoader2 =
 
 
 let buildManagerSessionTests toolsPath =
-    testSequenced
-    <| ftestList "buildManagerSessionTests" [
-        testCase
+    ftestList "buildManagerSessionTests" [
+        testCaseTask
         |> testWithEnv
             "loader2-solution-with-2-projects"
             ``loader2-solution-with-2-projects``
             (fun env ->
+                task {
 
-                let path =
-                    env.Entrypoints
-                    |> Seq.map ProjectGraphEntryPoint
+                    let path =
+                        env.Entrypoints
+                        |> Seq.map ProjectGraphEntryPoint
 
-                let loggers = env.Binlog.Loggers
+                    let loggers = env.Binlog.Loggers
 
-                // Evaluation
-                use pc = projectCollection ()
-                let graph = ProjectLoader2.EvaluateAsGraphDesignTime(path, pc)
+                    // Evaluation
+                    use pc = projectCollection ()
+                    let graph = ProjectLoader2.EvaluateAsGraphDesignTime(path, pc)
 
-                // Execution
-                let bp = BuildParameters(Loggers = loggers)
+                    // Execution
+                    let bp = BuildParameters(Loggers = loggers)
 
-                let bm = new BuildManagerSession(buildParameters = bp)
+                    let bm = new BuildManagerSession(buildParameters = bp)
 
-                let result =
-                    ProjectLoader2.Execution(bm, graph)
-                    |> Task.RunSynchronously
+                    let result =
+                        ProjectLoader2.Execution(bm, graph)
+                        |> Task.RunSynchronously
 
-                // Parse
-                let projectsAfterBuild =
-                    ProjectLoader2.Parse result
-                    |> Seq.choose (
-                        function
-                        | Ok(Ok(LoadedProjectInfo.StandardProjectInfo x)) -> Some x
-                        | _ -> None
-                    )
+                    // Parse
+                    let projectsAfterBuild =
+                        ProjectLoader2.Parse result
+                        |> Seq.choose (
+                            function
+                            | Ok(Ok(LoadedProjectInfo.StandardProjectInfo x)) -> Some x
+                            | _ -> None
+                        )
 
-                env.Data.Expects projectsAfterBuild
+                    env.Data.Expects projectsAfterBuild
+                }
             )
 
-        testCase
+        testCaseTask
         |> testWithEnv
             "Concurrency - new graph every time"
-            ``loader2-solution-with-2-projects``
+            ``loader2-concurrent``
             (fun env ->
-                let path =
-                    env.Entrypoints
-                    |> Seq.map ProjectGraphEntryPoint
+                task {
+                    let path =
+                        env.Entrypoints
+                        |> Seq.map ProjectGraphEntryPoint
 
-                use pc = projectCollection ()
+                    use pc = projectCollection ()
 
-                let bp = BuildParameters(Loggers = env.Binlog.Loggers)
+                    let bp = BuildParameters(Loggers = env.Binlog.Loggers)
 
-                let bm = new BuildManagerSession(buildParameters = bp)
+                    let bm = new BuildManagerSession(buildParameters = bp)
 
-                let work =
-                    async {
-                        // Evaluation
-                        let graph = ProjectLoader2.EvaluateAsGraph(path, pc)
-                        let! ct = Async.CancellationToken
+                    let work =
+                        async {
+                            // Evaluation
+                            let graph = ProjectLoader2.EvaluateAsGraph(path, pc)
+                            let! ct = Async.CancellationToken
 
-                        // Execution
-                        return!
-                            ProjectLoader2.Execution(bm, graph, ct = ct)
-                            |> Async.AwaitTask
-                    }
+                            // Execution
+                            return!
+                                ProjectLoader2.Execution(bm, graph, ct = ct)
+                                |> Async.AwaitTask
+                        }
 
-                // Should be throttled so concurrent builds won't fail
-                let result =
-                    Async.Parallel [
-                        work
-                        work
-                        work
-                        work
-                    ]
+                    // Should be throttled so concurrent builds won't fail
+                    let result =
+                        Async.Parallel [
+                            work
+                            work
+                            work
+                            work
+                        ]
 
-                    |> Async.RunSynchronously
+                        |> Async.RunSynchronously
 
-                ()
+                    ()
 
+                }
             )
 
 
-        testCase
+        testCaseTask
         |> testWithEnv
             "Cancellable"
             ``loader2-cancel-slow``
             (fun env ->
-                let path =
-                    env.Entrypoints
-                    |> Seq.map ProjectGraphEntryPoint
+                task {
+                    let path =
+                        env.Entrypoints
+                        |> Seq.map ProjectGraphEntryPoint
 
 
-                // Evaluation
-                use pc = projectCollection ()
+                    // Evaluation
+                    use pc = projectCollection ()
 
-                let graph = ProjectLoader2.EvaluateAsGraph(path, pc)
+                    let graph = ProjectLoader2.EvaluateAsGraph(path, pc)
 
-                // Execution
-                let bp = BuildParameters(Loggers = env.Binlog.Loggers)
-                let bm = new BuildManagerSession(buildParameters = bp)
+                    // Execution
+                    let bp = BuildParameters(Loggers = env.Binlog.Loggers)
+                    let bm = new BuildManagerSession(buildParameters = bp)
 
-                try
-                    use cts = new CancellationTokenSource()
-                    cts.CancelAfter(TimeSpan.FromSeconds(1.))
+                    try
+                        use cts = new CancellationTokenSource()
+                        cts.CancelAfter(TimeSpan.FromSeconds(1.))
 
-                    let build = ProjectLoader2.Execution(bm, graph, ct = cts.Token)
+                        let build = ProjectLoader2.Execution(bm, graph, ct = cts.Token)
 
-                    Task.RunSynchronously build
-                    |> ignore
-                with
-                | :? OperationCanceledException -> ()
-                | e -> reraise ()
+                        Task.RunSynchronously build
+                        |> ignore
+                    with
+                    | :? OperationCanceledException -> ()
+                    | e -> Exception.reraiseAny e
 
+                }
             )
     ]
 
