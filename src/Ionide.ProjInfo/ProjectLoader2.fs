@@ -70,7 +70,9 @@ module internal BuildManagerExtensions =
         member bm.StartBuild(?parameters: BuildParameters, ?ct: CancellationToken) =
             let parameters = defaultArg parameters null
             let ct = defaultArg ct CancellationToken.None
+            ct.ThrowIfCancellationRequested()
             bm.BeginBuild parameters
+            ct.ThrowIfCancellationRequested()
 
             let cancelSubmissions =
                 ct.Register(fun () ->

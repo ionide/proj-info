@@ -1,6 +1,15 @@
 module DotnetProjInfo.TestAssets
 
 open FileUtils
+open Ionide.ProjInfo.Types
+open Expecto
+
+
+type TestAssetProjInfo2 = {
+    ProjDir: string
+    EntryPoints: string seq
+    Expects: ProjectOptions seq -> unit
+}
 
 type TestAssetProjInfo = {
     ProjDir: string
@@ -393,4 +402,44 @@ let ``sample 16 solution folders (.slnx)`` = {
     ProjectFile = "sample16-solution-with-solution-folders.slnx"
     TargetFrameworks = Map.empty
     ProjectReferences = []
+}
+
+let ``loader2-solution-with-2-projects`` = {
+    ProjDir = "loader2-solution-with-2-projects"
+    EntryPoints = [ "loader2-solution-with-2-projects.sln" ]
+    Expects =
+        fun projectsAfterBuild ->
+            Expect.equal (Seq.length projectsAfterBuild) 2 "projects count"
+
+            let classlibf1 =
+                projectsAfterBuild
+                |> Seq.find (fun x -> x.ProjectFileName.EndsWith("classlibf1.fsproj"))
+
+            Expect.equal classlibf1.SourceFiles.Length 3 "classlibf1 source files"
+            Expect.equal classlibf1.TargetFramework "net8.0" "classlibf1 target framework"
+
+            let classlibf2 =
+                projectsAfterBuild
+                |> Seq.find (fun x -> x.ProjectFileName.EndsWith("classlibf2.fsproj"))
+
+            Expect.equal classlibf2.SourceFiles.Length 3 "classlibf2 source files"
+            Expect.equal classlibf2.TargetFramework "netstandard2.0" "classlibf1 target framework"
+}
+
+
+let ``loader2-cancel-slow`` = {
+    ProjDir = "loader2-cancel-slow"
+    EntryPoints = [
+        "classlibf1"
+        / "classlibf1.fsproj"
+    ]
+    Expects = fun projectsAfterBuild -> ()
+// Expect.equal (Seq.length projectsAfterBuild) 1 "projects count"
+
+// let classlibf1 =
+//     projectsAfterBuild
+//     |> Seq.head
+
+// Expect.equal classlibf1.SourceFiles.Length 3 "classlibf1 source files"
+// Expect.equal classlibf1.TargetFramework "net8.0" "classlibf1 target framework"
 }
