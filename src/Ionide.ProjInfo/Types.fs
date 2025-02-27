@@ -68,12 +68,13 @@ module Types =
         Items: ProjectItem list
         Properties: Property list
         CustomProperties: Property list
+        OtherItems: Map<string, Set<string * Map<string, string>>>
     } with
+
         /// ResolvedTargetPath is the path to the primary reference assembly for this project.
         /// For projects that produce ReferenceAssemblies, this is the path to the reference assembly.
         /// For other projects, this is the same as TargetPath.
-        member x.ResolvedTargetPath =
-            defaultArg x.TargetRefPath x.TargetPath
+        member x.ResolvedTargetPath = defaultArg x.TargetRefPath x.TargetPath
 
     /// Represents a `<Compile>` node within an fsproj file.
     type CompileItem = {

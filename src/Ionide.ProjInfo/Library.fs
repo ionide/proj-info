@@ -395,6 +395,29 @@ module ProjectLoader =
                 and set (v: LoggerVerbosity): unit = ()
         }
 
+    type ErrorLogger() =
+        let errors = ResizeArray<_>()
+        member this.Errors = errors
+
+        interface ILogger with
+            member this.Initialize(eventSource: IEventSource) : unit = eventSource.ErrorRaised.Add errors.Add
+
+            member this.Parameters
+                with get (): string = ""
+                and set (v: string): unit = ()
+
+            member this.Shutdown() : unit = ()
+
+            member this.Verbosity
+                with get (): LoggerVerbosity = LoggerVerbosity.Detailed
+                and set (v: LoggerVerbosity): unit = ()
+    // let internal errorLogger ()
+    //     { new ILogger with
+    //         member this.Initialize(eventSource: IEventSource) : unit =
+    //             eventSource.ErrorRaised.Add(fun t -> printfn "Error: %s" t.Message)
+
+    //     }
+
     let internal stringWriterLogger (writer: StringWriter) =
         { new ILogger with
             member this.Initialize(eventSource: IEventSource) : unit =
@@ -532,7 +555,7 @@ module ProjectLoader =
         let pi = project.CreateProjectInstance()
         getTfm pi isLegacyFrameworkProj
 
-    let createLoggers (path: string) (binaryLogs: BinaryLogGeneration) (sw: StringWriter) =
+    let createLoggers (path: string) (binaryLogs: BinaryLogGeneration) (sw: StringWriter) (errLogs: ErrorLogger option) =
         let swLogger = stringWriterLogger (sw)
         let msBuildLogger = msBuildToLogProvider ()
 
@@ -544,26 +567,49 @@ module ProjectLoader =
         [
             swLogger
             msBuildLogger
+            match errLogs with
+            | Some logger -> logger :> ILogger
+            | None -> ()
             match binaryLogs with
             | BinaryLogGeneration.Off -> ()
             | BinaryLogGeneration.Within dir -> Microsoft.Build.Logging.BinaryLogger(Parameters = logFilePath (dir, path)) :> ILogger
 
         ]
 
+    let internal designTimeBuildTargetsCore = [|
+        "ResolveAssemblyReferencesDesignTime"
+        "ResolveProjectReferencesDesignTime"
+        "ResolvePackageDependenciesDesignTime"
+        "ResolveSDKReferencesDesignTime"
+        // Populates ReferencePathWithRefAssemblies which CoreCompile requires.
+        // This can be removed one day when Microsoft.FSharp.Targets calls this.
+        "FindReferenceAssembliesForReferences"
+        "_GenerateCompileDependencyCache"
+        "_ComputeNonExistentFileProperty"
+        "BeforeBuild"
+        "BeforeCompile"
+        "CoreCompile"
+        "GetTargetPath"
+    |]
+
+    let defaultGlobalProps = [
+        "ProvideCommandLineArgs", "true"
+        "DesignTimeBuild", "true"
+        "SkipCompilerExecution", "true"
+        "GeneratePackageOnBuild", "false"
+        "Configuration", "Debug"
+        "DefineExplicitDefaults", "true"
+        "BuildProjectReferences", "false"
+        "UseCommonOutputDirectory", "false"
+        "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__") // Required by the Clean Target
+        "DotnetProjInfo", "true"
+    ]
+
     let getGlobalProps (tfm: string option) (globalProperties: (string * string) list) (propsSetFromParentCollection: Set<string>) =
         [
-            "ProvideCommandLineArgs", "true"
-            "DesignTimeBuild", "true"
-            "SkipCompilerExecution", "true"
-            "GeneratePackageOnBuild", "false"
-            "Configuration", "Debug"
-            "DefineExplicitDefaults", "true"
-            "BuildProjectReferences", "false"
-            "UseCommonOutputDirectory", "false"
-            "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__") // Required by the Clean Target
+            yield! defaultGlobalProps
             if tfm.IsSome then
                 "TargetFramework", tfm.Value
-            "DotnetProjInfo", "true"
             yield! globalProperties
         ]
         |> List.filter (fun (ourProp, _) -> not (propsSetFromParentCollection.Contains ourProp))
@@ -594,19 +640,7 @@ module ProjectLoader =
                 "CoreCompile"
             |]
         else
-            [|
-                "ResolveAssemblyReferencesDesignTime"
-                "ResolveProjectReferencesDesignTime"
-                "ResolvePackageDependenciesDesignTime"
-                // Populates ReferencePathWithRefAssemblies which CoreCompile requires.
-                // This can be removed one day when Microsoft.FSharp.Targets calls this.
-                "FindReferenceAssembliesForReferences"
-                "_GenerateCompileDependencyCache"
-                "_ComputeNonExistentFileProperty"
-                "BeforeBuild"
-                "BeforeCompile"
-                "CoreCompile"
-            |]
+            designTimeBuildTargetsCore
 
     let setLegacyMsbuildProperties isOldStyleProjFile =
         match LegacyFrameworkDiscovery.msbuildBinary.Value with
@@ -625,7 +659,7 @@ module ProjectLoader =
                     let legacyProjFormatXmlns = "xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\""
                     let lines: seq<string> = File.ReadLines path
 
-                    (Seq.tryFind (fun (line: string) -> line.Contains legacyProjFormatXmlns) lines)
+                    Seq.tryFind (fun (line: string) -> line.Contains legacyProjFormatXmlns) lines
                     |> Option.isSome
                 else
                     false
@@ -645,7 +679,7 @@ module ProjectLoader =
             let project = findOrCreateMatchingProject path projectCollection globalProperties
             use sw = new StringWriter()
 
-            let loggers = createLoggers path binaryLogs sw
+            let loggers = createLoggers path binaryLogs sw None
 
             let pi = project.CreateProjectInstance()
             let designTimeTargets = designTimeBuildTargets isLegacyFrameworkProjFile
@@ -873,7 +907,17 @@ module ProjectLoader =
             IsPublishable = msbuildPropBool "IsPublishable"
         }
 
-    let mapToProject (path: string) (compilerArgs: string seq) (p2p: ProjectReference seq) (compile: CompileItem seq) (nugetRefs: PackageReference seq) (sdkInfo: ProjectSdkInfo) (props: Property seq) (customProps: Property seq) =
+    let mapToProject
+        (path: string)
+        (compilerArgs: string seq)
+        (p2p: ProjectReference seq)
+        (compile: CompileItem seq)
+        (nugetRefs: PackageReference seq)
+        (sdkInfo: ProjectSdkInfo)
+        (props: Property seq)
+        (customProps: Property seq)
+        (otherItems)
+        =
         let projDir = Path.GetDirectoryName path
 
         let outputType, sourceFiles, otherOptions =
@@ -913,6 +957,7 @@ module ProjectLoader =
                     path
             )
 
+
         let project: ProjectOptions = {
             ProjectId = Some path
             ProjectFileName = path
@@ -944,6 +989,7 @@ module ProjectLoader =
             Items = compileItems
             Properties = List.ofSeq props
             CustomProperties = List.ofSeq customProps
+            OtherItems = otherItems
         }
 
 
@@ -1005,10 +1051,34 @@ module ProjectLoader =
             let sdkInfo = getSdkInfo props
             let customProps = getProperties p customProperties
 
+            let otherItems =
+                (Map.empty, p.Items)
+                ||> Seq.fold (fun acc item ->
+                    let value = item.EvaluatedInclude
+
+                    let metadata =
+                        item.Metadata
+                        |> Seq.map (fun m -> m.Name, m.EvaluatedValue)
+                        |> Map.ofSeq
+
+                    Map.change
+                        item.ItemType
+                        (function
+                        | None ->
+                            Set.singleton (value, metadata)
+                            |> Some
+                        | Some items ->
+                            items
+                            |> Set.add (value, metadata)
+                            |> Some)
+                        acc
+
+                )
+
             if not sdkInfo.RestoreSuccess then
                 Error "not restored"
             else
-                let proj = mapToProject path commandLineArgs p2pRefs compileItems nuGetRefs sdkInfo props customProps
+                let proj = mapToProject path commandLineArgs p2pRefs compileItems nuGetRefs sdkInfo props customProps otherItems
                 Ok(LoadedProjectInfo.StandardProjectInfo proj)
         | LoadedProject.Other p -> Ok(LoadedProjectInfo.OtherProjectInfo p)
 
@@ -1214,7 +1284,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
                 let bm = BuildManager.DefaultBuildManager
                 use sw = new StringWriter()
-                let loggers = ProjectLoader.createLoggers "graph-build" binaryLogs sw
+                let loggers = ProjectLoader.createLoggers "graph-build" binaryLogs sw None
                 let buildParameters = BuildParameters(Loggers = loggers)
 
                 buildParameters.ProjectLoadSettings <-
