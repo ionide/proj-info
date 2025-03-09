@@ -362,6 +362,18 @@ type ProjectLoader2 =
             return! session.BuildAsync(request, ?ct = ct)
         }
 
+    static member Execution(session: BuildManagerSession, projectInstances: ProjectInstance seq, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken) =
+        projectInstances
+        |> Seq.map (fun p -> ProjectLoader2.Execution(session, p, ?targetsToBuild = targetsToBuild, ?flags = flags, ?ct = ct))
+        |> Task.WhenAll
+
+    static member Execution(session: BuildManagerSession, projects: Project seq, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken) =
+        let instances =
+            projects
+            |> Seq.map (fun p -> p.CreateProjectInstance())
+
+        ProjectLoader2.Execution(session, instances, ?targetsToBuild = targetsToBuild, ?flags = flags, ?ct = ct)
+
     static member GetProjectInstance(buildResult: BuildResult) = buildResult.ProjectStateAfterBuild
 
     static member GetProjectInstance(buildResults: BuildResult seq) =

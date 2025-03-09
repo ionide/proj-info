@@ -1554,7 +1554,7 @@ let buildManagerSessionTests toolsPath =
     ftestList "buildManagerSessionTests" [
         testCaseTask
         |> testWithEnv
-            "loader2-solution-with-2-projects"
+            "loader2-solution-with-2-projects - Graph"
             ``loader2-solution-with-2-projects``
             (fun env ->
                 task {
@@ -1590,6 +1590,65 @@ let buildManagerSessionTests toolsPath =
                                 GraphBuildResult.resultsByNode (result, errorLogs)
 
                             failwith "Build failed"
+
+                    env.Data.Expects projectsAfterBuild
+                }
+            )
+        testCaseTask
+        |> testWithEnv
+            "loader2-solution-with-2-projects"
+            ``loader2-solution-with-2-projects``
+            (fun env ->
+                task {
+
+                    let path = env.Entrypoints
+
+                    let entrypoints =
+                        path
+                        |> Seq.collect (
+                            InspectSln.tryParseSln
+                            >> getResult
+                            >> InspectSln.loadingBuildOrder
+                        )
+
+                    let loggers = env.Binlog.Loggers
+
+                    // Evaluation
+                    use pc = projectCollection ()
+                    let graph = ProjectLoader2.EvaluateAsProjects(entrypoints, projectCollection = pc)
+
+                    // Execution
+                    let bp = BuildParameters(Loggers = loggers)
+                    let bm = new BuildManagerSession(buildParameters = bp)
+
+                    let! (results: Result<BuildResult, BuildErrors> array) = ProjectLoader2.Execution(bm, graph)
+
+                    let projectsAfterBuild =
+                        results
+                        |> Seq.choose (
+                            function
+                            | Ok result ->
+                                match ProjectLoader2.Parse result with
+                                | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
+                                | _ -> None
+                            | _ -> None
+                        )
+
+                    // Parse
+                    // let projectsAfterBuild =
+                    //     match result with
+                    //     | Ok result ->
+                    //         ProjectLoader2.Parse result
+                    //         |> Seq.choose (
+                    //             function
+                    //             | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
+                    //             | _ -> None
+                    //         )
+                    //     | Result.Error(GraphBuildErrors.BuildErr(result, errorLogs)) ->
+                    //         let results: Dictionary<ProjectGraphNode, Result<BuildResult, BuildErrors>> =
+                    //             GraphBuildResult.resultsByNode (result, errorLogs)
+
+                    //         failwith "Build failed"
 
                     env.Data.Expects projectsAfterBuild
                 }
@@ -1675,10 +1734,7 @@ let buildManagerSessionTests toolsPath =
                     let bp = BuildParameters(Loggers = loggers)
                     let bm = new BuildManagerSession(buildParameters = bp)
 
-                    let! (results: Result<_, BuildErrors> array) =
-                        projs
-                        |> Seq.map (fun p -> ProjectLoader2.Execution(bm, p.CreateProjectInstance()))
-                        |> Task.WhenAll
+                    let! (results: Result<_, BuildErrors> array) = ProjectLoader2.Execution(bm, projs)
 
                     let result =
                         results
