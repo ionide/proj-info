@@ -68,7 +68,7 @@ module Types =
         Items: ProjectItem list
         Properties: Property list
         CustomProperties: Property list
-        OtherItems: Map<string, Set<string * Map<string, string>>>
+        AllItems: Map<string, Set<string * Map<string, string>>>
     } with
 
         /// ResolvedTargetPath is the path to the primary reference assembly for this project.
