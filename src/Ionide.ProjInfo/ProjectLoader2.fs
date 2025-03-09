@@ -289,6 +289,10 @@ type ProjectLoader2 =
         let globalProperties = defaultArg globalProperties null
         pc.LoadProject(entryProjectFile, globalProperties = globalProperties, toolsVersion = null)
 
+    static member EvaluateAsProjects(entryProjectFiles: string seq, ?globalProperties: IDictionary<string, string>, ?projectCollection: ProjectCollection) =
+        entryProjectFiles
+        |> Seq.map (fun file -> ProjectLoader2.EvaluateAsProject(file, ?globalProperties = globalProperties, ?projectCollection = projectCollection))
+
     static member EvaluateAsGraph(entryProjectFile: string, ?globalProperties: IDictionary<string, string>, ?projectCollection: ProjectCollection, ?projectInstanceFactory, ?ct: CancellationToken) =
         let globalProperties = defaultArg globalProperties null
         ProjectLoader2.EvaluateAsGraph([ ProjectGraphEntryPoint(entryProjectFile, globalProperties = globalProperties) ], ?projectCollection = projectCollection, ?projectInstanceFactory = projectInstanceFactory, ?ct = ct)
@@ -358,10 +362,7 @@ type ProjectLoader2 =
             return! session.BuildAsync(request, ?ct = ct)
         }
 
-    static member GetProjectInstance(buildResult: BuildResult) =
-        match buildResult.OverallResult with
-        | BuildResultCode.Success -> Ok buildResult.ProjectStateAfterBuild
-        | _ -> Error buildResult
+    static member GetProjectInstance(buildResult: BuildResult) = buildResult.ProjectStateAfterBuild
 
     static member GetProjectInstance(buildResults: BuildResult seq) =
         buildResults
@@ -374,12 +375,12 @@ type ProjectLoader2 =
     static member Parse(graphBuildResult: GraphBuildResult) =
         graphBuildResult
         |> ProjectLoader2.GetProjectInstances
-        |> Seq.map (Result.map ProjectLoader2.Parse)
+        |> Seq.map ProjectLoader2.Parse
 
     static member Parse(buildResult: BuildResult) =
         buildResult
         |> ProjectLoader2.GetProjectInstance
-        |> Result.map ProjectLoader2.Parse
+        |> ProjectLoader2.Parse
 
     static member Parse(projectInstances: ProjectInstance seq) =
         projectInstances
