@@ -7,6 +7,7 @@ open Microsoft.Build.Execution
 open Microsoft.Build.Graph
 open System.Collections.Generic
 open Microsoft.Build.Evaluation
+open Microsoft.Build.Framework
 
 /// <summary>
 /// An awaitable wrapper around a task whose result is disposable. The wrapper is not disposable, so this prevents usage errors like "use _lock = myAsync()" when the appropriate usage should be "use! _lock = myAsync())".
@@ -43,16 +44,55 @@ module SemaphoreSlimExtensions =
             )
 
 
-type UnknownBuildFailure(data: BuildResult) =
+module Map =
 
-    inherit Exception("Build failed but no exception was filled out on BuildResult. Make sure to attach a binlog logger to BuildParameters in BuildManagerSession.")
+    let mapAddSome key value map =
+        match value with
+        | Some v -> Map.add key v map
+        | None -> map
+
+    let union loses wins =
+        Map.fold (fun acc key value -> Map.add key value acc) loses wins
+
+    let inline ofDict (dic) =
+        dic
+        |> Seq.map (|KeyValue|)
+        |> Map.ofSeq
+
+module BuildErrorEventArgs =
+
+    let messages (e: BuildErrorEventArgs seq) =
+        e
+        |> Seq.sortBy (fun e -> e.Timestamp)
+        |> Seq.map (fun e -> $"{e.ProjectFile} {e.Message}")
+        |> String.concat "\n"
+
+type UnknownBuildFailure(data: BuildResult, errorLogs: BuildErrorEventArgs list) =
+
+    inherit
+        Exception(
+            "Build failed but no exception was filled out on BuildResult. Make sure to attach a binlog logger to BuildParameters in BuildManagerSession.\n"
+            + (errorLogs
+               |> BuildErrorEventArgs.messages)
+        )
+
     do ``base``.Data.Add(UnknownBuildFailure.Key, data)
     static member Key = "BuildResult"
+    member _.Data = data
+    member _.ErrorLogs = errorLogs
 
-type UnknownGraphBuildFailure(data: GraphBuildResult) =
-    inherit Exception("Build failed but no exception was filled out on GraphBuildResult. Make sure to attach a binlog logger to BuildParameters in BuildManagerSession.")
+type UnknownGraphBuildFailure(data: GraphBuildResult, errorLogs: BuildErrorEventArgs list) =
+    inherit
+        Exception(
+            "Build failed but no exception was filled out on GraphBuildResult. Make sure to attach a binlog logger to BuildParameters in BuildManagerSession.\n"
+            + (errorLogs
+               |> BuildErrorEventArgs.messages)
+        )
+
     do ``base``.Data.Add(UnknownGraphBuildFailure.Key, data)
     static member Key = "GraphBuildResult"
+    member _.Data = data
+    member _.ErrorLogs = errorLogs
 
 [<AutoOpenAttribute>]
 module internal BuildManagerExtensions =
@@ -72,7 +112,6 @@ module internal BuildManagerExtensions =
             let ct = defaultArg ct CancellationToken.None
             ct.ThrowIfCancellationRequested()
             bm.BeginBuild parameters
-            ct.ThrowIfCancellationRequested()
 
             let cancelSubmissions =
                 ct.Register(fun () ->
@@ -91,6 +130,30 @@ module internal BuildManagerSession =
     // Creating SemaphoreSlim here so we only have one per application
     let internal locker = new SemaphoreSlim(1, 1)
 
+
+type BuildResultFailure<'e> =
+    static abstract BuildFailure: BuildResult * BuildErrorEventArgs list -> 'e
+
+type GraphBuildResultFailure<'e> =
+    static abstract BuildFailure: GraphBuildResult * BuildErrorEventArgs list -> 'e
+
+
+module GraphBuildResult =
+    let isolateFailures<'e when BuildResultFailure<'e>> (result: GraphBuildResult, errorLogs: BuildErrorEventArgs list) =
+
+        result.ResultsByNode
+        |> Seq.map (fun (KeyValue(k, v)) ->
+            match v.OverallResult with
+            | BuildResultCode.Success -> KeyValuePair(k, Ok v)
+            | _ ->
+                let logs =
+                    errorLogs
+                    |> List.filter (fun e -> e.ProjectFile = k.ProjectInstance.FullPath)
+
+                KeyValuePair(k, Error('e.BuildFailure(v, logs)))
+        )
+        |> Dictionary<_, _>
+
 /// <summary>
 /// Uses <see cref="T:Microsoft.Build.Execution.BuildManager"/> to run builds.
 /// This should be treated as a singleton because the BuildManager only allows one build request running at a time.
@@ -98,7 +161,18 @@ module internal BuildManagerSession =
 type BuildManagerSession(?bm: BuildManager, ?buildParameters: BuildParameters) =
     let locker = BuildManagerSession.locker
     let bm = defaultArg bm BuildManager.DefaultBuildManager
-    let buildParameters = defaultArg buildParameters (BuildParameters())
+    let buildParameters = defaultArg buildParameters (BuildParameters(Loggers = [ ProjectLoader.ErrorLogger() ]))
+
+    let tryGetErrorLogs () =
+        buildParameters.Loggers
+        |> Seq.tryPick (
+            function
+            | :? ProjectLoader.ErrorLogger as e -> Some e
+            | _ -> None
+        )
+        |> Option.toList
+        |> Seq.collect (fun e -> e.Errors)
+        |> Seq.toList
 
     let lockAndStartBuild (ct: CancellationToken) (a: unit -> Task<_>) =
         task {
@@ -107,19 +181,29 @@ type BuildManagerSession(?bm: BuildManager, ?buildParameters: BuildParameters) =
             return! a ()
         }
 
+    member private x.determineBuildOutput<'e when BuildResultFailure<'e>>(result: BuildResult) =
+        match result.OverallResult with
+        | BuildResultCode.Success -> Ok result
+        | _ -> Error('e.BuildFailure(result, tryGetErrorLogs ()))
+
+
+    member private x.determineGraphBuildOutput<'e when GraphBuildResultFailure<'e>>(result: GraphBuildResult) =
+        match result.OverallResult with
+        | BuildResultCode.Success -> Ok result
+        | _ -> Error('e.BuildFailure(result, tryGetErrorLogs ()))
+
 
     /// <summary>Submits a graph build request to the current build and starts it asynchronously.</summary>
     /// <param name="buildRequest">GraphBuildRequestData encapsulates all of the data needed to submit a graph build request.</param>
     /// <param name="ct">CancellationToken to cancel build submissions.</param>
     /// <returns>The BuildResult</returns>
-    member _.BuildAsync(buildRequest: BuildRequestData, ?ct: CancellationToken) =
+    member x.BuildAsync(buildRequest: BuildRequestData, ?ct: CancellationToken) =
         let ct = defaultArg ct CancellationToken.None
 
         lockAndStartBuild ct
         <| fun () ->
             task {
-
-                let tcs = TaskCompletionSource<_>()
+                let tcs = TaskCompletionSource<_> TaskCreationOptions.RunContinuationsAsynchronously
 
                 bm
                     .PendBuildRequest(buildRequest)
@@ -129,7 +213,7 @@ type BuildManagerSession(?bm: BuildManager, ?buildParameters: BuildParameters) =
 
                             if result.OverallResult = BuildResultCode.Failure then
                                 match result.Exception with
-                                | null -> tcs.SetException(UnknownBuildFailure result)
+                                | null -> tcs.SetException(UnknownBuildFailure(result, tryGetErrorLogs ()))
                                 | :? Microsoft.Build.Exceptions.BuildAbortedException when ct.IsCancellationRequested -> tcs.SetCanceled ct
                                 | e -> tcs.SetException e
                             else
@@ -138,20 +222,21 @@ type BuildManagerSession(?bm: BuildManager, ?buildParameters: BuildParameters) =
                         buildRequest
                     )
 
-                return! tcs.Task
+                let! t = tcs.Task
+                return x.determineBuildOutput t
             }
 
     /// <summary>Submits a graph build request to the current build and starts it asynchronously.</summary>
     /// <param name="graphBuildRequest">GraphBuildRequestData encapsulates all of the data needed to submit a graph build request.</param>
     /// <param name="ct">CancellationToken to cancel build submissions.</param>
     /// <returns>the GraphBuildResult</returns>
-    member _.BuildAsync(graphBuildRequest: GraphBuildRequestData, ?ct: CancellationToken) =
+    member x.BuildAsync(graphBuildRequest: GraphBuildRequestData, ?ct: CancellationToken) =
         let ct = defaultArg ct CancellationToken.None
 
         lockAndStartBuild ct
         <| fun () ->
             task {
-                let tcs = TaskCompletionSource<_>()
+                let tcs = TaskCompletionSource<_> TaskCreationOptions.RunContinuationsAsynchronously
 
                 bm
                     .PendBuildRequest(graphBuildRequest)
@@ -162,7 +247,7 @@ type BuildManagerSession(?bm: BuildManager, ?buildParameters: BuildParameters) =
 
                             if result.OverallResult = BuildResultCode.Failure then
                                 match result.Exception with
-                                | null -> tcs.SetException(UnknownGraphBuildFailure result)
+                                | null -> tcs.SetException(UnknownGraphBuildFailure(result, tryGetErrorLogs ()))
                                 | :? Microsoft.Build.Exceptions.BuildAbortedException when ct.IsCancellationRequested -> tcs.SetCanceled ct
                                 | e -> tcs.SetException e
                             else
@@ -171,8 +256,8 @@ type BuildManagerSession(?bm: BuildManager, ?buildParameters: BuildParameters) =
                         graphBuildRequest
                     )
 
-                return! tcs.Task
-
+                let! t = tcs.Task
+                return x.determineGraphBuildOutput t
             }
 
 
@@ -182,20 +267,6 @@ module ProjectPropertyInstance =
         |> Seq.tryFind (fun p -> p.Name = name)
         |> Option.map (fun v -> v.EvaluatedValue)
 
-module Map =
-
-    let mapAddSome key value map =
-        match value with
-        | Some v -> Map.add key v map
-        | None -> map
-
-    let union loses wins =
-        Map.fold (fun acc key value -> Map.add key value acc) loses wins
-
-    let ofDict (dic: System.Collections.Generic.IDictionary<_, _>) =
-        dic
-        |> Seq.map (|KeyValue|)
-        |> Map.ofSeq
 
 module ProjectLoading =
 
@@ -229,7 +300,6 @@ module ProjectLoading =
 
         pi
 
-open ProjectLoader
 
 type ProjectLoader2 =
 
@@ -245,21 +315,22 @@ type ProjectLoader2 =
         let globalProperties = defaultArg globalProperties null
         pc.LoadProject(entryProjectFile, globalProperties = globalProperties, toolsVersion = null)
 
-    static member EvaluateAsGraph(entryProjectFile: string, ?globalProperties: IDictionary<string, string>, ?projectCollection: ProjectCollection, ?projectInstanceFactory) =
+    static member EvaluateAsGraph(entryProjectFile: string, ?globalProperties: IDictionary<string, string>, ?projectCollection: ProjectCollection, ?projectInstanceFactory, ?ct: CancellationToken) =
         let globalProperties = defaultArg globalProperties null
-        ProjectLoader2.EvaluateAsGraph([ ProjectGraphEntryPoint(entryProjectFile, globalProperties = globalProperties) ], ?projectCollection = projectCollection, ?projectInstanceFactory = projectInstanceFactory)
+        ProjectLoader2.EvaluateAsGraph([ ProjectGraphEntryPoint(entryProjectFile, globalProperties = globalProperties) ], ?projectCollection = projectCollection, ?projectInstanceFactory = projectInstanceFactory, ?ct = ct)
 
-    static member EvaluateAsGraph(entryProjectFile: ProjectGraphEntryPoint seq, ?projectCollection: ProjectCollection, ?projectInstanceFactory) =
+    static member EvaluateAsGraph(entryProjectFile: ProjectGraphEntryPoint seq, ?projectCollection: ProjectCollection, ?projectInstanceFactory, ?ct: CancellationToken) =
         let pc = defaultArg projectCollection ProjectCollection.GlobalProjectCollection
+        let ct = defaultArg ct CancellationToken.None
 
         let projectInstanceFactory =
             defaultArg projectInstanceFactory (ProjectLoading.defaultProjectInstanceFactory ProjectLoading.selectFirstTfm)
 
-        ProjectGraph(entryProjectFile, pc, projectInstanceFactory)
+        ProjectGraph(entryProjectFile, pc, projectInstanceFactory, ct)
 
 
-    static member EvaluateAsGraphDesignTime(entryProjectFile: ProjectGraphEntryPoint seq, ?projectCollection: ProjectCollection, ?projectInstanceFactory, ?targets) =
-        let targets = defaultArg targets (ProjectLoader.designTimeBuildTargets false)
+    static member EvaluateAsGraphAllTfms(entryProjectFile: ProjectGraphEntryPoint seq, ?projectCollection: ProjectCollection, ?projectInstanceFactory) =
+
         let pc = defaultArg projectCollection ProjectCollection.GlobalProjectCollection
 
         let projectInstanceFactory =
@@ -268,13 +339,9 @@ type ProjectLoader2 =
         let graph =
             ProjectLoader2.EvaluateAsGraph(entryProjectFile, projectCollection = pc, projectInstanceFactory = projectInstanceFactory)
 
-        // this makes MSBuild find ProjectConfigurationDescriptions for each project
-        // this splits the projects by target framework and potentially other properties
-        // https://github.com/dotnet/msbuild/blob/74c74a2f9a4ca0fb0eb1471076ff1c72c965d787/src/Build/Graph/ProjectGraph.cs#L635
-        // let targets = graph.GetTargetLists(targets)
         let targets = graph.ProjectNodes
 
-        let tryGet (node: ProjectGraphNode) =
+        let inline tryGetTfmFromProps (node: ProjectGraphNode) =
             match node.ProjectInstance.GlobalProperties.TryGetValue "TargetFramework" with
             | true, tfm -> Some tfm
             | _ -> None
@@ -282,24 +349,16 @@ type ProjectLoader2 =
         // Then we only care about those with a TargetFramework
         let projects =
             targets
-            // |> Seq.choose (fun (KeyValue(node, v)) ->
             |> Seq.choose (fun node ->
-                // match node.ProjectInstance.GlobalProperties.TryGetValue "TargetFramework" with
-                // | true, _tfm ->
-                match
-                    tryGet node
-                    |> Option.orElseWith (fun () ->
-                        node.ProjectInstance.Properties
-                        |> ProjectPropertyInstance.tryFind "TargetFramework"
-                    )
-                with
-                | Some _ ->
-                    ProjectGraphEntryPoint(node.ProjectInstance.FullPath, globalProperties = node.ProjectInstance.GlobalProperties)
-                    |> Some
-                | _ -> None
+                tryGetTfmFromProps node
+                |> Option.orElseWith (fun () ->
+                    node.ProjectInstance.Properties
+                    |> ProjectPropertyInstance.tryFind "TargetFramework"
+                )
+                |> Option.map (fun _ -> ProjectGraphEntryPoint(node.ProjectInstance.FullPath, globalProperties = node.ProjectInstance.GlobalProperties))
             )
 
-        ProjectGraph(projects, pc, projectInstanceFactory)
+        ProjectLoader2.EvaluateAsGraph(projects, projectCollection = pc, projectInstanceFactory = projectInstanceFactory)
 
     static member Execution(session: BuildManagerSession, graph: ProjectGraph, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken) =
         task {

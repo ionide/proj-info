@@ -396,8 +396,14 @@ module ProjectLoader =
         }
 
     type ErrorLogger() =
-        let errors = ResizeArray<_>()
-        member this.Errors = errors
+        let errors = ResizeArray<BuildErrorEventArgs>()
+        member this.Errors = errors :> seq<_>
+
+        member this.Message =
+            this.Errors
+            |> Seq.sortBy (fun e -> e.Timestamp)
+            |> Seq.map (fun e -> $"{e.ProjectFile} {e.Message}")
+            |> String.concat "\n"
 
         interface ILogger with
             member this.Initialize(eventSource: IEventSource) : unit = eventSource.ErrorRaised.Add errors.Add
@@ -411,12 +417,6 @@ module ProjectLoader =
             member this.Verbosity
                 with get (): LoggerVerbosity = LoggerVerbosity.Detailed
                 and set (v: LoggerVerbosity): unit = ()
-    // let internal errorLogger ()
-    //     { new ILogger with
-    //         member this.Initialize(eventSource: IEventSource) : unit =
-    //             eventSource.ErrorRaised.Add(fun t -> printfn "Error: %s" t.Message)
-
-    //     }
 
     let internal stringWriterLogger (writer: StringWriter) =
         { new ILogger with

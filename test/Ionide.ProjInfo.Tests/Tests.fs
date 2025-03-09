@@ -1441,6 +1441,7 @@ module File =
         )
 
 open File
+open Microsoft.Build.Framework
 
 type Binlogs(binlog: FileInfo) =
     let sw = new StringWriter()
@@ -1537,6 +1538,18 @@ type IWorkspaceLoader2 =
     abstract member Load: paths: string list * ct: CancellationToken -> Task<seq<Result<BuildResult, BuildResult * ErrorLogger>>>
 
 
+type GraphBuildErrors =
+    | BuildErr of GraphBuildResult * BuildErrorEventArgs list
+
+    interface GraphBuildResultFailure<GraphBuildErrors> with
+        static member BuildFailure(result, errorLogs) = BuildErr(result, errorLogs)
+
+type BuildErrors =
+    | BuildErr of BuildResult * BuildErrorEventArgs list
+
+    interface BuildResultFailure<BuildErrors> with
+        static member BuildFailure(result, errorLogs) = BuildErr(result, errorLogs)
+
 let buildManagerSessionTests toolsPath =
     ftestList "buildManagerSessionTests" [
         testCaseTask
@@ -1554,25 +1567,34 @@ let buildManagerSessionTests toolsPath =
 
                     // Evaluation
                     use pc = projectCollection ()
-                    let graph = ProjectLoader2.EvaluateAsGraphDesignTime(path, pc)
+                    let graph = ProjectLoader2.EvaluateAsGraphAllTfms(path, pc)
 
                     // Execution
                     let bp = BuildParameters(Loggers = loggers)
-
                     let bm = new BuildManagerSession(buildParameters = bp)
 
-                    let result =
-                        ProjectLoader2.Execution(bm, graph)
-                        |> Task.RunSynchronously
+                    let! (result: Result<GraphBuildResult, GraphBuildErrors>) = ProjectLoader2.Execution(bm, graph)
 
                     // Parse
                     let projectsAfterBuild =
-                        ProjectLoader2.Parse result
-                        |> Seq.choose (
-                            function
-                            | Ok(Ok(LoadedProjectInfo.StandardProjectInfo x)) -> Some x
-                            | _ -> None
-                        )
+                        match result with
+                        | Ok result ->
+                            ProjectLoader2.Parse result
+                            |> Seq.choose (
+                                function
+                                | Ok(Ok(LoadedProjectInfo.StandardProjectInfo x)) -> Some x
+                                | _ -> None
+                            )
+                        | Result.Error(GraphBuildErrors.BuildErr(result, errorLogs)) ->
+                            let results: Dictionary<ProjectGraphNode, Result<BuildResult, BuildErrors>> =
+                                GraphBuildResult.isolateFailures (result, errorLogs)
+
+                            failwith "Build failed"
+                    // errorLogs
+                    // |> Seq.sortBy (fun x -> x.Timestamp, x.ProjectFile)
+                    // |> Seq.map (fun x -> $"{x.ProjectFile} {x.Message}")
+                    // |> String.concat "\n"
+                    // |> failwith
 
                     env.Data.Expects projectsAfterBuild
                 }
@@ -1580,7 +1602,7 @@ let buildManagerSessionTests toolsPath =
 
         testCaseTask
         |> testWithEnv
-            "Concurrency - new graph every time"
+            "Concurrency - don't crash on concurrent builds"
             ``loader2-concurrent``
             (fun env ->
                 task {
@@ -1594,11 +1616,11 @@ let buildManagerSessionTests toolsPath =
 
                     let bm = new BuildManagerSession(buildParameters = bp)
 
-                    let work =
+                    let work: Async<Result<GraphBuildResult, GraphBuildErrors>> =
                         async {
                             // Evaluation
-                            let graph = ProjectLoader2.EvaluateAsGraph(path, pc)
                             let! ct = Async.CancellationToken
+                            let graph = ProjectLoader2.EvaluateAsGraph(path, pc, ct = ct)
 
                             // Execution
                             return!
@@ -1625,7 +1647,7 @@ let buildManagerSessionTests toolsPath =
 
         testCaseTask
         |> testWithEnv
-            "Cancellable"
+            "Cancellation"
             ``loader2-cancel-slow``
             (fun env ->
                 task {
@@ -1642,17 +1664,17 @@ let buildManagerSessionTests toolsPath =
                     // Execution
                     let bp = BuildParameters(Loggers = env.Binlog.Loggers)
                     let bm = new BuildManagerSession(buildParameters = bp)
+                    use cts = new CancellationTokenSource()
 
                     try
-                        use cts = new CancellationTokenSource()
-                        cts.CancelAfter(TimeSpan.FromSeconds(1.))
+                        cts.CancelAfter(TimeSpan.FromSeconds 1.)
 
-                        let build = ProjectLoader2.Execution(bm, graph, ct = cts.Token)
+                        let build: Task<Result<GraphBuildResult, GraphBuildErrors>> = ProjectLoader2.Execution(bm, graph, ct = cts.Token)
 
                         Task.RunSynchronously build
                         |> ignore
                     with
-                    | :? OperationCanceledException -> ()
+                    | :? OperationCanceledException as oce when oce.CancellationToken = cts.Token -> ()
                     | e -> Exception.reraiseAny e
 
                 }
