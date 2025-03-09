@@ -1464,6 +1464,7 @@ type TestEnv = {
     Binlog: Binlogs
     Data: TestAssetProjInfo2
     Entrypoints: string seq
+    TestDir: DirectoryInfo
 } with
 
     interface IDisposable with
@@ -1478,7 +1479,7 @@ let testWithEnv name (data: TestAssetProjInfo2) f test =
                 let logger = Log.create (sprintf "Test '%s'" name)
                 let fs = FileUtils logger
 
-                let testDir = inDir fs data.ProjDir
+                let testDir = inDir fs name
                 copyDirFromAssets fs data.ProjDir testDir
 
                 let entrypoints =
@@ -1506,6 +1507,7 @@ let testWithEnv name (data: TestAssetProjInfo2) f test =
                     Binlog = blc
                     Data = data
                     Entrypoints = entrypoints
+                    TestDir = DirectoryInfo testDir
                 }
 
                 try
@@ -1580,7 +1582,7 @@ let buildManagerSessionTests toolsPath =
                             ProjectLoader2.Parse result
                             |> Seq.choose (
                                 function
-                                | Ok(Ok(LoadedProjectInfo.StandardProjectInfo x)) -> Some x
+                                | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
                                 | _ -> None
                             )
                         | Result.Error(GraphBuildErrors.BuildErr(result, errorLogs)) ->
@@ -1590,6 +1592,117 @@ let buildManagerSessionTests toolsPath =
                             failwith "Build failed"
 
                     env.Data.Expects projectsAfterBuild
+                }
+            )
+
+        testCaseTask
+        |> testWithEnv
+            "sample2-NetSdk-library2 - Graph"
+            ``sample2-NetSdk-library2``
+            (fun env ->
+                task {
+                    let projPath =
+                        env.TestDir.FullName
+                        / env.Data.EntryPoints.Single()
+
+                    let projDir = Path.GetDirectoryName projPath
+
+                    let path =
+                        env.Entrypoints
+                        |> Seq.map ProjectGraphEntryPoint
+
+                    let loggers = env.Binlog.Loggers
+
+                    // Evaluation
+                    use pc = projectCollection ()
+                    let graph = ProjectLoader2.EvaluateAsGraphAllTfms(path, pc)
+
+                    // Execution
+                    let bp = BuildParameters(Loggers = loggers)
+                    let bm = new BuildManagerSession(buildParameters = bp)
+
+                    let! (result: Result<GraphBuildResult, GraphBuildErrors>) = ProjectLoader2.Execution(bm, graph)
+
+                    let expectedSources =
+                        [
+                            projDir
+                            / "obj/Debug/netstandard2.0/n1.AssemblyInfo.fs"
+                            projDir
+                            / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
+                            projDir
+                            / "Library.fs"
+                        ]
+                        |> List.map Path.GetFullPath
+
+                    match result with
+                    | Result.Error _ -> failwith "expected success"
+                    | Ok result ->
+                        ProjectLoader2.Parse result
+                        |> Seq.choose (
+                            function
+                            | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
+                            | _ -> None
+                        )
+                        |> Seq.iter (fun x -> Expect.equal x.SourceFiles expectedSources "")
+
+                        ()
+
+                }
+            )
+
+
+        testCaseTask
+        |> testWithEnv
+            "sample2-NetSdk-library2"
+            ``sample2-NetSdk-library2``
+            (fun env ->
+                task {
+                    let projPath =
+                        env.TestDir.FullName
+                        / env.Data.EntryPoints.Single()
+
+                    let projDir = Path.GetDirectoryName projPath
+
+                    let entryPoints = env.Entrypoints
+
+                    let loggers = env.Binlog.Loggers
+
+                    // Evaluation
+                    use pc = projectCollection ()
+                    let projs = ProjectLoader2.EvaluateAsProjects(entryPoints, projectCollection = pc)
+
+                    // Execution
+                    let bp = BuildParameters(Loggers = loggers)
+                    let bm = new BuildManagerSession(buildParameters = bp)
+
+                    let! (results: Result<_, BuildErrors> array) =
+                        projs
+                        |> Seq.map (fun p -> ProjectLoader2.Execution(bm, p.CreateProjectInstance()))
+                        |> Task.WhenAll
+
+                    let result =
+                        results
+                        |> Seq.head
+
+                    let expectedSources =
+                        [
+                            projDir
+                            / "obj/Debug/netstandard2.0/n1.AssemblyInfo.fs"
+                            projDir
+                            / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
+                            projDir
+                            / "Library.fs"
+                        ]
+                        |> List.map Path.GetFullPath
+
+                    match result with
+                    | Result.Error _ -> failwith "expected success"
+                    | Ok result ->
+                        match ProjectLoader2.Parse result with
+
+                        | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Expect.equal x.SourceFiles expectedSources ""
+                        | _ -> failwith "lol"
+
                 }
             )
 
@@ -2838,8 +2951,9 @@ let tests toolsPath =
         ExpectNotification.loaded "l1.fsproj"
     ]
 
+    testSequenced
+    <| testList "Main tests" [
 
-    testList "Main tests" [
         buildManagerSessionTests toolsPath
         testSample2 toolsPath "WorkspaceLoader" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
         testSample2 toolsPath "WorkspaceLoader" true (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))

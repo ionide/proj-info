@@ -450,3 +450,9 @@ let ``loader2-failure-case1`` = {
     EntryPoints = [ "loader2-failure-case1.fsproj" ]
     Expects = ignore
 }
+
+let ``sample2-NetSdk-library2`` = {
+    ProjDir = ``sample2 NetSdk library``.ProjDir
+    EntryPoints = [ ``sample2 NetSdk library``.ProjectFile ]
+    Expects = ignore
+}
