@@ -1458,8 +1458,6 @@ type Binlogs(binlog: FileInfo) =
         member this.Dispose() = sw.Dispose()
 
 
-let currentPath = Path.Combine(__SOURCE_DIRECTORY__, "testBinLogs")
-
 type TestEnv = {
     Logger: Logger
     FS: FileUtils
@@ -1587,20 +1585,15 @@ let buildManagerSessionTests toolsPath =
                             )
                         | Result.Error(GraphBuildErrors.BuildErr(result, errorLogs)) ->
                             let results: Dictionary<ProjectGraphNode, Result<BuildResult, BuildErrors>> =
-                                GraphBuildResult.isolateFailures (result, errorLogs)
+                                GraphBuildResult.resultsByNode (result, errorLogs)
 
                             failwith "Build failed"
-                    // errorLogs
-                    // |> Seq.sortBy (fun x -> x.Timestamp, x.ProjectFile)
-                    // |> Seq.map (fun x -> $"{x.ProjectFile} {x.Message}")
-                    // |> String.concat "\n"
-                    // |> failwith
 
                     env.Data.Expects projectsAfterBuild
                 }
             )
 
-        testCaseTask
+        ptestCaseTask
         |> testWithEnv
             "Concurrency - don't crash on concurrent builds"
             ``loader2-concurrent``
@@ -1641,6 +1634,48 @@ let buildManagerSessionTests toolsPath =
 
                     ()
 
+                }
+            )
+
+        testCaseTask
+        |> testWithEnv
+            "Failure mode 1"
+            ``loader2-failure-case1``
+            (fun env ->
+
+                task {
+                    let path =
+                        env.Entrypoints
+                        |> Seq.map ProjectGraphEntryPoint
+
+                    let loggers = env.Binlog.Loggers
+
+                    // Evaluation
+                    use pc = projectCollection ()
+                    let graph = ProjectLoader2.EvaluateAsGraphAllTfms(path, pc)
+
+                    // Execution
+                    let bp = BuildParameters(Loggers = loggers)
+                    let bm = new BuildManagerSession(buildParameters = bp)
+
+                    let! (result: Result<GraphBuildResult, GraphBuildErrors>) = ProjectLoader2.Execution(bm, graph)
+                    Expect.isError result "expected error"
+
+                    match result with
+                    | Ok _ -> failwith "expected error"
+                    | Result.Error(GraphBuildErrors.BuildErr(result, errorLogs)) ->
+                        let results: (ProjectGraphNode * BuildErrors) seq = GraphBuildResult.isolateFailures (result, errorLogs)
+
+                        let _, BuildErr(_, errors) =
+                            results
+                            |> Seq.head
+
+                        let actualError =
+                            errors
+                            |> Seq.head
+                            |> _.Message
+
+                        Expect.equal actualError "Intentional failure" "expected error message"
                 }
             )
 

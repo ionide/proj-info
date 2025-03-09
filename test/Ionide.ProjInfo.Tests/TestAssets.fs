@@ -444,3 +444,9 @@ let ``loader2-concurrent`` = {
     ]
     Expects = ignore
 }
+
+let ``loader2-failure-case1`` = {
+    ProjDir = "loader2-failure-case1"
+    EntryPoints = [ "loader2-failure-case1.fsproj" ]
+    Expects = ignore
+}

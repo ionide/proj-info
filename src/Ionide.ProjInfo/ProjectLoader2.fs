@@ -67,32 +67,6 @@ module BuildErrorEventArgs =
         |> Seq.map (fun e -> $"{e.ProjectFile} {e.Message}")
         |> String.concat "\n"
 
-type UnknownBuildFailure(data: BuildResult, errorLogs: BuildErrorEventArgs list) =
-
-    inherit
-        Exception(
-            "Build failed but no exception was filled out on BuildResult. Make sure to attach a binlog logger to BuildParameters in BuildManagerSession.\n"
-            + (errorLogs
-               |> BuildErrorEventArgs.messages)
-        )
-
-    do ``base``.Data.Add(UnknownBuildFailure.Key, data)
-    static member Key = "BuildResult"
-    member _.Data = data
-    member _.ErrorLogs = errorLogs
-
-type UnknownGraphBuildFailure(data: GraphBuildResult, errorLogs: BuildErrorEventArgs list) =
-    inherit
-        Exception(
-            "Build failed but no exception was filled out on GraphBuildResult. Make sure to attach a binlog logger to BuildParameters in BuildManagerSession.\n"
-            + (errorLogs
-               |> BuildErrorEventArgs.messages)
-        )
-
-    do ``base``.Data.Add(UnknownGraphBuildFailure.Key, data)
-    static member Key = "GraphBuildResult"
-    member _.Data = data
-    member _.ErrorLogs = errorLogs
 
 [<AutoOpenAttribute>]
 module internal BuildManagerExtensions =
@@ -139,8 +113,7 @@ type GraphBuildResultFailure<'e> =
 
 
 module GraphBuildResult =
-    let isolateFailures<'e when BuildResultFailure<'e>> (result: GraphBuildResult, errorLogs: BuildErrorEventArgs list) =
-
+    let resultsByNode<'e when BuildResultFailure<'e>> (result: GraphBuildResult, errorLogs: BuildErrorEventArgs list) =
         result.ResultsByNode
         |> Seq.map (fun (KeyValue(k, v)) ->
             match v.OverallResult with
@@ -153,6 +126,14 @@ module GraphBuildResult =
                 KeyValuePair(k, Error('e.BuildFailure(v, logs)))
         )
         |> Dictionary<_, _>
+
+    let isolateFailures (result: GraphBuildResult, errorLogs: BuildErrorEventArgs list) =
+        resultsByNode (result, errorLogs)
+        |> Seq.choose (fun (KeyValue(k, v)) ->
+            match v with
+            | Ok v -> None
+            | Error e -> Some(k, e)
+        )
 
 /// <summary>
 /// Uses <see cref="T:Microsoft.Build.Execution.BuildManager"/> to run builds.
@@ -211,19 +192,15 @@ type BuildManagerSession(?bm: BuildManager, ?buildParameters: BuildParameters) =
                         (fun sub ->
                             let result = sub.BuildResult
 
-                            if result.OverallResult = BuildResultCode.Failure then
-                                match result.Exception with
-                                | null -> tcs.SetException(UnknownBuildFailure(result, tryGetErrorLogs ()))
-                                | :? Microsoft.Build.Exceptions.BuildAbortedException when ct.IsCancellationRequested -> tcs.SetCanceled ct
-                                | e -> tcs.SetException e
-                            else
-                                tcs.SetResult result
+                            match result.Exception with
+                            | null -> tcs.SetResult(x.determineBuildOutput result)
+                            | :? Microsoft.Build.Exceptions.BuildAbortedException when ct.IsCancellationRequested -> tcs.SetCanceled ct
+                            | e -> tcs.SetException e
                         ),
                         buildRequest
                     )
 
-                let! t = tcs.Task
-                return x.determineBuildOutput t
+                return! tcs.Task
             }
 
     /// <summary>Submits a graph build request to the current build and starts it asynchronously.</summary>
@@ -245,19 +222,16 @@ type BuildManagerSession(?bm: BuildManager, ?buildParameters: BuildParameters) =
 
                             let result = sub.BuildResult
 
-                            if result.OverallResult = BuildResultCode.Failure then
-                                match result.Exception with
-                                | null -> tcs.SetException(UnknownGraphBuildFailure(result, tryGetErrorLogs ()))
-                                | :? Microsoft.Build.Exceptions.BuildAbortedException when ct.IsCancellationRequested -> tcs.SetCanceled ct
-                                | e -> tcs.SetException e
-                            else
-                                tcs.SetResult result
+                            match result.Exception with
+                            | null -> tcs.SetResult(x.determineGraphBuildOutput result)
+                            | :? Microsoft.Build.Exceptions.BuildAbortedException when ct.IsCancellationRequested -> tcs.SetCanceled ct
+                            | e -> tcs.SetException e
+
                         ),
                         graphBuildRequest
                     )
 
-                let! t = tcs.Task
-                return x.determineGraphBuildOutput t
+                return! tcs.Task
             }
 
 
