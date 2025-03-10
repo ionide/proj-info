@@ -42,6 +42,80 @@ let ExamplesDir =
     / "test"
     / "examples"
 
+let normalizeFileName (fileName: string) =
+    if String.IsNullOrEmpty fileName then
+        ""
+    else
+        let invalidChars = HashSet<char>(Path.GetInvalidFileNameChars())
+        let chars = fileName.AsSpan()
+        let mutable output = Span<char>.Empty
+        let mutable outputIndex = 0
+        let mutable lastWasUnderscore = false
+
+        // Use a fixed-size buffer (stack-alloc if small enough)
+        let buffer = Span<char>(Array.zeroCreate<char> (min fileName.Length 255))
+        output <- buffer
+
+        for i = 0 to chars.Length
+                     - 1 do
+            let c = chars.[i]
+
+            if outputIndex < 255 then
+                if
+                    invalidChars.Contains(c)
+                    || Char.IsControl(c)
+                then
+                    if
+                        not lastWasUnderscore
+                        && outputIndex > 0
+                    then
+                        output.[outputIndex] <- '_'
+
+                        outputIndex <-
+                            outputIndex
+                            + 1
+
+                        lastWasUnderscore <- true
+                else
+                    output.[outputIndex] <- c
+
+                    outputIndex <-
+                        outputIndex
+                        + 1
+
+                    lastWasUnderscore <- false
+
+        // Trim leading/trailing underscores
+        let start =
+            if
+                outputIndex > 0
+                && output.[0] = '_'
+            then
+                1
+            else
+                0
+
+        let length =
+            if
+                outputIndex > 0
+                && output.[outputIndex
+                           - 1] = '_'
+            then
+                outputIndex
+                - start
+                - 1
+            else
+                outputIndex
+                - start
+
+        if
+            length
+            <= 0
+        then
+            ""
+        else
+            output.Slice(start, length).ToString()
+
 let pathForTestAssets (test: TestAssetProjInfo) =
     ExamplesDir
     / test.ProjDir
@@ -1446,10 +1520,12 @@ open Microsoft.Build.Framework
 type Binlogs(binlog: FileInfo) =
     let sw = new StringWriter()
     let errorLogger = ErrorLogger()
-    let loggers = ProjectLoader.createLoggers binlog.Name (BinaryLogGeneration.Within(binlog.Directory)) sw (Some errorLogger)
+
+    let loggers name =
+        ProjectLoader.createLoggers name (BinaryLogGeneration.Within(binlog.Directory)) sw (Some errorLogger)
 
     member x.ErrorLogger = errorLogger
-    member x.Loggers = loggers
+    member x.Loggers name = loggers name
 
     member x.Directory = binlog.Directory
     member x.File = binlog
@@ -1525,7 +1601,7 @@ let testWithEnv name (data: TestAssetProjInfo2) f test =
 
 let projectCollection () =
     new ProjectCollection(
-        globalProperties = Map.ofSeq (ProjectLoader.defaultGlobalProps),
+        globalProperties = dict ProjectLoader.defaultGlobalProps,
         loggers = null,
         remoteLoggers = null,
         toolsetDefinitionLocations = ToolsetDefinitionLocations.Local,
@@ -1560,9 +1636,9 @@ let buildManagerSessionTests toolsPath =
                 task {
                     let entrypoints =
                         env.Entrypoints
-                         |> Seq.map ProjectGraphEntryPoint
+                        |> Seq.map ProjectGraphEntryPoint
 
-                    let loggers = env.Binlog.Loggers
+                    let loggers = env.Binlog.Loggers env.Binlog.File.Name
 
                     // Evaluation
                     use pc = projectCollection ()
@@ -1570,9 +1646,9 @@ let buildManagerSessionTests toolsPath =
 
                     // Execution
                     let bp = BuildParameters(Loggers = loggers)
-                    let bm = new BuildManagerSession(buildParameters = bp)
+                    let bm = new BuildManagerSession()
 
-                    let! (result: Result<GraphBuildResult, GraphBuildErrors>) = ProjectLoader2.Execution(bm, graph)
+                    let! (result: Result<GraphBuildResult, GraphBuildErrors>) = ProjectLoader2.Execution(bm, graph, bp)
 
                     // Parse
                     let projectsAfterBuild =
@@ -1610,15 +1686,28 @@ let buildManagerSessionTests toolsPath =
                             >> InspectSln.loadingBuildOrder
                         )
 
-                    let loggers = env.Binlog.Loggers
 
                     // Evaluation
                     use pc = projectCollection ()
-                    let graph = ProjectLoader2.EvaluateAsProjectsAllTfms(entrypoints, projectCollection = pc)
+
+                    let graph =
+                        ProjectLoader2.EvaluateAsProjectsAllTfms(entrypoints, projectCollection = pc)
+                        |> Seq.map (fun p ->
+                            let fi = FileInfo p.FullPath
+                            let projectName = Path.GetFileNameWithoutExtension fi.Name
+
+                            let tfm =
+                                match p.GlobalProperties.TryGetValue("TargetFramework") with
+                                | true, tfm -> tfm
+                                | _ -> ""
+
+                            let normalized = normalizeFileName $"{projectName}-{tfm}"
+
+                            p, Some(BuildParameters(Loggers = env.Binlog.Loggers normalized))
+                        )
 
                     // Execution
-                    let bp = BuildParameters(Loggers = loggers)
-                    let bm = new BuildManagerSession(buildParameters = bp)
+                    let bm = new BuildManagerSession()
 
                     let! (results: Result<BuildResult, BuildErrors> array) = ProjectLoader2.Execution(bm, graph)
 
@@ -1653,7 +1742,7 @@ let buildManagerSessionTests toolsPath =
                         env.Entrypoints
                         |> Seq.map ProjectGraphEntryPoint
 
-                    let loggers = env.Binlog.Loggers
+                    let loggers = env.Binlog.Loggers env.Binlog.File.Name
 
                     // Evaluation
                     use pc = projectCollection ()
@@ -1661,9 +1750,9 @@ let buildManagerSessionTests toolsPath =
 
                     // Execution
                     let bp = BuildParameters(Loggers = loggers)
-                    let bm = new BuildManagerSession(buildParameters = bp)
+                    let bm = new BuildManagerSession()
 
-                    let! (result: Result<GraphBuildResult, GraphBuildErrors>) = ProjectLoader2.Execution(bm, graph)
+                    let! (result: Result<GraphBuildResult, GraphBuildErrors>) = ProjectLoader2.Execution(bm, graph, bp)
 
                     let expectedSources =
                         [
@@ -1711,11 +1800,24 @@ let buildManagerSessionTests toolsPath =
 
                     // Evaluation
                     use pc = projectCollection ()
-                    let projs = ProjectLoader2.EvaluateAsProjects(entryPoints, projectCollection = pc)
+
+                    let projs =
+                        ProjectLoader2.EvaluateAsProjectsAllTfms(entryPoints, projectCollection = pc)
+                        |> Seq.map (fun p ->
+                            let fi = FileInfo p.FullPath
+                            let projectName = Path.GetFileNameWithoutExtension fi.Name
+
+                            let tfm =
+                                match p.GlobalProperties.TryGetValue("TargetFramework") with
+                                | true, tfm -> tfm.Replace('.', '_')
+                                | _ -> ""
+
+                            let normalized = normalizeFileName $"{projectName}-{tfm}"
+                            p, Some(BuildParameters(Loggers = loggers normalized))
+                        )
 
                     // Execution
-                    let bp = BuildParameters(Loggers = loggers)
-                    let bm = new BuildManagerSession(buildParameters = bp)
+                    let bm = new BuildManagerSession()
 
                     let! (results: Result<_, BuildErrors> array) = ProjectLoader2.Execution(bm, projs)
 
@@ -1757,9 +1859,9 @@ let buildManagerSessionTests toolsPath =
 
                     use pc = projectCollection ()
 
-                    let bp = BuildParameters(Loggers = env.Binlog.Loggers)
+                    let bp = BuildParameters(Loggers = env.Binlog.Loggers env.Binlog.File.Name)
 
-                    let bm = new BuildManagerSession(buildParameters = bp)
+                    let bm = new BuildManagerSession()
 
                     let work: Async<Result<GraphBuildResult, GraphBuildErrors>> =
                         async {
@@ -1769,7 +1871,7 @@ let buildManagerSessionTests toolsPath =
 
                             // Execution
                             return!
-                                ProjectLoader2.Execution(bm, graph, ct = ct)
+                                ProjectLoader2.Execution(bm, graph, buildParameters = bp, ct = ct)
                                 |> Async.AwaitTask
                         }
 
@@ -1800,7 +1902,7 @@ let buildManagerSessionTests toolsPath =
                         env.Entrypoints
                         |> Seq.map ProjectGraphEntryPoint
 
-                    let loggers = env.Binlog.Loggers
+                    let loggers = env.Binlog.Loggers env.Binlog.File.Name
 
                     // Evaluation
                     use pc = projectCollection ()
@@ -1808,9 +1910,9 @@ let buildManagerSessionTests toolsPath =
 
                     // Execution
                     let bp = BuildParameters(Loggers = loggers)
-                    let bm = new BuildManagerSession(buildParameters = bp)
+                    let bm = new BuildManagerSession()
 
-                    let! (result: Result<GraphBuildResult, GraphBuildErrors>) = ProjectLoader2.Execution(bm, graph)
+                    let! (result: Result<GraphBuildResult, GraphBuildErrors>) = ProjectLoader2.Execution(bm, graph, bp)
                     Expect.isError result "expected error"
 
                     match result with
@@ -1849,14 +1951,14 @@ let buildManagerSessionTests toolsPath =
                     let graph = ProjectLoader2.EvaluateAsGraph(path, pc)
 
                     // Execution
-                    let bp = BuildParameters(Loggers = env.Binlog.Loggers)
-                    let bm = new BuildManagerSession(buildParameters = bp)
+                    let bp = BuildParameters(Loggers = env.Binlog.Loggers env.Binlog.File.Name)
+                    let bm = new BuildManagerSession()
                     use cts = new CancellationTokenSource()
 
                     try
                         cts.CancelAfter(TimeSpan.FromSeconds 1.)
 
-                        let build: Task<Result<GraphBuildResult, GraphBuildErrors>> = ProjectLoader2.Execution(bm, graph, ct = cts.Token)
+                        let build: Task<Result<GraphBuildResult, GraphBuildErrors>> = ProjectLoader2.Execution(bm, graph, bp, ct = cts.Token)
 
                         Task.RunSynchronously build
                         |> ignore

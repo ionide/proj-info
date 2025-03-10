@@ -150,12 +150,11 @@ module GraphBuildResult =
 /// Uses <see cref="T:Microsoft.Build.Execution.BuildManager"/> to run builds.
 /// This should be treated as a singleton because the BuildManager only allows one build request running at a time.
 /// </summary>
-type BuildManagerSession(?bm: BuildManager, ?buildParameters: BuildParameters) =
+type BuildManagerSession(?bm: BuildManager) =
     let locker = BuildManagerSession.locker
     let bm = defaultArg bm BuildManager.DefaultBuildManager
-    let buildParameters = defaultArg buildParameters (BuildParameters(Loggers = [ ProjectLoader.ErrorLogger() ]))
 
-    let tryGetErrorLogs () =
+    let tryGetErrorLogs (buildParameters: BuildParameters) =
         buildParameters.Loggers
         |> Seq.tryPick (
             function
@@ -166,33 +165,34 @@ type BuildManagerSession(?bm: BuildManager, ?buildParameters: BuildParameters) =
         |> Seq.collect (fun e -> e.Errors)
         |> Seq.toList
 
-    let lockAndStartBuild (ct: CancellationToken) (a: unit -> Task<_>) =
+    let lockAndStartBuild (ct: CancellationToken) buildParameters (a: unit -> Task<_>) =
         task {
             use! _lock = locker.LockAsync ct
             use _ = bm.StartBuild(buildParameters, ct)
             return! a ()
         }
 
-    member private x.determineBuildOutput<'e when BuildResultFailure<'e>>(result: BuildResult) =
+    member private x.determineBuildOutput<'e when BuildResultFailure<'e>>(buildParameters, result: BuildResult) =
         match result.OverallResult with
         | BuildResultCode.Success -> Ok result
-        | _ -> Error('e.BuildFailure(result, tryGetErrorLogs ()))
+        | _ -> Error('e.BuildFailure(result, tryGetErrorLogs buildParameters))
 
 
-    member private x.determineGraphBuildOutput<'e when GraphBuildResultFailure<'e>>(result: GraphBuildResult) =
+    member private x.determineGraphBuildOutput<'e when GraphBuildResultFailure<'e>>(buildParameters, result: GraphBuildResult) =
         match result.OverallResult with
         | BuildResultCode.Success -> Ok result
-        | _ -> Error('e.BuildFailure(result, tryGetErrorLogs ()))
+        | _ -> Error('e.BuildFailure(result, tryGetErrorLogs buildParameters))
 
 
     /// <summary>Submits a graph build request to the current build and starts it asynchronously.</summary>
     /// <param name="buildRequest">GraphBuildRequestData encapsulates all of the data needed to submit a graph build request.</param>
     /// <param name="ct">CancellationToken to cancel build submissions.</param>
     /// <returns>The BuildResult</returns>
-    member x.BuildAsync(buildRequest: BuildRequestData, ?ct: CancellationToken) =
+    member x.BuildAsync(buildRequest: BuildRequestData, ?buildParameters: BuildParameters, ?ct: CancellationToken) =
         let ct = defaultArg ct CancellationToken.None
+        let buildParameters = defaultArg buildParameters (BuildParameters(Loggers = [ ProjectLoader.ErrorLogger() ]))
 
-        lockAndStartBuild ct
+        lockAndStartBuild ct buildParameters
         <| fun () ->
             task {
                 let tcs = TaskCompletionSource<_> TaskCreationOptions.RunContinuationsAsynchronously
@@ -204,7 +204,7 @@ type BuildManagerSession(?bm: BuildManager, ?buildParameters: BuildParameters) =
                             let result = sub.BuildResult
 
                             match result.Exception with
-                            | null -> tcs.SetResult(x.determineBuildOutput result)
+                            | null -> tcs.SetResult(x.determineBuildOutput (buildParameters, result))
                             | :? Microsoft.Build.Exceptions.BuildAbortedException when ct.IsCancellationRequested -> tcs.SetCanceled ct
                             | e -> tcs.SetException e
                         ),
@@ -218,10 +218,11 @@ type BuildManagerSession(?bm: BuildManager, ?buildParameters: BuildParameters) =
     /// <param name="graphBuildRequest">GraphBuildRequestData encapsulates all of the data needed to submit a graph build request.</param>
     /// <param name="ct">CancellationToken to cancel build submissions.</param>
     /// <returns>the GraphBuildResult</returns>
-    member x.BuildAsync(graphBuildRequest: GraphBuildRequestData, ?ct: CancellationToken) =
+    member x.BuildAsync(graphBuildRequest: GraphBuildRequestData, ?buildParameters: BuildParameters, ?ct: CancellationToken) =
         let ct = defaultArg ct CancellationToken.None
+        let buildParameters = defaultArg buildParameters (BuildParameters(Loggers = [ ProjectLoader.ErrorLogger() ]))
 
-        lockAndStartBuild ct
+        lockAndStartBuild ct buildParameters
         <| fun () ->
             task {
                 let tcs = TaskCompletionSource<_> TaskCreationOptions.RunContinuationsAsynchronously
@@ -234,7 +235,7 @@ type BuildManagerSession(?bm: BuildManager, ?buildParameters: BuildParameters) =
                             let result = sub.BuildResult
 
                             match result.Exception with
-                            | null -> tcs.SetResult(x.determineGraphBuildOutput result)
+                            | null -> tcs.SetResult(x.determineGraphBuildOutput (buildParameters, result))
                             | :? Microsoft.Build.Exceptions.BuildAbortedException when ct.IsCancellationRequested -> tcs.SetCanceled ct
                             | e -> tcs.SetException e
 
@@ -361,7 +362,7 @@ type ProjectLoader2 =
 
         ProjectLoader2.EvaluateAsGraph(projects, ?projectCollection = projectCollection, ?projectInstanceFactory = projectInstanceFactory)
 
-    static member Execution(session: BuildManagerSession, graph: ProjectGraph, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken) =
+    static member Execution(session: BuildManagerSession, graph: ProjectGraph, ?buildParameters: BuildParameters, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken) =
         task {
             let targetsToBuild = defaultArg targetsToBuild (ProjectLoader.designTimeBuildTargets false)
 
@@ -370,10 +371,10 @@ type ProjectLoader2 =
             let request =
                 GraphBuildRequestData(projectGraph = graph, targetsToBuild = targetsToBuild, hostServices = null, flags = flags)
 
-            return! session.BuildAsync(request, ?ct = ct)
+            return! session.BuildAsync(request, ?buildParameters = buildParameters, ?ct = ct)
         }
 
-    static member Execution(session: BuildManagerSession, projectInstance: ProjectInstance, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken) =
+    static member Execution(session: BuildManagerSession, projectInstance: ProjectInstance, ?buildParameters: BuildParameters, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken) =
         task {
             let targetsToBuild = defaultArg targetsToBuild (ProjectLoader.designTimeBuildTargets false)
 
@@ -382,18 +383,18 @@ type ProjectLoader2 =
             let request =
                 BuildRequestData(projectInstance = projectInstance, targetsToBuild = targetsToBuild, hostServices = null, flags = flags)
 
-            return! session.BuildAsync(request, ?ct = ct)
+            return! session.BuildAsync(request, ?buildParameters = buildParameters, ?ct = ct)
         }
 
-    static member Execution(session: BuildManagerSession, projectInstances: ProjectInstance seq, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken) =
+    static member Execution(session: BuildManagerSession, projectInstances: (ProjectInstance * BuildParameters option) seq, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken) =
         projectInstances
-        |> Seq.map (fun p -> ProjectLoader2.Execution(session, p, ?targetsToBuild = targetsToBuild, ?flags = flags, ?ct = ct))
+        |> Seq.map (fun (p, bp) -> ProjectLoader2.Execution(session, p, ?buildParameters = bp, ?targetsToBuild = targetsToBuild, ?flags = flags, ?ct = ct))
         |> Task.WhenAll
 
-    static member Execution(session: BuildManagerSession, projects: Project seq, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken) =
+    static member Execution(session: BuildManagerSession, projects: (Project * BuildParameters option) seq, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken) =
         let instances =
             projects
-            |> Seq.map (fun p -> p.CreateProjectInstance())
+            |> Seq.map (fun (p, bp) -> p.CreateProjectInstance(), bp)
 
         ProjectLoader2.Execution(session, instances, ?targetsToBuild = targetsToBuild, ?flags = flags, ?ct = ct)
 
