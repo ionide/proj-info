@@ -409,14 +409,27 @@ let ``loader2-solution-with-2-projects`` = {
     EntryPoints = [ "loader2-solution-with-2-projects.sln" ]
     Expects =
         fun projectsAfterBuild ->
-            Expect.equal (Seq.length projectsAfterBuild) 2 "projects count"
+            Expect.equal (Seq.length projectsAfterBuild) 3 "projects count"
 
-            let classlibf1 =
+            let classlibf1s =
                 projectsAfterBuild
-                |> Seq.find (fun x -> x.ProjectFileName.EndsWith("classlibf1.fsproj"))
+                |> Seq.filter (fun x -> x.ProjectFileName.EndsWith("classlibf1.fsproj"))
 
-            Expect.equal classlibf1.SourceFiles.Length 3 "classlibf1 source files"
-            Expect.equal classlibf1.TargetFramework "net8.0" "classlibf1 target framework"
+            Expect.hasLength classlibf1s 2 ""
+
+            let classlibf1net80 =
+                classlibf1s
+                |> Seq.find (fun x -> x.TargetFramework = "net8.0")
+
+            Expect.equal classlibf1net80.SourceFiles.Length 3 "classlibf1 source files"
+
+
+            let classlibf1ns21 =
+                classlibf1s
+                |> Seq.find (fun x -> x.TargetFramework = "netstandard2.1")
+
+            Expect.equal classlibf1ns21.SourceFiles.Length 3 "classlibf1 source files"
+
 
             let classlibf2 =
                 projectsAfterBuild

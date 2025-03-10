@@ -1558,16 +1558,15 @@ let buildManagerSessionTests toolsPath =
             ``loader2-solution-with-2-projects``
             (fun env ->
                 task {
-
-                    let path =
+                    let entrypoints =
                         env.Entrypoints
-                        |> Seq.map ProjectGraphEntryPoint
+                         |> Seq.map ProjectGraphEntryPoint
 
                     let loggers = env.Binlog.Loggers
 
                     // Evaluation
                     use pc = projectCollection ()
-                    let graph = ProjectLoader2.EvaluateAsGraphAllTfms(path, pc)
+                    let graph = ProjectLoader2.EvaluateAsGraphAllTfms(entrypoints, pc)
 
                     // Execution
                     let bp = BuildParameters(Loggers = loggers)
@@ -1615,7 +1614,7 @@ let buildManagerSessionTests toolsPath =
 
                     // Evaluation
                     use pc = projectCollection ()
-                    let graph = ProjectLoader2.EvaluateAsProjects(entrypoints, projectCollection = pc)
+                    let graph = ProjectLoader2.EvaluateAsProjectsAllTfms(entrypoints, projectCollection = pc)
 
                     // Execution
                     let bp = BuildParameters(Loggers = loggers)
@@ -1633,22 +1632,6 @@ let buildManagerSessionTests toolsPath =
                                 | _ -> None
                             | _ -> None
                         )
-
-                    // Parse
-                    // let projectsAfterBuild =
-                    //     match result with
-                    //     | Ok result ->
-                    //         ProjectLoader2.Parse result
-                    //         |> Seq.choose (
-                    //             function
-                    //             | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
-                    //             | _ -> None
-                    //         )
-                    //     | Result.Error(GraphBuildErrors.BuildErr(result, errorLogs)) ->
-                    //         let results: Dictionary<ProjectGraphNode, Result<BuildResult, BuildErrors>> =
-                    //             GraphBuildResult.resultsByNode (result, errorLogs)
-
-                    //         failwith "Build failed"
 
                     env.Data.Expects projectsAfterBuild
                 }
@@ -2742,6 +2725,7 @@ let traversalProjectTest toolsPath loaderType workspaceFactory =
         $"can crack traversal projects - {loaderType}"
         (fun () ->
             let logger = Log.create "Test 'can crack traversal projects'"
+
             let fs = FileUtils(logger)
             let projPath = pathForProject ``traversal project``
             // // need to build the projects first so that there's something to latch on to

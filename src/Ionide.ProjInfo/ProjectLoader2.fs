@@ -54,10 +54,21 @@ module Map =
     let union loses wins =
         Map.fold (fun acc key value -> Map.add key value acc) loses wins
 
-    let inline ofDict (dic) =
-        dic
+    let inline ofDict dictionary =
+        dictionary
         |> Seq.map (|KeyValue|)
         |> Map.ofSeq
+
+
+    let inline copyToDict (map: Map<_, _>) =
+        // Have to use a mutable dictionary here because the F# Map doesn't have an Add method
+        let dictionary = Dictionary<_, _>()
+
+        for KeyValue(k, v) in map do
+            dictionary.Add(k, v)
+
+        dictionary :> IDictionary<_, _>
+
 
 module BuildErrorEventArgs =
 
@@ -244,35 +255,32 @@ module ProjectPropertyInstance =
 
 module ProjectLoading =
 
-    let selectFirstTfm (projectPath: string) =
+    let getAllTfms (projectPath: string) =
         let pi = ProjectInstance(projectPath)
 
-        match
+        pi.Properties
+        |> (ProjectPropertyInstance.tryFind "TargetFramework"
+            >> Option.map Array.singleton)
+        |> Option.orElseWith (fun () ->
             pi.Properties
-            |> ProjectPropertyInstance.tryFind "TargetFramework"
-        with
-        | Some v -> Some v
-        | None ->
-            match
-                pi.Properties
-                |> ProjectPropertyInstance.tryFind "TargetFrameworks"
-            with
-            | None -> None
-            | Some tfms ->
-                match tfms.Split(';') with
-                | [||] -> None
-                | tfms -> Array.tryHead tfms
+            |> ProjectPropertyInstance.tryFind "TargetFrameworks"
+            |> Option.bind (fun tfms ->
+                tfms.Split(
+                    ';',
+                    StringSplitOptions.TrimEntries
+                    ||| StringSplitOptions.RemoveEmptyEntries
+                )
+                |> Option.ofObj
+            )
+        )
 
-    let defaultProjectInstanceFactory tfmSelector (projectPath: string) (xml: Dictionary<string, string>) (collection: ProjectCollection) =
+    let selectFirstTfm (projectPath: string) =
+        getAllTfms projectPath
+        |> Option.bind Array.tryHead
 
-        let tfm = tfmSelector projectPath
-
+    let defaultProjectInstanceFactory (projectPath: string) (xml: Dictionary<string, string>) (collection: ProjectCollection) =
         let props = Map.union (Map.ofDict xml) (Map.ofDict collection.GlobalProperties)
-        // |> Map.mapAddSome "TargetFramework" tfm
-
-        let pi = ProjectInstance(projectPath, props, toolsVersion = null, projectCollection = collection)
-
-        pi
+        ProjectInstance(projectPath, props, toolsVersion = null, projectCollection = collection)
 
 
 type ProjectLoader2 =
@@ -293,6 +301,30 @@ type ProjectLoader2 =
         entryProjectFiles
         |> Seq.map (fun file -> ProjectLoader2.EvaluateAsProject(file, ?globalProperties = globalProperties, ?projectCollection = projectCollection))
 
+    static member EvaluateAsProjectsAllTfms(entryProjectFiles: string seq, ?globalProperties: IDictionary<string, string>, ?projectCollection: ProjectCollection) =
+        let globalProperties =
+            globalProperties
+            |> Option.map Map.ofDict
+            |> Option.defaultValue Map.empty
+
+        entryProjectFiles
+        |> Seq.collect (fun path ->
+            ProjectLoading.getAllTfms path
+            |> Option.toArray
+            |> Array.collect (
+                Array.map (fun tfm ->
+                    ProjectLoader2.EvaluateAsProject(
+                        path,
+                        globalProperties =
+                            (globalProperties
+                             |> Map.add "TargetFramework" tfm
+                             |> Map.copyToDict),
+                        ?projectCollection = projectCollection
+                    )
+                )
+            )
+        )
+
     static member EvaluateAsGraph(entryProjectFile: string, ?globalProperties: IDictionary<string, string>, ?projectCollection: ProjectCollection, ?projectInstanceFactory, ?ct: CancellationToken) =
         let globalProperties = defaultArg globalProperties null
         ProjectLoader2.EvaluateAsGraph([ ProjectGraphEntryPoint(entryProjectFile, globalProperties = globalProperties) ], ?projectCollection = projectCollection, ?projectInstanceFactory = projectInstanceFactory, ?ct = ct)
@@ -301,23 +333,14 @@ type ProjectLoader2 =
         let pc = defaultArg projectCollection ProjectCollection.GlobalProjectCollection
         let ct = defaultArg ct CancellationToken.None
 
-        let projectInstanceFactory =
-            defaultArg projectInstanceFactory (ProjectLoading.defaultProjectInstanceFactory ProjectLoading.selectFirstTfm)
+        let projectInstanceFactory = defaultArg projectInstanceFactory ProjectLoading.defaultProjectInstanceFactory
 
         ProjectGraph(entryProjectFile, pc, projectInstanceFactory, ct)
 
 
     static member EvaluateAsGraphAllTfms(entryProjectFile: ProjectGraphEntryPoint seq, ?projectCollection: ProjectCollection, ?projectInstanceFactory) =
-
-        let pc = defaultArg projectCollection ProjectCollection.GlobalProjectCollection
-
-        let projectInstanceFactory =
-            defaultArg projectInstanceFactory (ProjectLoading.defaultProjectInstanceFactory ProjectLoading.selectFirstTfm)
-
         let graph =
-            ProjectLoader2.EvaluateAsGraph(entryProjectFile, projectCollection = pc, projectInstanceFactory = projectInstanceFactory)
-
-        let targets = graph.ProjectNodes
+            ProjectLoader2.EvaluateAsGraph(entryProjectFile, ?projectCollection = projectCollection, ?projectInstanceFactory = projectInstanceFactory)
 
         let inline tryGetTfmFromProps (node: ProjectGraphNode) =
             match node.ProjectInstance.GlobalProperties.TryGetValue "TargetFramework" with
@@ -326,7 +349,7 @@ type ProjectLoader2 =
 
         // Then we only care about those with a TargetFramework
         let projects =
-            targets
+            graph.ProjectNodes
             |> Seq.choose (fun node ->
                 tryGetTfmFromProps node
                 |> Option.orElseWith (fun () ->
@@ -336,7 +359,7 @@ type ProjectLoader2 =
                 |> Option.map (fun _ -> ProjectGraphEntryPoint(node.ProjectInstance.FullPath, globalProperties = node.ProjectInstance.GlobalProperties))
             )
 
-        ProjectLoader2.EvaluateAsGraph(projects, projectCollection = pc, projectInstanceFactory = projectInstanceFactory)
+        ProjectLoader2.EvaluateAsGraph(projects, ?projectCollection = projectCollection, ?projectInstanceFactory = projectInstanceFactory)
 
     static member Execution(session: BuildManagerSession, graph: ProjectGraph, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken) =
         task {
