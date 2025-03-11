@@ -1,6 +1,6 @@
 <Project>
     <PropertyGroup>
-        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <NoWarn>$(NoWarn);FS3535</NoWarn> <!-- interfaces with static abstract methods -->        <PublishRepositoryUrl>true</PublishRepositoryUrl>
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <DebugType>embedded</DebugType>
