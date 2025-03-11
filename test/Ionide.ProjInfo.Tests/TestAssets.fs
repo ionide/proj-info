@@ -430,6 +430,49 @@ let ``loader2-solution-with-2-projects`` = {
 
             Expect.equal classlibf1ns21.SourceFiles.Length 3 "classlibf1 source files"
 
+            let classlibf2 =
+                projectsAfterBuild
+                |> Seq.find (fun x -> x.ProjectFileName.EndsWith("classlibf2.fsproj"))
+
+            Expect.equal classlibf2.SourceFiles.Length 3 "classlibf2 source files"
+            Expect.equal classlibf2.TargetFramework "netstandard2.0" "classlibf1 target framework"
+}
+
+
+let ``loader2-no-solution-with-2-projects`` = {
+    ProjDir = "loader2-no-solution-with-2-projects"
+    EntryPoints = [
+        "src"
+        / "classlibf1"
+        / "classlibf1.fsproj"
+    ]
+    Expects =
+        fun projectsAfterBuild ->
+            let projectPaths =
+                projectsAfterBuild
+                |> Seq.map (_.ProjectFileName)
+                |> String.concat "\n"
+
+            Expect.equal (Seq.length projectsAfterBuild) 3 $"Should be three projects but got {Seq.length projectsAfterBuild} : {projectPaths}"
+
+            let classlibf1s =
+                projectsAfterBuild
+                |> Seq.filter (fun x -> x.ProjectFileName.EndsWith("classlibf1.fsproj"))
+
+            Expect.hasLength classlibf1s 2 ""
+
+            let classlibf1net80 =
+                classlibf1s
+                |> Seq.find (fun x -> x.TargetFramework = "net8.0")
+
+            Expect.equal classlibf1net80.SourceFiles.Length 3 "classlibf1 source files"
+
+
+            let classlibf1ns21 =
+                classlibf1s
+                |> Seq.find (fun x -> x.TargetFramework = "netstandard2.1")
+
+            Expect.equal classlibf1ns21.SourceFiles.Length 3 "classlibf1 source files"
 
             let classlibf2 =
                 projectsAfterBuild
