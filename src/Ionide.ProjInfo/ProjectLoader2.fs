@@ -8,6 +8,7 @@ open Microsoft.Build.Graph
 open System.Collections.Generic
 open Microsoft.Build.Evaluation
 open Microsoft.Build.Framework
+open ProjectLoader
 
 /// <summary>
 /// An awaitable wrapper around a task whose result is disposable. The wrapper is not disposable, so this prevents usage errors like "use _lock = myAsync()" when the appropriate usage should be "use! _lock = myAsync())".
@@ -186,11 +187,21 @@ type BuildManagerSession(?bm: BuildManager) =
 
     /// <summary>Submits a graph build request to the current build and starts it asynchronously.</summary>
     /// <param name="buildRequest">GraphBuildRequestData encapsulates all of the data needed to submit a graph build request.</param>
+    /// <param name="buildParameters">All of the settings which must be specified to start a build</param>
     /// <param name="ct">CancellationToken to cancel build submissions.</param>
     /// <returns>The BuildResult</returns>
     member x.BuildAsync(buildRequest: BuildRequestData, ?buildParameters: BuildParameters, ?ct: CancellationToken) =
         let ct = defaultArg ct CancellationToken.None
-        let buildParameters = defaultArg buildParameters (BuildParameters(Loggers = [ ProjectLoader.ErrorLogger() ]))
+
+        let buildParameters =
+            defaultArg
+                buildParameters
+                (BuildParameters(
+                    Loggers = [
+                        msBuildToLogProvider ()
+                        ProjectLoader.ErrorLogger()
+                    ]
+                ))
 
         lockAndStartBuild ct buildParameters
         <| fun () ->
@@ -216,6 +227,7 @@ type BuildManagerSession(?bm: BuildManager) =
 
     /// <summary>Submits a graph build request to the current build and starts it asynchronously.</summary>
     /// <param name="graphBuildRequest">GraphBuildRequestData encapsulates all of the data needed to submit a graph build request.</param>
+    /// <param name="buildParameters">All of the settings which must be specified to start a build</param>
     /// <param name="ct">CancellationToken to cancel build submissions.</param>
     /// <returns>the GraphBuildResult</returns>
     member x.BuildAsync(graphBuildRequest: GraphBuildRequestData, ?buildParameters: BuildParameters, ?ct: CancellationToken) =
@@ -254,10 +266,40 @@ module ProjectPropertyInstance =
         |> Option.map (fun v -> v.EvaluatedValue)
 
 
+type ProjectPath = string
+type TargetFramework = string
+type TargetFrameworks = string array
+
+module TargetFrameworks =
+
+    let parse (tfms: string) =
+        tfms
+        |> Option.ofObj
+        |> Option.bind (fun tfms ->
+            tfms.Split(
+                ';',
+                StringSplitOptions.TrimEntries
+                ||| StringSplitOptions.RemoveEmptyEntries
+            )
+            |> Option.ofObj
+        )
+
+
+type ProjectMap<'a> = Map<ProjectPath, Map<TargetFramework, 'a>>
+
+module ProjectMap =
+
+    let map (f: ProjectPath -> TargetFramework -> 'a -> 'a0) (m: ProjectMap<'a>) =
+        m
+        |> Map.map (fun k -> Map.map (f k))
+
+type ProjectProjectMap = ProjectMap<Project>
+type ProjectGraphMap = ProjectMap<ProjectGraphNode>
+
 module ProjectLoading =
 
-    let getAllTfms (projectPath: string) =
-        let pi = ProjectInstance(projectPath)
+    let getAllTfms (projectPath: ProjectPath) =
+        let pi = ProjectInstance projectPath
 
         pi.Properties
         |> (ProjectPropertyInstance.tryFind "TargetFramework"
@@ -265,14 +307,7 @@ module ProjectLoading =
         |> Option.orElseWith (fun () ->
             pi.Properties
             |> ProjectPropertyInstance.tryFind "TargetFrameworks"
-            |> Option.bind (fun tfms ->
-                tfms.Split(
-                    ';',
-                    StringSplitOptions.TrimEntries
-                    ||| StringSplitOptions.RemoveEmptyEntries
-                )
-                |> Option.ofObj
-            )
+            |> Option.bind TargetFrameworks.parse
         )
 
     let selectFirstTfm (projectPath: string) =
@@ -386,17 +421,49 @@ type ProjectLoader2 =
             return! session.BuildAsync(request, ?buildParameters = buildParameters, ?ct = ct)
         }
 
-    static member Execution(session: BuildManagerSession, projectInstances: (ProjectInstance * BuildParameters option) seq, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken) =
-        projectInstances
-        |> Seq.map (fun (p, bp) -> ProjectLoader2.Execution(session, p, ?buildParameters = bp, ?targetsToBuild = targetsToBuild, ?flags = flags, ?ct = ct))
-        |> Task.WhenAll
+    static member ExecutionWalkReferences<'e when BuildResultFailure<'e>>
+        (session: BuildManagerSession, projects: Project  seq, buildParameters: Project -> BuildParameters option, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken)
+        =
+        task {
+            let projectsToVisit = Queue<Project> projects
 
-    static member Execution(session: BuildManagerSession, projects: (Project * BuildParameters option) seq, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken) =
-        let instances =
-            projects
-            |> Seq.map (fun (p, bp) -> p.CreateProjectInstance(), bp)
+            let visited = Dictionary<Project, Result<BuildResult, 'e>>()
 
-        ProjectLoader2.Execution(session, instances, ?targetsToBuild = targetsToBuild, ?flags = flags, ?ct = ct)
+            while projectsToVisit.Count > 0 do
+                let p = projectsToVisit.Dequeue()
+
+                match visited.TryGetValue p with
+                | true, _ -> ()
+                | _ ->
+
+                    let projectInstance = p.CreateProjectInstance()
+                    let bp = buildParameters p
+
+                    let! result = ProjectLoader2.Execution(session, projectInstance, ?buildParameters = bp, ?targetsToBuild = targetsToBuild, ?flags = flags, ?ct = ct)
+                    visited.Add(p, result)
+
+                    match result with
+                    | Ok result ->
+                        let references =
+                            result.ProjectStateAfterBuild.Items
+                            |> Seq.choose (fun item ->
+                                if
+                                    item.ItemType = "_MSBuildProjectReferenceExistent"
+                                    && item.HasMetadata "FullPath"
+                                then
+                                    Some(item.GetMetadataValue "FullPath")
+                                else
+                                    None
+                            )
+                        ProjectLoader2.EvaluateAsProjectsAllTfms(references, projectCollection = p.ProjectCollection)
+                        |> Seq.iter projectsToVisit.Enqueue
+                    | _ -> ()
+                    |> ignore
+
+            return
+                visited.Values
+                |> Seq.toArray
+        }
 
     static member GetProjectInstance(buildResult: BuildResult) = buildResult.ProjectStateAfterBuild
 

@@ -144,7 +144,7 @@ let TestRunInvariantDir =
     / "invariant"
 
 let checkExitCodeZero (cmd: Command) =
-    Expect.equal 0 cmd.Result.ExitCode "command finished with exit code non-zero."
+    Expect.equal 0 cmd.Result.ExitCode $"command {cmd.Result.StandardOutput} finished with exit code non-zero."
 
 let findByPath path parsed =
     parsed
@@ -1631,7 +1631,7 @@ let buildManagerSessionTests toolsPath =
         testCaseTask
         |> testWithEnv
             "loader2-solution-with-2-projects - Graph"
-            ``loader2-solution-with-2-projects``
+            ``loader2-no-solution-with-2-projects``
             (fun env ->
                 task {
                     let entrypoints =
@@ -1672,7 +1672,7 @@ let buildManagerSessionTests toolsPath =
         testCaseTask
         |> testWithEnv
             "loader2-solution-with-2-projects"
-            ``loader2-solution-with-2-projects``
+            ``loader2-no-solution-with-2-projects``
             (fun env ->
                 task {
 
@@ -1680,36 +1680,41 @@ let buildManagerSessionTests toolsPath =
 
                     let entrypoints =
                         path
-                        |> Seq.collect (
-                            InspectSln.tryParseSln
-                            >> getResult
-                            >> InspectSln.loadingBuildOrder
+                        |> Seq.collect (fun p ->
+                            if p.EndsWith(".sln") then
+                                p
+                                |> InspectSln.tryParseSln
+                                |> getResult
+                                |> InspectSln.loadingBuildOrder
+                            else
+                                [ p ]
                         )
 
 
                     // Evaluation
                     use pc = projectCollection ()
 
-                    let graph =
+
+                    let allprojects =
                         ProjectLoader2.EvaluateAsProjectsAllTfms(entrypoints, projectCollection = pc)
-                        |> Seq.map (fun p ->
-                            let fi = FileInfo p.FullPath
-                            let projectName = Path.GetFileNameWithoutExtension fi.Name
+                        |> Seq.toList
 
-                            let tfm =
-                                match p.GlobalProperties.TryGetValue("TargetFramework") with
-                                | true, tfm -> tfm
-                                | _ -> ""
+                    let createBuildParametersFromProject (p: Project) =
+                        let fi = FileInfo p.FullPath
+                        let projectName = Path.GetFileNameWithoutExtension fi.Name
 
-                            let normalized = normalizeFileName $"{projectName}-{tfm}"
+                        let tfm =
+                            match p.GlobalProperties.TryGetValue("TargetFramework") with
+                            | true, tfm -> tfm.Replace('.', '_')
+                            | _ -> ""
 
-                            p, Some(BuildParameters(Loggers = env.Binlog.Loggers normalized))
-                        )
+                        let normalized = $"{projectName}-{tfm}"
 
+                        Some(BuildParameters(Loggers = env.Binlog.Loggers normalized))
                     // Execution
                     let bm = new BuildManagerSession()
 
-                    let! (results: Result<BuildResult, BuildErrors> array) = ProjectLoader2.Execution(bm, graph)
+                    let! (results: Result<BuildResult, BuildErrors> array) = ProjectLoader2.ExecutionWalkReferences(bm, allprojects, createBuildParametersFromProject)
 
                     let projectsAfterBuild =
                         results
@@ -1801,25 +1806,25 @@ let buildManagerSessionTests toolsPath =
                     // Evaluation
                     use pc = projectCollection ()
 
-                    let projs =
-                        ProjectLoader2.EvaluateAsProjectsAllTfms(entryPoints, projectCollection = pc)
-                        |> Seq.map (fun p ->
-                            let fi = FileInfo p.FullPath
-                            let projectName = Path.GetFileNameWithoutExtension fi.Name
+                    let createBuildParametersFromProject (p: Project) =
+                        let fi = FileInfo p.FullPath
+                        let projectName = Path.GetFileNameWithoutExtension fi.Name
 
-                            let tfm =
-                                match p.GlobalProperties.TryGetValue("TargetFramework") with
-                                | true, tfm -> tfm.Replace('.', '_')
-                                | _ -> ""
+                        let tfm =
+                            match p.GlobalProperties.TryGetValue("TargetFramework") with
+                            | true, tfm -> tfm.Replace('.', '_')
+                            | _ -> ""
 
-                            let normalized = normalizeFileName $"{projectName}-{tfm}"
-                            p, Some(BuildParameters(Loggers = loggers normalized))
-                        )
+                        let normalized = $"{projectName}-{tfm}"
+
+                        Some(BuildParameters(Loggers = env.Binlog.Loggers normalized))
+
+                    let projs = ProjectLoader2.EvaluateAsProjectsAllTfms(entryPoints, projectCollection = pc)
 
                     // Execution
                     let bm = new BuildManagerSession()
 
-                    let! (results: Result<_, BuildErrors> array) = ProjectLoader2.Execution(bm, projs)
+                    let! (results: Result<_, BuildErrors> array) = ProjectLoader2.ExecutionWalkReferences(bm, projs, createBuildParametersFromProject)
 
                     let result =
                         results

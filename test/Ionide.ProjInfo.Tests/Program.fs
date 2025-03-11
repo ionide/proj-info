@@ -20,7 +20,7 @@ let main argv =
 
     let args = [
         CLIArguments.Printer (TestPrinters.summaryPrinter defaultConfig.printer)
-        CLIArguments.Verbosity LogLevel.Verbose
+        CLIArguments.Verbosity LogLevel.Info
     ]
 
     Tests.runTestsWithCLIArgs
