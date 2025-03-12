@@ -40,9 +40,25 @@
     <PackageReference Include="YoloDev.Expecto.TestSdk" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="GitHubActionsTestLogger" />
-    <PackageReference Include="Microsoft.Build" ExcludeAssets="runtime" IncludeAssets="compile" />
+    <!-- <PackageReference Include="Microsoft.Build" ExcludeAssets="runtime" IncludeAssets="compile" />
     <PackageReference Include="Microsoft.Build.Framework" ExcludeAssets="runtime" IncludeAssets="compile" />
     <PackageReference Include="Microsoft.Build.Utilities.Core" ExcludeAssets="runtime" IncludeAssets="compile"  />
-    <PackageReference Include="Microsoft.Build.Tasks.Core" ExcludeAssets="runtime" IncludeAssets="compile" />
+    <PackageReference Include="Microsoft.Build.Tasks.Core" ExcludeAssets="runtime" IncludeAssets="compile" /> -->
+
   </ItemGroup>
+
+  <ItemGroup>
+  <Reference Include="Microsoft.Build">
+    <HintPath>$(MSBuildBinPath)\Microsoft.Build.dll</HintPath>
+  </Reference>
+  <Reference Include="Microsoft.Build.Framework">
+    <HintPath>$(MSBuildBinPath)\Microsoft.Build.Framework.dll</HintPath>
+  </Reference>
+  <Reference Include="Microsoft.Build.Utilities.Core">
+    <HintPath>$(MSBuildBinPath)\Microsoft.Build.Utilities.Core.dll</HintPath>
+  </Reference>
+  <Reference Include="Microsoft.Build.Tasks.Core">
+    <HintPath>$(MSBuildBinPath)\Microsoft.Build.Tasks.Core.dll</HintPath>
+  </Reference>
+</ItemGroup>
 </Project>
