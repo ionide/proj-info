@@ -68,6 +68,8 @@ let subscription: System.IDisposable = defaultLoader.Notifications.Subscribe(fun
 let projectOptions = loader.LoadProjects([ yourFsProjPath ]) |> Seq.toArray
 ```
 
+> If planning on passing to FSharp.Compiler.Service, please see [Ionide.ProjInfo.FCS](./src/Ionide.ProjInfo.FCS/README.md)
+
 ## How to contribute
 
 *Imposter syndrome disclaimer*: I want your help. No really, I do.
