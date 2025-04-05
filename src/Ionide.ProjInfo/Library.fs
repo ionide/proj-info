@@ -440,7 +440,8 @@ module ProjectLoader =
         let combined = Dictionary(collection.GlobalProperties)
 
         for kvp in otherProperties do
-            combined.Add(kvp.Key, kvp.Value)
+            combined.TryAdd(kvp.Key, kvp.Value)
+            |> ignore
 
         combined
 
@@ -590,6 +591,7 @@ module ProjectLoader =
         "BeforeCompile"
         "CoreCompile"
         "GetTargetPath"
+
     |]
 
     let defaultGlobalProps = [
@@ -603,6 +605,9 @@ module ProjectLoader =
         "UseCommonOutputDirectory", "false"
         "NonExistentFile", Path.Combine("__NonExistentSubDir__", "__NonExistentFile__") // Required by the Clean Target
         "DotnetProjInfo", "true"
+        "InnerTargets",
+        designTimeBuildTargetsCore
+        |> String.concat ";"
     ]
 
     let getGlobalProps (tfm: string option) (globalProperties: (string * string) list) (propsSetFromParentCollection: Set<string>) =
@@ -640,7 +645,10 @@ module ProjectLoader =
                 "CoreCompile"
             |]
         else
-            designTimeBuildTargetsCore
+            [|
+                yield! designTimeBuildTargetsCore
+                "DispatchToInnerBuilds"
+            |]
 
     let setLegacyMsbuildProperties isOldStyleProjFile =
         match LegacyFrameworkDiscovery.msbuildBinary.Value with
