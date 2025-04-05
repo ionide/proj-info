@@ -298,21 +298,22 @@ type ProjectGraphMap = ProjectMap<ProjectGraphNode>
 
 module ProjectLoading =
 
-    let getAllTfms (projectPath: ProjectPath) =
-        let pi = ProjectInstance projectPath
+    // let getAllTfms (projectPath: ProjectPath) pc props =
+    //     let p = findOrCreateMatchingProject projectPath pc props
+    //     let pi = p.CreateProjectInstance()
 
-        pi.Properties
-        |> (ProjectPropertyInstance.tryFind "TargetFramework"
-            >> Option.map Array.singleton)
-        |> Option.orElseWith (fun () ->
-            pi.Properties
-            |> ProjectPropertyInstance.tryFind "TargetFrameworks"
-            |> Option.bind TargetFrameworks.parse
-        )
+    //     pi.Properties
+    //     |> (ProjectPropertyInstance.tryFind "TargetFramework"
+    //         >> Option.map Array.singleton)
+    //     |> Option.orElseWith (fun () ->
+    //         pi.Properties
+    //         |> ProjectPropertyInstance.tryFind "TargetFrameworks"
+    //         |> Option.bind TargetFrameworks.parse
+    //     )
 
-    let selectFirstTfm (projectPath: string) =
-        getAllTfms projectPath
-        |> Option.bind Array.tryHead
+    // let selectFirstTfm (projectPath: string) =
+    //     getAllTfms projectPath
+    //     |> Option.bind Array.tryHead
 
     let defaultProjectInstanceFactory (projectPath: string) (xml: Dictionary<string, string>) (collection: ProjectCollection) =
         let props = Map.union (Map.ofDict xml) (Map.ofDict collection.GlobalProperties)
@@ -330,35 +331,49 @@ type ProjectLoader2 =
 
     static member EvaluateAsProject(entryProjectFile: string, ?globalProperties: IDictionary<string, string>, ?projectCollection: ProjectCollection) =
         let pc = defaultArg projectCollection ProjectCollection.GlobalProjectCollection
-        let globalProperties = defaultArg globalProperties null
-        pc.LoadProject(entryProjectFile, globalProperties = globalProperties, toolsVersion = null)
+        let globalProperties = defaultArg globalProperties (new Dictionary<string, string>())
+        findOrCreateMatchingProject entryProjectFile pc globalProperties
 
     static member EvaluateAsProjects(entryProjectFiles: string seq, ?globalProperties: IDictionary<string, string>, ?projectCollection: ProjectCollection) =
         entryProjectFiles
         |> Seq.map (fun file -> ProjectLoader2.EvaluateAsProject(file, ?globalProperties = globalProperties, ?projectCollection = projectCollection))
 
     static member EvaluateAsProjectsAllTfms(entryProjectFiles: string seq, ?globalProperties: IDictionary<string, string>, ?projectCollection: ProjectCollection) =
-        let globalProperties =
-            globalProperties
-            |> Option.map Map.ofDict
-            |> Option.defaultValue Map.empty
+
+        let globalPropertiesMap =
+            lazy
+                (globalProperties
+                 |> Option.map Map.ofDict
+                 |> Option.defaultValue Map.empty)
 
         entryProjectFiles
         |> Seq.collect (fun path ->
-            ProjectLoading.getAllTfms path
-            |> Option.toArray
-            |> Array.collect (
-                Array.map (fun tfm ->
+            let p = ProjectLoader2.EvaluateAsProject(path, ?globalProperties = globalProperties, ?projectCollection = projectCollection)
+            let pi = p.CreateProjectInstance()
+
+            match
+                pi.Properties
+                |> ProjectPropertyInstance.tryFind "TargetFramework"
+            with
+            | Some _ -> Seq.singleton p
+            | None ->
+                let tfms =
+                    pi.Properties
+                    |> ProjectPropertyInstance.tryFind "TargetFrameworks"
+                    |> Option.bind TargetFrameworks.parse
+                    |> Option.defaultValue Array.empty
+
+                tfms
+                |> Seq.map (fun tfm ->
                     ProjectLoader2.EvaluateAsProject(
                         path,
                         globalProperties =
-                            (globalProperties
+                            (globalPropertiesMap.Value
                              |> Map.add "TargetFramework" tfm
                              |> Map.copyToDict),
                         ?projectCollection = projectCollection
                     )
                 )
-            )
         )
 
     static member EvaluateAsGraph(entryProjectFile: string, ?globalProperties: IDictionary<string, string>, ?projectCollection: ProjectCollection, ?projectInstanceFactory, ?ct: CancellationToken) =
@@ -369,7 +384,12 @@ type ProjectLoader2 =
         let pc = defaultArg projectCollection ProjectCollection.GlobalProjectCollection
         let ct = defaultArg ct CancellationToken.None
 
-        let projectInstanceFactory = defaultArg projectInstanceFactory ProjectLoading.defaultProjectInstanceFactory
+        let projectInstanceFactory =
+            let inline defaultFunc path xml pc =
+                // (findOrCreateMatchingProject path pc xml).CreateProjectInstance()
+                ProjectLoading.defaultProjectInstanceFactory path xml pc
+
+            defaultArg projectInstanceFactory defaultFunc
 
         ProjectGraph(entryProjectFile, pc, projectInstanceFactory, ct)
 
@@ -378,22 +398,24 @@ type ProjectLoader2 =
         let graph =
             ProjectLoader2.EvaluateAsGraph(entryProjectFile, ?projectCollection = projectCollection, ?projectInstanceFactory = projectInstanceFactory)
 
-        let inline tryGetTfmFromProps (node: ProjectGraphNode) =
+        let inline tryGetTfmFromGlobalProps (node: ProjectGraphNode) =
             match node.ProjectInstance.GlobalProperties.TryGetValue "TargetFramework" with
             | true, tfm -> Some tfm
             | _ -> None
+
+        let inline tryGetFromProps (node: ProjectGraphNode) =
+            node.ProjectInstance.Properties
+            |> ProjectPropertyInstance.tryFind "TargetFramework"
 
         // Then we only care about those with a TargetFramework
         let projects =
             graph.ProjectNodes
             |> Seq.choose (fun node ->
-                tryGetTfmFromProps node
-                |> Option.orElseWith (fun () ->
-                    node.ProjectInstance.Properties
-                    |> ProjectPropertyInstance.tryFind "TargetFramework"
-                )
+                tryGetTfmFromGlobalProps node
+                |> Option.orElseWith (fun () -> tryGetFromProps node)
                 |> Option.map (fun _ -> ProjectGraphEntryPoint(node.ProjectInstance.FullPath, globalProperties = node.ProjectInstance.GlobalProperties))
             )
+
 
         ProjectLoader2.EvaluateAsGraph(projects, ?projectCollection = projectCollection, ?projectInstanceFactory = projectInstanceFactory)
 
@@ -421,9 +443,7 @@ type ProjectLoader2 =
             return! session.BuildAsync(request, ?buildParameters = buildParameters, ?ct = ct)
         }
 
-    static member ExecutionWalkReferences<'e when BuildResultFailure<'e>>
-        (session: BuildManagerSession, projects: Project  seq, buildParameters: Project -> BuildParameters option, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken)
-        =
+    static member ExecutionWalkReferences(session: BuildManagerSession, projects: Project seq, buildParameters: Project -> BuildParameters option, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken) =
         task {
             let projectsToVisit = Queue<Project> projects
 
@@ -455,10 +475,10 @@ type ProjectLoader2 =
                                 else
                                     None
                             )
+
                         ProjectLoader2.EvaluateAsProjectsAllTfms(references, projectCollection = p.ProjectCollection)
                         |> Seq.iter projectsToVisit.Enqueue
                     | _ -> ()
-                    |> ignore
 
             return
                 visited.Values
@@ -472,6 +492,47 @@ type ProjectLoader2 =
         |> Seq.map ProjectLoader2.GetProjectInstance
 
     static member GetProjectInstances(graphBuildResult: GraphBuildResult) =
+
+        // let start =
+        //     graphBuildResult.ResultsByNode
+        //     |> Seq.map (fun (KeyValue(node, _)) -> node)
+
+        // let projectsToVisit = Queue<ProjectGraphNode>(start)
+
+        // let visited = HashSet<ProjectGraphNode>()
+        // let results = ResizeArray<ProjectInstance>()
+
+        // while projectsToVisit.Count > 0 do
+        //     let p = projectsToVisit.Dequeue()
+
+        //     match visited.TryGetValue p with
+        //     | true, _ -> ()
+        //     | _ ->
+        //         visited.Add(p)
+        //         |> ignore
+
+        //         p.ProjectReferences
+        //         |> Seq.iter (fun r -> projectsToVisit.Enqueue r)
+
+
+        //         p.ProjectInstance.Properties
+        //         |> ProjectPropertyInstance.tryFind "TargetFramework"
+        //         |> Option.iter (fun _ -> results.Add p.ProjectInstance)
+
+
+        // results :> seq<_>
+        // graphBuildResult.ResultsByNode
+        // |> Seq.collect(fun (KeyValue(node,_)) ->
+
+        //     let pi = node.ProjectInstance
+        //     match pi.Properties |> ProjectPropertyInstance.tryFind "TargetFrameworks" with
+        //     | Some x ->
+        //         Seq.empty
+        //     | _ ->
+        //         Seq.singleton pi
+
+        // )
+
         graphBuildResult.ResultsByNode
         |> Seq.map (fun (KeyValue(node, result)) -> ProjectLoader2.GetProjectInstance result)
 

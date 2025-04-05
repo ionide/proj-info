@@ -1852,7 +1852,7 @@ let buildManagerSessionTests toolsPath =
                 }
             )
 
-        ptestCaseTask
+        testCaseTask
         |> testWithEnv
             "Concurrency - don't crash on concurrent builds"
             ``loader2-concurrent``
@@ -1881,7 +1881,7 @@ let buildManagerSessionTests toolsPath =
                         }
 
                     // Should be throttled so concurrent builds won't fail
-                    let result =
+                    let! _ =
                         Async.Parallel [
                             work
                             work
@@ -1889,7 +1889,7 @@ let buildManagerSessionTests toolsPath =
                             work
                         ]
 
-                        |> Async.RunSynchronously
+                        |> Async.StartImmediateAsTask
 
                     ()
 
@@ -1949,7 +1949,6 @@ let buildManagerSessionTests toolsPath =
                         env.Entrypoints
                         |> Seq.map ProjectGraphEntryPoint
 
-
                     // Evaluation
                     use pc = projectCollection ()
 
@@ -1963,12 +1962,10 @@ let buildManagerSessionTests toolsPath =
                     try
                         cts.CancelAfter(TimeSpan.FromSeconds 1.)
 
-                        let build: Task<Result<GraphBuildResult, GraphBuildErrors>> = ProjectLoader2.Execution(bm, graph, bp, ct = cts.Token)
-
-                        Task.RunSynchronously build
-                        |> ignore
+                        let! (_: Result<GraphBuildResult, GraphBuildErrors>) = ProjectLoader2.Execution(bm, graph, bp, ct = cts.Token)
+                        ()
                     with
-                    | :? OperationCanceledException as oce when oce.CancellationToken = cts.Token -> ()
+                    | :? OperationCanceledException as oce -> Expect.equal oce.CancellationToken cts.Token "expected cancellation"
                     | e -> Exception.reraiseAny e
 
                 }
