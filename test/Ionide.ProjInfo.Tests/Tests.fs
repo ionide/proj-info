@@ -19,6 +19,18 @@ open System.Linq
 
 #nowarn "25"
 
+open Microsoft.Build.Execution
+open Microsoft.Build.Graph
+open System.Threading.Tasks
+open Microsoft.Build.Evaluation
+open Ionide.ProjInfo.ProjectLoader
+
+module Exception =
+    open System.Runtime.ExceptionServices
+
+    let inline reraiseAny (e: exn) =
+        ExceptionDispatchInfo.Capture(e).Throw()
+
 let RepoDir =
     (__SOURCE_DIRECTORY__
      / ".."
@@ -29,6 +41,80 @@ let ExamplesDir =
     RepoDir
     / "test"
     / "examples"
+
+let normalizeFileName (fileName: string) =
+    if String.IsNullOrEmpty fileName then
+        ""
+    else
+        let invalidChars = HashSet<char>(Path.GetInvalidFileNameChars())
+        let chars = fileName.AsSpan()
+        let mutable output = Span<char>.Empty
+        let mutable outputIndex = 0
+        let mutable lastWasUnderscore = false
+
+        // Use a fixed-size buffer (stack-alloc if small enough)
+        let buffer = Span<char>(Array.zeroCreate<char> (min fileName.Length 255))
+        output <- buffer
+
+        for i = 0 to chars.Length
+                     - 1 do
+            let c = chars.[i]
+
+            if outputIndex < 255 then
+                if
+                    invalidChars.Contains(c)
+                    || Char.IsControl(c)
+                then
+                    if
+                        not lastWasUnderscore
+                        && outputIndex > 0
+                    then
+                        output.[outputIndex] <- '_'
+
+                        outputIndex <-
+                            outputIndex
+                            + 1
+
+                        lastWasUnderscore <- true
+                else
+                    output.[outputIndex] <- c
+
+                    outputIndex <-
+                        outputIndex
+                        + 1
+
+                    lastWasUnderscore <- false
+
+        // Trim leading/trailing underscores
+        let start =
+            if
+                outputIndex > 0
+                && output.[0] = '_'
+            then
+                1
+            else
+                0
+
+        let length =
+            if
+                outputIndex > 0
+                && output.[outputIndex
+                           - 1] = '_'
+            then
+                outputIndex
+                - start
+                - 1
+            else
+                outputIndex
+                - start
+
+        if
+            length
+            <= 0
+        then
+            ""
+        else
+            output.Slice(start, length).ToString()
 
 let pathForTestAssets (test: TestAssetProjInfo) =
     ExamplesDir
@@ -58,7 +144,7 @@ let TestRunInvariantDir =
     / "invariant"
 
 let checkExitCodeZero (cmd: Command) =
-    Expect.equal 0 cmd.Result.ExitCode "command finished with exit code non-zero."
+    Expect.equal 0 cmd.Result.ExitCode $"command {cmd.Result.StandardOutput} finished with exit code non-zero."
 
 let findByPath path parsed =
     parsed
@@ -548,6 +634,7 @@ let testSample3 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
             Expect.equal l2Parsed l2Loaded "l2 notificaton and parsed should be the same"
             Expect.equal c1Parsed c1Loaded "c1 notificaton and parsed should be the same"
         )
+
 
 let testSample4 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
@@ -1378,6 +1465,514 @@ let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
 
         )
 
+module Task =
+    let RunSynchronously (task: Task<'T>) = task.GetAwaiter().GetResult()
+
+module File =
+    let combinePaths path1 (path2: string) =
+        Path.Combine(
+            path1,
+            path2.TrimStart [|
+                '\\'
+                '/'
+            |]
+        )
+
+    let (</>) path1 path2 = combinePaths path1 path2
+
+    let rec copyDirectory (sourceDir: DirectoryInfo) destDir =
+        // Get the subdirectories for the specified directory.
+        // let dir = DirectoryInfo(sourceDir)
+
+        if not sourceDir.Exists then
+            raise (
+                DirectoryNotFoundException(
+                    "Source directory does not exist or could not be found: "
+                    + sourceDir.FullName
+                )
+            )
+
+        let dirs = sourceDir.GetDirectories()
+
+        // If the destination directory doesn't exist, create it.
+        Directory.CreateDirectory(destDir)
+        |> ignore
+
+        // Get the files in the directory and copy them to the new location.
+        sourceDir.GetFiles()
+        |> Seq.iter (fun file ->
+            let tempPath = Path.Combine(destDir, file.Name)
+
+            file.CopyTo(tempPath, false)
+            |> ignore
+        )
+
+        // If copying subdirectories, copy them and their contents to new location.
+        dirs
+        |> Seq.iter (fun dir ->
+            let tempPath = Path.Combine(destDir, dir.Name)
+            copyDirectory dir tempPath
+        )
+
+open File
+open Microsoft.Build.Framework
+
+type Binlogs(binlog: FileInfo) =
+    let sw = new StringWriter()
+    let errorLogger = ErrorLogger()
+
+    let loggers name =
+        ProjectLoader.createLoggers name (BinaryLogGeneration.Within(binlog.Directory)) sw (Some errorLogger)
+
+    member x.ErrorLogger = errorLogger
+    member x.Loggers name = loggers name
+
+    member x.Directory = binlog.Directory
+    member x.File = binlog
+
+    interface IDisposable with
+        member this.Dispose() = sw.Dispose()
+
+
+type TestEnv = {
+    Logger: Logger
+    FS: FileUtils
+    Binlog: Binlogs
+    Data: TestAssetProjInfo2
+    Entrypoints: string seq
+    TestDir: DirectoryInfo
+} with
+
+    interface IDisposable with
+        member this.Dispose() = (this.Binlog :> IDisposable).Dispose()
+
+
+let testWithEnv name (data: TestAssetProjInfo2) f test =
+    test
+        name
+        (fun () ->
+            task {
+                let logger = Log.create (sprintf "Test '%s'" name)
+                let fs = FileUtils logger
+
+                let testDir = inDir fs name
+                copyDirFromAssets fs data.ProjDir testDir
+
+                let entrypoints =
+                    data.EntryPoints
+                    |> Seq.map (fun x ->
+                        testDir
+                        / x
+                    )
+
+                entrypoints
+                |> Seq.iter (fun x ->
+                    dotnet fs [
+                        "restore"
+                        x
+                    ]
+                    |> checkExitCodeZero
+                )
+
+                let binlog = new FileInfo(Path.Combine(testDir, $"{name}.binlog"))
+                use blc = new Binlogs(binlog)
+
+                let env = {
+                    Logger = logger
+                    FS = fs
+                    Binlog = blc
+                    Data = data
+                    Entrypoints = entrypoints
+                    TestDir = DirectoryInfo testDir
+                }
+
+                try
+                    do! f env
+                with e ->
+
+                    logger.error (
+                        Message.eventX "binlog path {binlog}"
+                        >> Message.setField "binlog" binlog.FullName
+                    )
+
+                    Exception.reraiseAny e
+            }
+        )
+
+let projectCollection () =
+    new ProjectCollection(
+        globalProperties = dict ProjectLoader.defaultGlobalProps,
+        loggers = null,
+        remoteLoggers = null,
+        toolsetDefinitionLocations = ToolsetDefinitionLocations.Local,
+        maxNodeCount = Environment.ProcessorCount,
+        onlyLogCriticalEvents = false,
+        loadProjectsReadOnly = true
+    )
+
+type IWorkspaceLoader2 =
+    abstract member Load: paths: string list * ct: CancellationToken -> Task<seq<Result<BuildResult, BuildResult * ErrorLogger>>>
+
+
+type GraphBuildErrors =
+    | BuildErr of GraphBuildResult * BuildErrorEventArgs list
+
+    interface GraphBuildResultFailure<GraphBuildErrors> with
+        static member BuildFailure(result, errorLogs) = BuildErr(result, errorLogs)
+
+type BuildErrors =
+    | BuildErr of BuildResult * BuildErrorEventArgs list
+
+    interface BuildResultFailure<BuildErrors> with
+        static member BuildFailure(result, errorLogs) = BuildErr(result, errorLogs)
+
+let buildManagerSessionTests toolsPath =
+    ftestList "buildManagerSessionTests" [
+        testCaseTask
+        |> testWithEnv
+            "loader2-solution-with-2-projects - Graph"
+            ``loader2-no-solution-with-2-projects``
+            (fun env ->
+                task {
+                    let entrypoints =
+                        env.Entrypoints
+                        |> Seq.map ProjectGraphEntryPoint
+
+                    let loggers = env.Binlog.Loggers env.Binlog.File.Name
+
+                    // Evaluation
+                    use pc = projectCollection ()
+                    let graph = ProjectLoader2.EvaluateAsGraphAllTfms(entrypoints, pc)
+
+                    // Execution
+                    let bp = BuildParameters(Loggers = loggers)
+                    let bm = new BuildManagerSession()
+
+                    let! (result: Result<GraphBuildResult, GraphBuildErrors>) = ProjectLoader2.Execution(bm, graph, bp)
+
+                    // Parse
+                    let projectsAfterBuild =
+                        match result with
+                        | Ok result ->
+                            ProjectLoader2.Parse result
+                            |> Seq.choose (
+                                function
+                                | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
+                                | _ -> None
+                            )
+                        | Result.Error(GraphBuildErrors.BuildErr(result, errorLogs)) ->
+                            let results: Dictionary<ProjectGraphNode, Result<BuildResult, BuildErrors>> =
+                                GraphBuildResult.resultsByNode (result, errorLogs)
+
+                            failwith "Build failed"
+
+                    env.Data.Expects projectsAfterBuild
+                }
+            )
+        testCaseTask
+        |> testWithEnv
+            "loader2-solution-with-2-projects"
+            ``loader2-no-solution-with-2-projects``
+            (fun env ->
+                task {
+
+                    let path = env.Entrypoints
+
+                    let entrypoints =
+                        path
+                        |> Seq.collect (fun p ->
+                            if p.EndsWith(".sln") then
+                                p
+                                |> InspectSln.tryParseSln
+                                |> getResult
+                                |> InspectSln.loadingBuildOrder
+                            else
+                                [ p ]
+                        )
+
+
+                    // Evaluation
+                    use pc = projectCollection ()
+
+
+                    let allprojects =
+                        ProjectLoader2.EvaluateAsProjectsAllTfms(entrypoints, projectCollection = pc)
+                        |> Seq.toList
+
+                    let createBuildParametersFromProject (p: Project) =
+                        let fi = FileInfo p.FullPath
+                        let projectName = Path.GetFileNameWithoutExtension fi.Name
+
+                        let tfm =
+                            match p.GlobalProperties.TryGetValue("TargetFramework") with
+                            | true, tfm -> tfm.Replace('.', '_')
+                            | _ -> ""
+
+                        let normalized = $"{projectName}-{tfm}"
+
+                        Some(BuildParameters(Loggers = env.Binlog.Loggers normalized))
+                    // Execution
+                    let bm = new BuildManagerSession()
+
+                    let! (results: Result<BuildResult, BuildErrors> array) = ProjectLoader2.ExecutionWalkReferences(bm, allprojects, createBuildParametersFromProject)
+
+                    let projectsAfterBuild =
+                        results
+                        |> Seq.choose (
+                            function
+                            | Ok result ->
+                                match ProjectLoader2.Parse result with
+                                | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
+                                | _ -> None
+                            | _ -> None
+                        )
+
+                    env.Data.Expects projectsAfterBuild
+                }
+            )
+
+        testCaseTask
+        |> testWithEnv
+            "sample2-NetSdk-library2 - Graph"
+            ``sample2-NetSdk-library2``
+            (fun env ->
+                task {
+                    let projPath =
+                        env.TestDir.FullName
+                        / env.Data.EntryPoints.Single()
+
+                    let projDir = Path.GetDirectoryName projPath
+
+                    let path =
+                        env.Entrypoints
+                        |> Seq.map ProjectGraphEntryPoint
+
+                    let loggers = env.Binlog.Loggers env.Binlog.File.Name
+
+                    // Evaluation
+                    use pc = projectCollection ()
+                    let graph = ProjectLoader2.EvaluateAsGraphAllTfms(path, pc)
+
+                    // Execution
+                    let bp = BuildParameters(Loggers = loggers)
+                    let bm = new BuildManagerSession()
+
+                    let! (result: Result<GraphBuildResult, GraphBuildErrors>) = ProjectLoader2.Execution(bm, graph, bp)
+
+                    let expectedSources =
+                        [
+                            projDir
+                            / "obj/Debug/netstandard2.0/n1.AssemblyInfo.fs"
+                            projDir
+                            / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
+                            projDir
+                            / "Library.fs"
+                        ]
+                        |> List.map Path.GetFullPath
+
+                    match result with
+                    | Result.Error _ -> failwith "expected success"
+                    | Ok result ->
+                        ProjectLoader2.Parse result
+                        |> Seq.choose (
+                            function
+                            | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
+                            | _ -> None
+                        )
+                        |> Seq.iter (fun x -> Expect.equal x.SourceFiles expectedSources "")
+
+                        ()
+
+                }
+            )
+
+
+        testCaseTask
+        |> testWithEnv
+            "sample2-NetSdk-library2"
+            ``sample2-NetSdk-library2``
+            (fun env ->
+                task {
+                    let projPath =
+                        env.TestDir.FullName
+                        / env.Data.EntryPoints.Single()
+
+                    let projDir = Path.GetDirectoryName projPath
+
+                    let entryPoints = env.Entrypoints
+
+                    let loggers = env.Binlog.Loggers
+
+                    // Evaluation
+                    use pc = projectCollection ()
+
+                    let createBuildParametersFromProject (p: Project) =
+                        let fi = FileInfo p.FullPath
+                        let projectName = Path.GetFileNameWithoutExtension fi.Name
+
+                        let tfm =
+                            match p.GlobalProperties.TryGetValue("TargetFramework") with
+                            | true, tfm -> tfm.Replace('.', '_')
+                            | _ -> ""
+
+                        let normalized = $"{projectName}-{tfm}"
+
+                        Some(BuildParameters(Loggers = env.Binlog.Loggers normalized))
+
+                    let projs = ProjectLoader2.EvaluateAsProjectsAllTfms(entryPoints, projectCollection = pc)
+
+                    // Execution
+                    let bm = new BuildManagerSession()
+
+                    let! (results: Result<_, BuildErrors> array) = ProjectLoader2.ExecutionWalkReferences(bm, projs, createBuildParametersFromProject)
+
+                    let result =
+                        results
+                        |> Seq.head
+
+                    let expectedSources =
+                        [
+                            projDir
+                            / "obj/Debug/netstandard2.0/n1.AssemblyInfo.fs"
+                            projDir
+                            / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
+                            projDir
+                            / "Library.fs"
+                        ]
+                        |> List.map Path.GetFullPath
+
+                    match result with
+                    | Result.Error _ -> failwith "expected success"
+                    | Ok result ->
+                        match ProjectLoader2.Parse result with
+
+                        | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Expect.equal x.SourceFiles expectedSources ""
+                        | _ -> failwith "lol"
+
+                }
+            )
+
+        testCaseTask
+        |> testWithEnv
+            "Concurrency - don't crash on concurrent builds"
+            ``loader2-concurrent``
+            (fun env ->
+                task {
+                    let path =
+                        env.Entrypoints
+                        |> Seq.map ProjectGraphEntryPoint
+
+                    use pc = projectCollection ()
+
+                    let bp = BuildParameters(Loggers = env.Binlog.Loggers env.Binlog.File.Name)
+
+                    let bm = new BuildManagerSession()
+
+                    let work: Async<Result<GraphBuildResult, GraphBuildErrors>> =
+                        async {
+                            // Evaluation
+                            let! ct = Async.CancellationToken
+                            let graph = ProjectLoader2.EvaluateAsGraph(path, pc, ct = ct)
+
+                            // Execution
+                            return!
+                                ProjectLoader2.Execution(bm, graph, buildParameters = bp, ct = ct)
+                                |> Async.AwaitTask
+                        }
+
+                    // Should be throttled so concurrent builds won't fail
+                    let! _ =
+                        Async.Parallel [
+                            work
+                            work
+                            work
+                            work
+                        ]
+
+                        |> Async.StartImmediateAsTask
+
+                    ()
+
+                }
+            )
+
+        testCaseTask
+        |> testWithEnv
+            "Failure mode 1"
+            ``loader2-failure-case1``
+            (fun env ->
+
+                task {
+                    let path =
+                        env.Entrypoints
+                        |> Seq.map ProjectGraphEntryPoint
+
+                    let loggers = env.Binlog.Loggers env.Binlog.File.Name
+
+                    // Evaluation
+                    use pc = projectCollection ()
+                    let graph = ProjectLoader2.EvaluateAsGraphAllTfms(path, pc)
+
+                    // Execution
+                    let bp = BuildParameters(Loggers = loggers)
+                    let bm = new BuildManagerSession()
+
+                    let! (result: Result<GraphBuildResult, GraphBuildErrors>) = ProjectLoader2.Execution(bm, graph, bp)
+                    Expect.isError result "expected error"
+
+                    match result with
+                    | Ok _ -> failwith "expected error"
+                    | Result.Error(GraphBuildErrors.BuildErr(result, errorLogs)) ->
+                        let results: (ProjectGraphNode * BuildErrors) seq = GraphBuildResult.isolateFailures (result, errorLogs)
+
+                        let _, BuildErr(_, errors) =
+                            results
+                            |> Seq.head
+
+                        let actualError =
+                            errors
+                            |> Seq.head
+                            |> _.Message
+
+                        Expect.equal actualError "Intentional failure" "expected error message"
+                }
+            )
+
+
+        testCaseTask
+        |> testWithEnv
+            "Cancellation"
+            ``loader2-cancel-slow``
+            (fun env ->
+                task {
+                    let path =
+                        env.Entrypoints
+                        |> Seq.map ProjectGraphEntryPoint
+
+                    // Evaluation
+                    use pc = projectCollection ()
+
+                    let graph = ProjectLoader2.EvaluateAsGraph(path, pc)
+
+                    // Execution
+                    let bp = BuildParameters(Loggers = env.Binlog.Loggers env.Binlog.File.Name)
+                    let bm = new BuildManagerSession()
+                    use cts = new CancellationTokenSource()
+
+                    try
+                        cts.CancelAfter(TimeSpan.FromSeconds 1.)
+
+                        let! (_: Result<GraphBuildResult, GraphBuildErrors>) = ProjectLoader2.Execution(bm, graph, bp, ct = cts.Token)
+                        ()
+                    with
+                    | :? OperationCanceledException as oce -> Expect.equal oce.CancellationToken cts.Token "expected cancellation"
+                    | e -> Exception.reraiseAny e
+
+                }
+            )
+    ]
+
+
 let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     ptestCase
     |> withLog
@@ -1506,6 +2101,7 @@ let testFCSmapManyProjCheckCaching =
                 Items = []
                 Properties = []
                 CustomProperties = []
+                AllItems = Map.empty
             }
 
             let makeReference (options: ProjectOptions) = {
@@ -2231,6 +2827,7 @@ let traversalProjectTest toolsPath loaderType workspaceFactory =
         $"can crack traversal projects - {loaderType}"
         (fun () ->
             let logger = Log.create "Test 'can crack traversal projects'"
+
             let fs = FileUtils(logger)
             let projPath = pathForProject ``traversal project``
             // // need to build the projects first so that there's something to latch on to
@@ -2307,9 +2904,10 @@ let tests toolsPath =
         ExpectNotification.loaded "l1.fsproj"
     ]
 
-
     testSequenced
     <| testList "Main tests" [
+
+        buildManagerSessionTests toolsPath
         testSample2 toolsPath "WorkspaceLoader" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
         testSample2 toolsPath "WorkspaceLoader" true (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
         testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" false (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))

@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>loader2_failure_case1</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <Target Name="TargetName" BeforeTargets="PrepareForBuild">
+    <Error Text="Intentional failure" Condition="'$(DesignTimeBuild)' == 'True'" />
+  </Target>
+
+</Project>
