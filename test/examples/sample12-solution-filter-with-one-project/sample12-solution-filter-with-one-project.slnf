@@ -1,0 +1,8 @@
+{
+  "solution": {
+    "path": "sample12-solution-with-two-projects.sln",
+    "projects": [
+      "classlibf2\\classlibf2.fsproj"
+    ]
+  }
+}

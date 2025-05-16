@@ -329,3 +329,23 @@ let ``sample 11 sln with other project types`` = {
     TargetFrameworks = Map.empty
     ProjectReferences = []
 }
+
+let ``sample 12 slnf with one project`` = {
+    ProjDir = "sample12-solution-filter-with-one-project"
+    AssemblyName = ""
+    ProjectFile = "sample12-solution-filter-with-one-project.slnf"
+    TargetFrameworks = Map.empty
+    ProjectReferences = [
+        {
+            ProjDir =
+                "sample12-solution-filter-with-one-project"
+                / "classlibf2"
+            AssemblyName = "lclasslibf2"
+            ProjectFile =
+                "classlibf2"
+                / "classlibf2.fsproj"
+            TargetFrameworks = Map.ofList [ "netstandard8.0", sourceFiles [ "Library.fs" ] ]
+            ProjectReferences = []
+        }
+    ]
+}

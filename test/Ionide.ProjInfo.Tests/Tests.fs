@@ -2273,6 +2273,36 @@ let sample11OtherProjectsTest toolsPath loaderType workspaceFactory =
             Expect.hasLength parsed 1 "Should have fsproj"
         )
 
+let sample12SlnFilterTest toolsPath loaderType workspaceFactory =
+    testCase
+        $"Can load sample12 with solution folder with one project - {loaderType}"
+        (fun () ->
+
+            let projPath = pathForProject ``sample 12 slnf with one project``
+
+            let projPaths =
+                // using Inspectsln emulates what we do in FsAutocomplete for gathering projects to load
+                InspectSln.tryParseSln projPath
+                |> getResult
+                |> InspectSln.loadingBuildOrder
+
+            let loader: IWorkspaceLoader = workspaceFactory toolsPath
+
+            let parsed =
+                loader.LoadProjects projPaths
+                |> Seq.toList
+
+            Expect.hasLength parsed 1 "Should have fsproj"
+
+            let projDir = Path.GetDirectoryName projPath
+
+            let fsproj =
+                projDir
+                / ``sample 12 slnf with one project``.ProjectReferences.[0].ProjectFile
+
+            Expect.equal parsed[0].ProjectFileName fsproj "should contain the expected project"
+        )
+
 let tests toolsPath =
     let testSample3WorkspaceLoaderExpected = [
         ExpectNotification.loading "c1.fsproj"
@@ -2402,4 +2432,7 @@ let tests toolsPath =
 
         sample11OtherProjectsTest toolsPath (nameof (WorkspaceLoader)) WorkspaceLoader.Create
         sample11OtherProjectsTest toolsPath (nameof (WorkspaceLoaderViaProjectGraph)) WorkspaceLoaderViaProjectGraph.Create
+
+        sample12SlnFilterTest toolsPath (nameof (WorkspaceLoader)) WorkspaceLoader.Create
+        sample12SlnFilterTest toolsPath (nameof (WorkspaceLoaderViaProjectGraph)) WorkspaceLoaderViaProjectGraph.Create
     ]

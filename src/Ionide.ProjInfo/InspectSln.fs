@@ -58,21 +58,22 @@ module InspectSln =
 
     /// Parses a file on disk and returns data about its contents. Supports sln, slnf, and slnx files.
     let tryParseSln (slnFilePath: string) =
+
+        let slnDir = Path.GetDirectoryName slnFilePath
+
+        let makeAbsoluteFromSlnDir =
+            let makeAbs (path: string) =
+                if Path.IsPathRooted path then
+                    path
+                else
+                    Path.Combine(slnDir, path)
+                    |> Path.GetFullPath
+
+            normalizeDirSeparators
+            >> makeAbs
+
         let parseSln (sln: Model.SolutionModel) (projectsToRead: string Set option) =
             sln.DistillProjectConfigurations()
-
-            let slnDir = Path.GetDirectoryName slnFilePath
-
-            let makeAbsoluteFromSlnDir =
-                let makeAbs (path: string) =
-                    if Path.IsPathRooted path then
-                        path
-                    else
-                        Path.Combine(slnDir, path)
-                        |> Path.GetFullPath
-
-                normalizeDirSeparators
-                >> makeAbs
 
             let parseItem (item: Model.SolutionItemModel) : SolutionItem = {
                 Guid = item.Id
@@ -141,9 +142,10 @@ module InspectSln =
                 let projects =
                     solutionElement.GetProperty("projects").EnumerateArray()
                     |> Seq.map (fun p -> p.GetString())
+                    |> Seq.map makeAbsoluteFromSlnDir
                     |> Set.ofSeq
 
-                slnPath, projects
+                makeAbsoluteFromSlnDir slnPath, projects
 
             match tryLoadSolutionModel slnFilePath with
             | Ok sln -> Ok(parseSln sln (Some projectsToRead))
