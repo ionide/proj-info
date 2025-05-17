@@ -23,9 +23,12 @@ module WorkspacePeek =
         | Slnx
         | Fsx
 
-    [<return:Struct>]
+    [<return: Struct>]
     let inline (|HasExt|_|) (ext: string) (file: FileInfo) =
-        if file.Extension = ext then ValueSome() else ValueNone
+        if file.Extension = ext then
+            ValueSome()
+        else
+            ValueNone
 
     let private partitionByChoice3 =
         let foldBy (a, b, c) t =
