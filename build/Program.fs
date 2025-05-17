@@ -49,7 +49,7 @@ let init args =
         | true, v -> v
         | _ -> false
 
-    let packages () = !! "src/**/*.nupkg"
+    let packages () = !!"src/**/*.nupkg"
 
     Target.create
         "Clean"
@@ -173,17 +173,12 @@ let init args =
 
 [<EntryPoint>]
 let main args =
-    init (
-        (args
-         |> List.ofArray)
-    )
+    List.ofArray args
+    |> init
 
     try
-        match args with
-        | [| target |] -> Target.runOrDefaultWithArguments target
-        | _ -> Target.runOrDefaultWithArguments "Default"
-
+        Target.runOrDefaultWithArguments "Default"
         0
     with e ->
-        printfn "%A" e
+        eprintfn "%A" e
         1
