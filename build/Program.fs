@@ -114,7 +114,7 @@ let init args =
 
             exec
                 "dotnet"
-                $"test %s{failedOnFocus} --blame --blame-hang-timeout 60s --framework {tfm} --logger trx --logger GitHubActions -c %s{configuration} .\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj"
+                $"test --blame --blame-hang-timeout 60s --framework {tfm} --logger trx --logger GitHubActions -c %s{configuration} .\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj -- %s{failedOnFocus}"
                 "test"
                 (Map.ofSeq [ "BuildNet9", tfmToBuildNet9Map.[tfm].ToString() ])
             |> ignore
