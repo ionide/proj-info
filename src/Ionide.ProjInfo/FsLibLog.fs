@@ -546,9 +546,7 @@ module Providers =
             let pushPropertyMethodCall = Expression.Call(null, pushPropertyMethod, nameParam, valueParam, destructureObjectParam)
 
             let pushProperty =
-                Expression
-                    .Lambda<Func<string, obj, bool, IDisposable>>(pushPropertyMethodCall, nameParam, valueParam, destructureObjectParam)
-                    .Compile()
+                Expression.Lambda<Func<string, obj, bool, IDisposable>>(pushPropertyMethodCall, nameParam, valueParam, destructureObjectParam).Compile()
 
             fun key value destructure -> pushProperty.Invoke(key, value, destructure)
 
@@ -581,9 +579,7 @@ module Providers =
             let methodCall = Expression.Call(null, method, exrs)
 
             let func =
-                Expression
-                    .Lambda<Func<string, obj, bool, obj>>(methodCall, propertyNameParam, valueParam, destructureObjectsParam)
-                    .Compile()
+                Expression.Lambda<Func<string, obj, bool, obj>>(methodCall, propertyNameParam, valueParam, destructureObjectsParam).Compile()
 
             fun name -> func.Invoke("SourceContext", name, false)
 
@@ -646,10 +642,7 @@ module Providers =
 
                 let isEnabledMethodCall = Expression.Call(instanceCast, isEnabledMethodInfo, levelCast)
 
-                let isEnabled =
-                    Expression
-                        .Lambda<Func<obj, obj, bool>>(isEnabledMethodCall, instanceParam, levelParam)
-                        .Compile()
+                let isEnabled = Expression.Lambda<Func<obj, obj, bool>>(isEnabledMethodCall, instanceParam, levelParam).Compile()
 
                 let writeMethodInfo =
                     loggerType.GetMethod(
@@ -688,9 +681,7 @@ module Providers =
                     Expression.Call(instanceCast, writeExceptionMethodInfo, levelCast, exceptionParam, messageParam, propertyValuesParam)
 
                 let writeException =
-                    Expression
-                        .Lambda<Action<obj, obj, exn, string, obj[]>>(writeMethodExp, instanceParam, levelParam, exceptionParam, messageParam, propertyValuesParam)
-                        .Compile()
+                    Expression.Lambda<Action<obj, obj, exn, string, obj[]>>(writeMethodExp, instanceParam, levelParam, exceptionParam, messageParam, propertyValuesParam).Compile()
 
                 {
                     Write = (fun logger level message formattedParmeters -> write.Invoke(logger, level, message, formattedParmeters))
@@ -779,9 +770,7 @@ module Providers =
                     let createLoggerMethodExp = Expression.Call(instanceCast, createLoggerMethodInfo, nameParam)
 
                     let createLogger =
-                        Expression
-                            .Lambda<Func<ILoggerFactory, string, ILogger>>(createLoggerMethodExp, instanceParam, nameParam)
-                            .Compile()
+                        Expression.Lambda<Func<ILoggerFactory, string, ILogger>>(createLoggerMethodExp, instanceParam, nameParam).Compile()
 
                     createLogger
                     |> FuncConvert.FromFunc
@@ -814,9 +803,7 @@ module Providers =
                     let isEnabledMethodCall = Expression.Call(instanceCast, isEnabledMethodInfo, levelCast)
 
 
-                    Expression
-                        .Lambda<Func<ILogger, MicrosoftLogLevel, bool>>(isEnabledMethodCall, instanceParam, levelParam)
-                        .Compile()
+                    Expression.Lambda<Func<ILogger, MicrosoftLogLevel, bool>>(isEnabledMethodCall, instanceParam, levelParam).Compile()
                     |> FuncConvert.FromFunc
 
                 let write, writeError =
@@ -909,9 +896,7 @@ module Providers =
                     let stateParam = Expression.Parameter(typedefof<obj>)
                     let beginScopeMethodCall = Expression.Call(instanceCast, beginScopeMethodInfo, stateParam)
 
-                    Expression
-                        .Lambda<Func<ILogger, obj, IDisposable>>(beginScopeMethodCall, instanceParam, stateParam)
-                        .Compile()
+                    Expression.Lambda<Func<ILogger, obj, IDisposable>>(beginScopeMethodCall, instanceParam, stateParam).Compile()
                     |> FuncConvert.FromFunc
 
                 {
@@ -991,12 +976,13 @@ module LogProvider =
 
     let mutable private currentLogProvider = None
 
-    let private knownProviders = [
+    let private knownProviders =
+        [
 #if !FABLE_COMPILER
-        (SerilogProvider.isAvailable, SerilogProvider.create)
-        (MicrosoftExtensionsLoggingProvider.isAvailable, MicrosoftExtensionsLoggingProvider.create)
+            (SerilogProvider.isAvailable, SerilogProvider.create)
+            (MicrosoftExtensionsLoggingProvider.isAvailable, MicrosoftExtensionsLoggingProvider.create)
 #endif
-    ]
+        ]
 
     /// Greedy search for first available LogProvider. Order of known providers matters.
     let private resolvedLogger =

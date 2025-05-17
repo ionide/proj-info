@@ -11,6 +11,26 @@ System.Environment.CurrentDirectory <- (Path.combine __SOURCE_DIRECTORY__ "..")
 // --------------------------------------------------------------------------------------
 let isNullOrWhiteSpace = System.String.IsNullOrWhiteSpace
 
+let environVarAsBoolOrDefault varName defaultValue =
+    let truthyConsts = [
+        "1"
+        "Y"
+        "YES"
+        "T"
+        "TRUE"
+    ]
+
+    try
+        let envvar = (Environment.environVar varName).ToUpper()
+
+        truthyConsts
+        |> List.exists ((=) envvar)
+    with _ ->
+        defaultValue
+
+
+let isCI = lazy (environVarAsBoolOrDefault "CI" false)
+
 let exec cmd args dir env =
     let proc =
         CreateProcess.fromRawCommandLine cmd args
@@ -49,7 +69,7 @@ let init args =
         | true, v -> v
         | _ -> false
 
-    let packages () = !! "src/**/*.nupkg"
+    let packages () = !!"src/**/*.nupkg"
 
     Target.create
         "Clean"
@@ -86,9 +106,15 @@ let init args =
         try
             exec "dotnet" $"new globaljson --force --sdk-version {tfmToSdkMap.[tfm]} --roll-forward LatestMinor" "test" Map.empty
 
+            let failedOnFocus =
+                if isCI.Value then
+                    "Expecto.fail-on-focused-tests=true"
+                else
+                    ""
+
             exec
                 "dotnet"
-                $"test --blame --blame-hang-timeout 60s --framework {tfm} --logger trx --logger GitHubActions -c {configuration} .\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj"
+                $"test --blame --blame-hang-timeout 60s --framework {tfm} --logger trx --logger GitHubActions -c %s{configuration} .\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj -- %s{failedOnFocus}"
                 "test"
                 (Map.ofSeq [ "BuildNet9", tfmToBuildNet9Map.[tfm].ToString() ])
             |> ignore
@@ -173,17 +199,12 @@ let init args =
 
 [<EntryPoint>]
 let main args =
-    init (
-        (args
-         |> List.ofArray)
-    )
+    List.ofArray args
+    |> init
 
     try
-        match args with
-        | [| target |] -> Target.runOrDefaultWithArguments target
-        | _ -> Target.runOrDefaultWithArguments "Default"
-
+        Target.runOrDefaultWithArguments "Default"
         0
     with e ->
-        printfn "%A" e
+        eprintfn "%A" e
         1
