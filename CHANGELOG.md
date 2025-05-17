@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+### [0.71.0]- 2025-05-17
+
+### Changed
+
+- [FSharp.Compiler.Service update 43.9.300](https://github.com/ionide/proj-info/pull/232) (thanks @TheAngryByrd)
+
 ## [0.70.2] - 2025-02-14
 
 ### Fixed
