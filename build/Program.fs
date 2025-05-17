@@ -11,6 +11,26 @@ System.Environment.CurrentDirectory <- (Path.combine __SOURCE_DIRECTORY__ "..")
 // --------------------------------------------------------------------------------------
 let isNullOrWhiteSpace = System.String.IsNullOrWhiteSpace
 
+let environVarAsBoolOrDefault varName defaultValue =
+    let truthyConsts = [
+        "1"
+        "Y"
+        "YES"
+        "T"
+        "TRUE"
+    ]
+
+    try
+        let envvar = (Environment.environVar varName).ToUpper()
+
+        truthyConsts
+        |> List.exists ((=) envvar)
+    with _ ->
+        defaultValue
+
+
+let isCI = lazy (environVarAsBoolOrDefault "CI" false)
+
 let exec cmd args dir env =
     let proc =
         CreateProcess.fromRawCommandLine cmd args
@@ -86,9 +106,15 @@ let init args =
         try
             exec "dotnet" $"new globaljson --force --sdk-version {tfmToSdkMap.[tfm]} --roll-forward LatestMinor" "test" Map.empty
 
+            let failedOnFocus =
+                if isCI.Value then
+                    "Expecto.fail-on-focused-tests=true"
+                else
+                    ""
+
             exec
                 "dotnet"
-                $"test --blame --blame-hang-timeout 60s --framework {tfm} --logger trx --logger GitHubActions -c {configuration} .\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj"
+                $"test %s{failedOnFocus} --blame --blame-hang-timeout 60s --framework {tfm} --logger trx --logger GitHubActions -c %s{configuration} .\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj"
                 "test"
                 (Map.ofSeq [ "BuildNet9", tfmToBuildNet9Map.[tfm].ToString() ])
             |> ignore
