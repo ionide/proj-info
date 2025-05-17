@@ -349,3 +349,11 @@ let ``sample 12 slnf with one project`` = {
         }
     ]
 }
+
+let ``sample 13 sln with solution files`` = {
+    ProjDir = "sample13-solution-with-solution-files"
+    AssemblyName = ""
+    ProjectFile = "sample13-solution-with-solution-files.sln"
+    TargetFrameworks = Map.empty
+    ProjectReferences = []
+}

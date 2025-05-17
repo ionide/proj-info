@@ -2303,6 +2303,34 @@ let sample12SlnFilterTest toolsPath loaderType workspaceFactory =
             Expect.equal parsed[0].ProjectFileName fsproj "should contain the expected project"
         )
 
+let sample13SolutionFilesTest toolsPath loaderType workspaceFactory =
+    testCase
+        $"Can load sample13 sln with solution files - {loaderType}"
+        (fun () ->
+
+            let projPath = pathForProject ``sample 13 sln with solution files``
+            let projDir = Path.GetDirectoryName projPath
+
+            let expectedReadme =
+                projDir
+                / "README.md"
+
+            let solutionContents =
+                InspectSln.tryParseSln projPath
+                |> getResult
+
+            let solutionItem = solutionContents.Items[0]
+
+            Expect.equal solutionItem.Guid (Guid("8ec462fd-d22e-90a8-e5ce-7e832ba40c5d")) "Should have the epxcted guid"
+            Expect.equal solutionItem.Name "\\Solution Items\\" "Should have the expected folder name"
+
+            match solutionItem.Kind with
+            | InspectSln.Folder(_, files) ->
+                Expect.hasLength files 1 "Should have one file"
+                Expect.sequenceEqual files [ expectedReadme ] "Should contain the expected readme.md"
+            | _ -> failtestf "Expected a folder, but got %A" solutionItem.Kind
+        )
+
 let tests toolsPath =
     let testSample3WorkspaceLoaderExpected = [
         ExpectNotification.loading "c1.fsproj"
@@ -2435,4 +2463,7 @@ let tests toolsPath =
 
         sample12SlnFilterTest toolsPath (nameof (WorkspaceLoader)) WorkspaceLoader.Create
         sample12SlnFilterTest toolsPath (nameof (WorkspaceLoaderViaProjectGraph)) WorkspaceLoaderViaProjectGraph.Create
+
+        sample13SolutionFilesTest toolsPath (nameof (WorkspaceLoader)) WorkspaceLoader.Create
+        sample13SolutionFilesTest toolsPath (nameof (WorkspaceLoaderViaProjectGraph)) WorkspaceLoaderViaProjectGraph.Create
     ]
