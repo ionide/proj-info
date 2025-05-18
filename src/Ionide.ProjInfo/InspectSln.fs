@@ -97,9 +97,16 @@ module InspectSln =
                             not (isNull item.Parent)
                             && item.Parent.Id = folder.Id
                         )
-                        |> Seq.map (fun p -> parseItem p, string p.Id)
-                        |> List.ofSeq
-                        |> List.unzip
+                        |> Seq.map (fun p -> parseItem p)
+                        |> List.ofSeq,
+
+                        folder.Files
+                        |> Option.ofObj
+                        |> Option.map (
+                            Seq.map makeAbsoluteFromSlnDir
+                            >> List.ofSeq
+                        )
+                        |> Option.defaultValue []
                     )
             }
 

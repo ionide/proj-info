@@ -1,0 +1,3 @@
+# Ionide.ProjInfo
+
+Hello world
