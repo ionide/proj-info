@@ -89,7 +89,7 @@ module InspectSln =
 
             let parseFolder (folder: Model.SolutionFolderModel) : SolutionItem = {
                 Guid = folder.Id
-                Name = makeAbsoluteFromSlnDir folder.Path
+                Name = folder.ActualDisplayName
                 Kind =
                     SolutionItemKind.Folder(
                         sln.SolutionItems
