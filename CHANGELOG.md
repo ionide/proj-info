@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.71.2] - 2025-06-01
+
+### Fixed
+
+- Solution Explorer fixes [#233](https://github.com/ionide/proj-info/pull/233) [#234](https://github.com/ionide/proj-info/pull/234) [#235](https://github.com/ionide/proj-info/pull/235) (thanks @Numpsy)
+
 ## [0.71.1] - 2025-05-17
 
 ### Fixed
