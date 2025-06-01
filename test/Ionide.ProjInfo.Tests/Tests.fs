@@ -2322,7 +2322,7 @@ let sample13SolutionFilesTest toolsPath loaderType workspaceFactory =
             let solutionItem = solutionContents.Items[0]
 
             Expect.equal solutionItem.Guid (Guid("8ec462fd-d22e-90a8-e5ce-7e832ba40c5d")) "Should have the epxcted guid"
-            Expect.equal solutionItem.Name $"{Path.DirectorySeparatorChar}Solution Items{Path.DirectorySeparatorChar}" "Should have the expected folder name"
+            Expect.equal solutionItem.Name "Solution Items" "Should have the expected folder name"
 
             match solutionItem.Kind with
             | InspectSln.Folder(_, files) ->
