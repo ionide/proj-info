@@ -357,3 +357,12 @@ let ``sample 13 sln with solution files`` = {
     TargetFrameworks = Map.empty
     ProjectReferences = []
 }
+
+// A test with a .slnx format solution file
+let ``sample 14 slnx solution`` = {
+    ProjDir = "sample-14-slnx-solution"
+    AssemblyName = ""
+    ProjectFile = "sample-14-slnx-solution.slnx"
+    TargetFrameworks = Map.empty
+    ProjectReferences = []
+}
