@@ -2331,6 +2331,28 @@ let sample13SolutionFilesTest toolsPath loaderType workspaceFactory =
             | _ -> failtestf "Expected a folder, but got %A" solutionItem.Kind
         )
 
+let sample14SlnxFileTest toolsPath loaderType workspaceFactory =
+    testCase
+        $"Can load sample14 slnx file test - {loaderType}"
+        (fun () ->
+
+            let projPath = pathForProject ``sample 14 slnx solution``
+            let slnDir = Path.GetDirectoryName projPath
+
+            let solutionContents =
+                InspectSln.tryParseSln projPath
+                |> getResult
+
+            let expectedProject = solutionContents.Items[0]
+
+            let expectedProjectPath = Path.Combine(slnDir, "proj1", "proj1.fsproj")
+            Expect.equal expectedProject.Name expectedProjectPath "Should have the expected project path"
+
+            match expectedProject.Kind with
+            | InspectSln.MSBuildFormat items -> Expect.isEmpty items "we don't currently store anything here"
+            | _ -> failtestf "Expected a project, but got %A" expectedProject.Kind
+        )
+
 let tests toolsPath =
     let testSample3WorkspaceLoaderExpected = [
         ExpectNotification.loading "c1.fsproj"
@@ -2466,4 +2488,7 @@ let tests toolsPath =
 
         sample13SolutionFilesTest toolsPath (nameof (WorkspaceLoader)) WorkspaceLoader.Create
         sample13SolutionFilesTest toolsPath (nameof (WorkspaceLoaderViaProjectGraph)) WorkspaceLoaderViaProjectGraph.Create
+
+        sample14SlnxFileTest toolsPath (nameof (WorkspaceLoader)) WorkspaceLoader.Create
+        sample14SlnxFileTest toolsPath (nameof (WorkspaceLoaderViaProjectGraph)) WorkspaceLoaderViaProjectGraph.Create
     ]
