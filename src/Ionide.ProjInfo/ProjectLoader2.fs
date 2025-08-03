@@ -216,7 +216,9 @@ type BuildManagerSession(?bm: BuildManager) =
 
                             match result.Exception with
                             | null -> tcs.SetResult(x.determineBuildOutput (buildParameters, result))
-                            | :? Microsoft.Build.Exceptions.BuildAbortedException when ct.IsCancellationRequested -> tcs.SetCanceled ct
+                            | :? Microsoft.Build.Exceptions.BuildAbortedException as bae when ct.IsCancellationRequested ->
+                                OperationCanceledException("Build was cancelled", bae, ct)
+                                |> tcs.SetException
                             | e -> tcs.SetException e
                         ),
                         buildRequest
@@ -248,7 +250,9 @@ type BuildManagerSession(?bm: BuildManager) =
 
                             match result.Exception with
                             | null -> tcs.SetResult(x.determineGraphBuildOutput (buildParameters, result))
-                            | :? Microsoft.Build.Exceptions.BuildAbortedException when ct.IsCancellationRequested -> tcs.SetCanceled ct
+                            | :? Microsoft.Build.Exceptions.BuildAbortedException as bae when ct.IsCancellationRequested ->
+                                OperationCanceledException("Build was cancelled", bae, ct)
+                                |> tcs.SetException
                             | e -> tcs.SetException e
 
                         ),
