@@ -1519,7 +1519,7 @@ open Microsoft.Build.Framework
 
 type Binlogs(binlog: FileInfo) =
     let sw = new StringWriter()
-    let errorLogger = ErrorLogger()
+    let errorLogger = new ErrorLogger()
 
     let loggers name =
         ProjectLoader.createLoggers name (BinaryLogGeneration.Within(binlog.Directory)) sw (Some errorLogger)
@@ -1614,16 +1614,10 @@ type IWorkspaceLoader2 =
     abstract member Load: paths: string list * ct: CancellationToken -> Task<seq<Result<BuildResult, BuildResult * ErrorLogger>>>
 
 
-type GraphBuildErrors =
-    | BuildErr of GraphBuildResult * BuildErrorEventArgs list
+type BuildErrors<'BuildResult> =
+    | BuildErr of 'BuildResult * BuildErrorEventArgs list
 
-    interface GraphBuildResultFailure<GraphBuildErrors> with
-        static member BuildFailure(result, errorLogs) = BuildErr(result, errorLogs)
-
-type BuildErrors =
-    | BuildErr of BuildResult * BuildErrorEventArgs list
-
-    interface BuildResultFailure<BuildErrors> with
+    interface BuildResultFailure<BuildErrors<'BuildResult>, 'BuildResult> with
         static member BuildFailure(result, errorLogs) = BuildErr(result, errorLogs)
 
 let buildManagerSessionTests toolsPath =
@@ -1648,7 +1642,7 @@ let buildManagerSessionTests toolsPath =
                     let bp = BuildParameters(Loggers = loggers)
                     let bm = new BuildManagerSession()
 
-                    let! (result: Result<GraphBuildResult, GraphBuildErrors>) = ProjectLoader2.Execution(bm, graph, bp)
+                    let! (result: Result<GraphBuildResult, BuildErrors<GraphBuildResult>>) = ProjectLoader2.Execution(bm, graph, bp)
 
                     // Parse
                     let projectsAfterBuild =
@@ -1660,9 +1654,9 @@ let buildManagerSessionTests toolsPath =
                                 | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
                                 | _ -> None
                             )
-                        | Result.Error(GraphBuildErrors.BuildErr(result, errorLogs)) ->
-                            let results: Dictionary<ProjectGraphNode, Result<BuildResult, BuildErrors>> =
-                                GraphBuildResult.resultsByNode (result, errorLogs)
+                        | Result.Error(BuildErrors.BuildErr(result, errorLogs)) ->
+                            let results: Dictionary<ProjectGraphNode, Result<BuildResult, BuildErrors<BuildResult>>> =
+                                GraphBuildResult.resultsByNode result errorLogs
 
                             failwith "Build failed"
 
@@ -1714,7 +1708,7 @@ let buildManagerSessionTests toolsPath =
                     // Execution
                     let bm = new BuildManagerSession()
 
-                    let! (results: Result<BuildResult, BuildErrors> array) = ProjectLoader2.ExecutionWalkReferences(bm, allprojects, createBuildParametersFromProject)
+                    let! (results: Result<BuildResult, BuildErrors<BuildResult>> array) = ProjectLoader2.ExecutionWalkReferences(bm, allprojects, createBuildParametersFromProject)
 
                     let projectsAfterBuild =
                         results
@@ -1757,7 +1751,7 @@ let buildManagerSessionTests toolsPath =
                     let bp = BuildParameters(Loggers = loggers)
                     let bm = new BuildManagerSession()
 
-                    let! (result: Result<GraphBuildResult, GraphBuildErrors>) = ProjectLoader2.Execution(bm, graph, bp)
+                    let! (result: Result<GraphBuildResult, BuildErrors<GraphBuildResult>>) = ProjectLoader2.Execution(bm, graph, bp)
 
                     let expectedSources =
                         [
@@ -1824,7 +1818,7 @@ let buildManagerSessionTests toolsPath =
                     // Execution
                     let bm = new BuildManagerSession()
 
-                    let! (results: Result<_, BuildErrors> array) = ProjectLoader2.ExecutionWalkReferences(bm, projs, createBuildParametersFromProject)
+                    let! (results: Result<_, BuildErrors<BuildResult>> array) = ProjectLoader2.ExecutionWalkReferences(bm, projs, createBuildParametersFromProject)
 
                     let result =
                         results
@@ -1868,7 +1862,7 @@ let buildManagerSessionTests toolsPath =
 
                     let bm = new BuildManagerSession()
 
-                    let work: Async<Result<GraphBuildResult, GraphBuildErrors>> =
+                    let work: Async<Result<GraphBuildResult, BuildErrors<GraphBuildResult>>> =
                         async {
                             // Evaluation
                             let! ct = Async.CancellationToken
@@ -1917,13 +1911,13 @@ let buildManagerSessionTests toolsPath =
                     let bp = BuildParameters(Loggers = loggers)
                     let bm = new BuildManagerSession()
 
-                    let! (result: Result<GraphBuildResult, GraphBuildErrors>) = ProjectLoader2.Execution(bm, graph, bp)
+                    let! (result: Result<GraphBuildResult, BuildErrors<GraphBuildResult>>) = ProjectLoader2.Execution(bm, graph, bp)
                     Expect.isError result "expected error"
 
                     match result with
                     | Ok _ -> failwith "expected error"
-                    | Result.Error(GraphBuildErrors.BuildErr(result, errorLogs)) ->
-                        let results: (ProjectGraphNode * BuildErrors) seq = GraphBuildResult.isolateFailures (result, errorLogs)
+                    | Result.Error(BuildErrors.BuildErr(result, errorLogs)) ->
+                        let results: (ProjectGraphNode * BuildErrors<BuildResult>) seq = GraphBuildResult.isolateFailures result errorLogs
 
                         let _, BuildErr(_, errors) =
                             results
@@ -1962,7 +1956,7 @@ let buildManagerSessionTests toolsPath =
                     try
                         cts.CancelAfter(TimeSpan.FromSeconds 1.)
 
-                        let! (_: Result<GraphBuildResult, GraphBuildErrors>) = ProjectLoader2.Execution(bm, graph, bp, ct = cts.Token)
+                        let! (_: Result<GraphBuildResult, BuildErrors<GraphBuildResult>>) = ProjectLoader2.Execution(bm, graph, bp, ct = cts.Token)
                         ()
                     with
                     | :? OperationCanceledException as oce -> Expect.equal oce.CancellationToken cts.Token "expected cancellation"
