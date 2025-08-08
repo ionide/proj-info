@@ -79,7 +79,6 @@ module BuildErrorEventArgs =
         |> Seq.map (fun e -> $"{e.ProjectFile} {e.Message}")
         |> String.concat "\n"
 
-
 [<AutoOpenAttribute>]
 module internal BuildManagerExtensions =
 
@@ -117,30 +116,32 @@ module internal BuildManagerSession =
     let internal locker = new SemaphoreSlim(1, 1)
 
 
-type BuildResultFailure<'e> =
-    static abstract BuildFailure: BuildResult * BuildErrorEventArgs list -> 'e
-
-type GraphBuildResultFailure<'e> =
-    static abstract BuildFailure: GraphBuildResult * BuildErrorEventArgs list -> 'e
-
+type BuildResultFailure<'e, 'buildResult> =
+    static abstract BuildFailure: 'buildResult * BuildErrorEventArgs list -> 'e
 
 module GraphBuildResult =
-    let resultsByNode<'e when BuildResultFailure<'e>> (result: GraphBuildResult, errorLogs: BuildErrorEventArgs list) =
+    let resultsByNode<'e when BuildResultFailure<'e, BuildResult>> (result: GraphBuildResult) (errorLogs: BuildErrorEventArgs list) =
+        let errorLogsMap =
+            errorLogs
+            |> List.groupBy (fun e -> e.ProjectFile)
+            |> Map.ofList
+
         result.ResultsByNode
         |> Seq.map (fun (KeyValue(k, v)) ->
             match v.OverallResult with
             | BuildResultCode.Success -> KeyValuePair(k, Ok v)
             | _ ->
                 let logs =
-                    errorLogs
-                    |> List.filter (fun e -> e.ProjectFile = k.ProjectInstance.FullPath)
+                    errorLogsMap
+                    |> Map.tryFind k.ProjectInstance.FullPath
+                    |> Option.defaultValue []
 
                 KeyValuePair(k, Error('e.BuildFailure(v, logs)))
         )
         |> Dictionary<_, _>
 
-    let isolateFailures (result: GraphBuildResult, errorLogs: BuildErrorEventArgs list) =
-        resultsByNode (result, errorLogs)
+    let isolateFailures (result: GraphBuildResult) (errorLogs: BuildErrorEventArgs list) =
+        resultsByNode result errorLogs
         |> Seq.choose (fun (KeyValue(k, v)) ->
             match v with
             | Ok v -> None
@@ -173,13 +174,13 @@ type BuildManagerSession(?bm: BuildManager) =
             return! a ()
         }
 
-    member private x.determineBuildOutput<'e when BuildResultFailure<'e>>(buildParameters, result: BuildResult) =
+    member private x.determineBuildOutput<'e when BuildResultFailure<'e, BuildResult>>(buildParameters, result: BuildResult) =
         match result.OverallResult with
         | BuildResultCode.Success -> Ok result
         | _ -> Error('e.BuildFailure(result, tryGetErrorLogs buildParameters))
 
 
-    member private x.determineGraphBuildOutput<'e when GraphBuildResultFailure<'e>>(buildParameters, result: GraphBuildResult) =
+    member private x.determineGraphBuildOutput<'e when BuildResultFailure<'e, GraphBuildResult>>(buildParameters, result: GraphBuildResult) =
         match result.OverallResult with
         | BuildResultCode.Success -> Ok result
         | _ -> Error('e.BuildFailure(result, tryGetErrorLogs buildParameters))
