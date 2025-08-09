@@ -120,29 +120,41 @@ type BuildResultFailure<'e, 'buildResult> =
     static abstract BuildFailure: 'buildResult * BuildErrorEventArgs list -> 'e
 
 module GraphBuildResult =
+
+    /// <summary>
+    /// Groups build results by their associated project nodes.
+    /// </summary>
+    /// <param name="result">The GraphBuildResult to group.</param>
+    /// <param name="errorLogs">The error logs from the failed build.</param>
+    /// <returns>A dictionary where the key is the project node and the value is either a successful BuildResult or an error containing the failure details.</returns>
     let resultsByNode<'e when BuildResultFailure<'e, BuildResult>> (result: GraphBuildResult) (errorLogs: BuildErrorEventArgs list) =
         let errorLogsMap =
-            errorLogs
-            |> List.groupBy (fun e -> e.ProjectFile)
-            |> Map.ofList
+            lazy
+                (errorLogs
+                 |> List.groupBy (fun e -> e.ProjectFile)
+                 |> Map.ofList)
 
         result.ResultsByNode
         |> Seq.map (fun (KeyValue(k, v)) ->
             match v.OverallResult with
-            | BuildResultCode.Success -> KeyValuePair(k, Ok v)
+            | BuildResultCode.Success -> k, Ok v
             | _ ->
                 let logs =
-                    errorLogsMap
+                    errorLogsMap.Value
                     |> Map.tryFind k.ProjectInstance.FullPath
                     |> Option.defaultValue []
 
-                KeyValuePair(k, Error('e.BuildFailure(v, logs)))
+                k, Error('e.BuildFailure(v, logs))
         )
-        |> Dictionary<_, _>
 
+    /// <summary>
+    /// Isolates failures from a GraphBuildResult, returning a sequence of KeyValuePairs where the value is an Error.
+    /// </summary>
+    /// <param name="result">The GraphBuildResult to isolate failures from.</param>
+    /// <param name="errorLogs">The error logs from the failed build.</param>
     let isolateFailures (result: GraphBuildResult) (errorLogs: BuildErrorEventArgs list) =
         resultsByNode result errorLogs
-        |> Seq.choose (fun (KeyValue(k, v)) ->
+        |> Seq.choose (fun (k, v) ->
             match v with
             | Ok v -> None
             | Error e -> Some(k, e)
@@ -178,7 +190,6 @@ type BuildManagerSession(?bm: BuildManager) =
         match result.OverallResult with
         | BuildResultCode.Success -> Ok result
         | _ -> Error('e.BuildFailure(result, tryGetErrorLogs buildParameters))
-
 
     member private x.determineGraphBuildOutput<'e when BuildResultFailure<'e, GraphBuildResult>>(buildParameters, result: GraphBuildResult) =
         match result.OverallResult with
@@ -277,7 +288,15 @@ type TargetFrameworks = string array
 
 module TargetFrameworks =
 
-    let parse (tfms: string) =
+    /// <summary>
+    /// Parses a string containing TargetFrameworks into an array of TargetFrameworks.
+    /// </summary>
+    /// <param name="tfms">The string containing TargetFrameworks, separated by semicolons.</param>
+    /// <returns>An array of TargetFrameworks, or None if the input is null or empty.</returns>
+    /// <remarks>
+    /// This takes a string of the form "net5.0;net6.0;net7.0" and splits it into an array of TargetFrameworks.
+    /// </remarks>
+    let parse (tfms: string) : TargetFramework array option =
         tfms
         |> Option.ofObj
         |> Option.bind (fun tfms ->
@@ -290,16 +309,16 @@ module TargetFrameworks =
         )
 
 
-type ProjectMap<'a> = Map<ProjectPath, Map<TargetFramework, 'a>>
+// type ProjectMap<'a> = Map<ProjectPath, Map<TargetFramework, 'a>>
 
-module ProjectMap =
+// module ProjectMap =
 
-    let map (f: ProjectPath -> TargetFramework -> 'a -> 'a0) (m: ProjectMap<'a>) =
-        m
-        |> Map.map (fun k -> Map.map (f k))
+//     let map (f: ProjectPath -> TargetFramework -> 'a -> 'a0) (m: ProjectMap<'a>) =
+//         m
+//         |> Map.map (fun k -> Map.map (f k))
 
-type ProjectProjectMap = ProjectMap<Project>
-type ProjectGraphMap = ProjectMap<ProjectGraphNode>
+// type ProjectProjectMap = ProjectMap<Project>
+// type ProjectGraphMap = ProjectMap<ProjectGraphNode>
 
 module ProjectLoading =
 
@@ -327,6 +346,15 @@ module ProjectLoading =
 
 type ProjectLoader2 =
 
+    /// <summary>
+    /// Default flags for build requests.
+    ///
+    /// BuildRequestDataFlags.SkipNonexistentTargets
+    /// ||| BuildRequestDataFlags.ClearCachesAfterBuild
+    /// ||| BuildRequestDataFlags.ProvideProjectStateAfterBuild
+    /// ||| BuildRequestDataFlags.IgnoreMissingEmptyAndInvalidImports
+    /// ||| BuildRequestDataFlags.ReplaceExistingProjectInstance
+    /// </summary>
     static member DefaultFlags =
         BuildRequestDataFlags.SkipNonexistentTargets
         ||| BuildRequestDataFlags.ClearCachesAfterBuild
@@ -334,15 +362,52 @@ type ProjectLoader2 =
         ||| BuildRequestDataFlags.IgnoreMissingEmptyAndInvalidImports
         ||| BuildRequestDataFlags.ReplaceExistingProjectInstance
 
+
+    /// <summary>
+    /// Finds or creates a project matching the specified entry project file and global properties.
+    /// </summary>
+    /// <param name="entryProjectFile">The project file to match.</param>
+    /// <param name="globalProperties">Optional global properties to apply to the project.</param>
+    /// <param name="projectCollection">Optional project collection to use for evaluation.</param>
+    /// <returns>The evaluated project.</returns>
+    /// <remarks>
+    /// This method evaluates the project file and returns the corresponding project.
+    /// It does not check for TargetFramework or TargetFrameworks properties; it simply returns the project as is.
+    /// </remarks>
     static member EvaluateAsProject(entryProjectFile: string, ?globalProperties: IDictionary<string, string>, ?projectCollection: ProjectCollection) =
         let pc = defaultArg projectCollection ProjectCollection.GlobalProjectCollection
         let globalProperties = defaultArg globalProperties (new Dictionary<string, string>())
         findOrCreateMatchingProject entryProjectFile pc globalProperties
 
+    /// <summary>
+    /// Evaluates a sequence of project files, returning a sequence of projects.
+    /// </summary>
+    /// <param name="entryProjectFiles">The project files to evaluate.</param>
+    /// <param name="globalProperties">Optional global properties to apply to each project.</param>
+    /// <param name="projectCollection">Optional project collection to use for evaluation.</param>
+    /// <returns>A sequence of projects, each corresponding to a project file.</returns>
+    /// <remarks>
+    /// This method evaluates each project file and returns the corresponding project.
+    /// It does not check for TargetFramework or TargetFrameworks properties; it simply returns the project as is.
+    /// </remarks>
     static member EvaluateAsProjects(entryProjectFiles: string seq, ?globalProperties: IDictionary<string, string>, ?projectCollection: ProjectCollection) =
         entryProjectFiles
         |> Seq.map (fun file -> ProjectLoader2.EvaluateAsProject(file, ?globalProperties = globalProperties, ?projectCollection = projectCollection))
 
+    /// <summary>
+    /// Evaluates a sequence of project files, returning a sequence of projects for each TargetFramework
+    /// or TargetFrameworks defined in the project files.
+    /// </summary>
+    /// <param name="entryProjectFiles">The project files to evaluate.</param>
+    /// <param name="globalProperties">Optional global properties to apply to each project.</param>
+    /// <param name="projectCollection">Optional project collection to use for evaluation.</param>
+    /// <returns>A sequence of projects, each corresponding to a specific TargetFramework or TargetFrameworks defined in the project files.</returns>
+    /// <remarks>
+    /// This method evaluates each project file and checks for the presence of a "TargetFramework"
+    /// property. If it exists, the project is returned as is. If it does not exist, it checks for the "TargetFrameworks"
+    /// property and splits it into individual TargetFrameworks. For each TargetFramework, it creates a new project
+    /// with the "TargetFramework" global property set to that TargetFramework.
+    /// </remarks>
     static member EvaluateAsProjectsAllTfms(entryProjectFiles: string seq, ?globalProperties: IDictionary<string, string>, ?projectCollection: ProjectCollection) =
 
         let globalPropertiesMap =
@@ -381,10 +446,35 @@ type ProjectLoader2 =
                 )
         )
 
+    /// <summary>
+    /// Evaluates a project graph based on the specified entry project file a
+    /// </summary>
+    /// <param name="entryProjectFile">The entry project file to evaluate.</param>
+    /// <param name="globalProperties">Optional global properties to apply to the project.</param>
+    /// <param name="projectCollection">Optional project collection to use for evaluation.</param>
+    /// <param name="projectInstanceFactory">Optional factory function to create project instances.</param>
+    /// <param name="ct">Optional cancellation token to cancel the evaluation.</param>
+    /// <returns>A project graph representing the evaluated project.</returns>
+    /// <remarks>
+    /// This method evaluates the project file and returns a project graph.
+    /// It does not check for TargetFramework or TargetFrameworks properties; it simply returns the project graph as is.
+    /// </remarks>
     static member EvaluateAsGraph(entryProjectFile: string, ?globalProperties: IDictionary<string, string>, ?projectCollection: ProjectCollection, ?projectInstanceFactory, ?ct: CancellationToken) =
         let globalProperties = defaultArg globalProperties null
         ProjectLoader2.EvaluateAsGraph([ ProjectGraphEntryPoint(entryProjectFile, globalProperties = globalProperties) ], ?projectCollection = projectCollection, ?projectInstanceFactory = projectInstanceFactory, ?ct = ct)
 
+    /// <summary>
+    /// Evaluates a project graph based on the specified entry project files
+    /// </summary>
+    /// <param name="entryProjectFile">The entry project files to evaluate.</param>
+    /// <param name="projectCollection">Optional project collection to use for evaluation.</param>
+    /// <param name="projectInstanceFactory">Optional factory function to create project instances.</param>
+    /// <param name="ct">Optional cancellation token to cancel the evaluation.</param>
+    /// <returns>A project graph representing the evaluated projects.</returns>
+    /// <remarks>
+    /// This method evaluates the project files and returns a project graph.
+    /// It does not check for TargetFramework or TargetFrameworks properties; it simply returns the project graph as is.
+    /// </remarks>
     static member EvaluateAsGraph(entryProjectFile: ProjectGraphEntryPoint seq, ?projectCollection: ProjectCollection, ?projectInstanceFactory, ?ct: CancellationToken) =
         let pc = defaultArg projectCollection ProjectCollection.GlobalProjectCollection
         let ct = defaultArg ct CancellationToken.None
@@ -399,6 +489,23 @@ type ProjectLoader2 =
         ProjectGraph(entryProjectFile, pc, projectInstanceFactory, ct)
 
 
+    /// <summary>
+    /// Evaluates a project graph based on the specified entry project files, returning a ProjectGraph containing
+    /// projects for each TargetFramework or TargetFrameworks defined in the project files.
+    /// </summary>
+    /// <param name="entryProjectFile">The entry project files to evaluate.</param>
+    /// <param name="projectCollection">Optional project collection to use for evaluation.</param>
+    /// <param name="projectInstanceFactory">Optional factory function to create project instances.</param>
+    /// <returns>A project graph representing the evaluated projects, each corresponding to a specific TargetFramework
+    /// or TargetFrameworks defined in the project files.</returns>
+    /// <remarks>
+    /// This method evaluates each project file and checks for the presence of a "TargetFramework"
+    /// property. If it exists, the project is returned as is. If it does not
+    ///     exist, it checks for the "TargetFrameworks"
+    /// property and splits it into individual TargetFrameworks. For each TargetFramework, it creates
+    /// a new project
+    /// with the "TargetFramework" global property set to that TargetFramework.
+    /// </remarks>
     static member EvaluateAsGraphAllTfms(entryProjectFile: ProjectGraphEntryPoint seq, ?projectCollection: ProjectCollection, ?projectInstanceFactory) =
         let graph =
             ProjectLoader2.EvaluateAsGraph(entryProjectFile, ?projectCollection = projectCollection, ?projectInstanceFactory = projectInstanceFactory)
@@ -424,6 +531,17 @@ type ProjectLoader2 =
 
         ProjectLoader2.EvaluateAsGraph(projects, ?projectCollection = projectCollection, ?projectInstanceFactory = projectInstanceFactory)
 
+    /// <summary>
+    /// Executes a build request against the BuildManagerSession.
+    /// </summary>
+    /// <param name="session">The BuildManagerSession to use for the build.</param
+    /// ><param name="graph">The project graph to build.</param>
+    /// <param name="buildParameters">Optional build parameters to use for the build.</param
+    /// ><param name="targetsToBuild">Optional targets to build. Defaults to design-time build targets.</param>
+    /// <param name="flags">Optional flags for the build request. Defaults to ProjectLoader2.DefaultFlags.</param>
+    /// <param name="ct">Optional cancellation token to cancel the
+    /// build.</param>
+    /// <returns>A either a GraphBuildResult or an error containing the failed build and message.</returns>
     static member Execution(session: BuildManagerSession, graph: ProjectGraph, ?buildParameters: BuildParameters, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken) =
         task {
             let targetsToBuild = defaultArg targetsToBuild (ProjectLoader.designTimeBuildTargets false)
@@ -436,6 +554,17 @@ type ProjectLoader2 =
             return! session.BuildAsync(request, ?buildParameters = buildParameters, ?ct = ct)
         }
 
+    /// <summary>
+    /// Executes a build request against the BuildManagerSession.
+    /// </summary>
+    /// <param name="session">The BuildManagerSession to use for the build.</param
+    /// ><param name="projectInstance">The project instance to build.</param>
+    /// <param name="buildParameters">Optional build parameters to use for the build.</param
+    /// ><param name="targetsToBuild">Optional targets to build. Defaults to design-time build targets.</param>
+    /// <param name="flags">Optional flags for the build request. Defaults to ProjectLoader2.DefaultFlags.</param>
+    /// <param name="ct">Optional cancellation token to cancel the
+    /// build.</param>
+    /// <returns>A either a BuildResult or an error containing the failed build and message.</returns>
     static member Execution(session: BuildManagerSession, projectInstance: ProjectInstance, ?buildParameters: BuildParameters, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken) =
         task {
             let targetsToBuild = defaultArg targetsToBuild (ProjectLoader.designTimeBuildTargets false)
@@ -448,6 +577,24 @@ type ProjectLoader2 =
             return! session.BuildAsync(request, ?buildParameters = buildParameters, ?ct = ct)
         }
 
+    /// <summary>
+    /// Walks the project references of the given projects and executes a build for each project.
+    /// </summary>
+    /// <param name="session">The BuildManagerSession to use for the build.</param
+    /// ><param name="projects">The projects to walk references for.</param>
+    /// <param name="buildParameters">Function to get build parameters for each project.</param
+    /// ><param name="targetsToBuild">Optional targets to build. Defaults to design-time build targets.</param>
+    /// <param name="flags">Optional flags for the build request. Defaults to ProjectLoader2.DefaultFlags.</param>
+    /// <param name="ct">Optional cancellation token to cancel the
+    /// build.</param>
+    /// <returns>A task that returns an array of BuildResult or an error containing the failed build and message.</returns>
+    /// <remarks>
+    /// This method will visit each project, build it, and then recursively visit its references.
+    /// It will return an array of BuildResult for each project that was built.
+    /// If a project has already been visited, it will not be visited again.
+    ///
+    /// This is useful for scenarios where you want to build a project and all of its references.
+    /// </remarks>
     static member ExecutionWalkReferences(session: BuildManagerSession, projects: Project seq, buildParameters: Project -> BuildParameters option, ?targetsToBuild: string array, ?flags: BuildRequestDataFlags, ?ct: CancellationToken) =
         task {
             let projectsToVisit = Queue<Project> projects
@@ -482,6 +629,10 @@ type ProjectLoader2 =
                             )
 
                         ProjectLoader2.EvaluateAsProjectsAllTfms(references, projectCollection = p.ProjectCollection)
+                        |> Seq.filter (
+                            visited.ContainsKey
+                            >> not
+                        )
                         |> Seq.iter projectsToVisit.Enqueue
                     | _ -> ()
 
@@ -490,12 +641,28 @@ type ProjectLoader2 =
                 |> Seq.toArray
         }
 
+    /// <summary>
+    /// Gets the project instance from a BuildResult.
+    /// </summary>
+    /// <param name="buildResult">The BuildResult to get the project instance from.</param>
+    /// <returns>The project instance from the BuildResult.</returns>
+
     static member GetProjectInstance(buildResult: BuildResult) = buildResult.ProjectStateAfterBuild
 
-    static member GetProjectInstance(buildResults: BuildResult seq) =
+    /// <summary>
+    /// Gets the project instance from a sequence of BuildResults.
+    /// </summary>
+    /// <param name="buildResults">The sequence of BuildResults to get the project instances from.</param>
+    /// <returns>The project instances from the sequence of BuildResults.</returns>
+    static member GetProjectInstances(buildResults: BuildResult seq) =
         buildResults
         |> Seq.map ProjectLoader2.GetProjectInstance
 
+    /// <summary>
+    /// Gets the project instances from a GraphBuildResult.
+    /// </summary>
+    /// <param name="graphBuildResult">The GraphBuildResult to get the project instances from.</param>
+    /// <returns>The project instances from the GraphBuildResult.</returns>
     static member GetProjectInstances(graphBuildResult: GraphBuildResult) =
 
         // let start =
@@ -541,20 +708,41 @@ type ProjectLoader2 =
         graphBuildResult.ResultsByNode
         |> Seq.map (fun (KeyValue(node, result)) -> ProjectLoader2.GetProjectInstance result)
 
+
+    /// <summary>
+    /// Parses a BuildResult or GraphBuildResult into a ProjectInfo.
+    /// </summary>
+    /// <param name="graphBuildResult">The BuildResult or GraphBuildResult to parse.</param>
+    /// <returns>A sequence of ProjectInfo parsed from the BuildResult or GraphBuildResult.</returns>
     static member Parse(graphBuildResult: GraphBuildResult) =
         graphBuildResult
         |> ProjectLoader2.GetProjectInstances
         |> Seq.map ProjectLoader2.Parse
 
+    /// <summary>
+    /// Parses a BuildResult into a ProjectInfo.
+    /// </summary>
+    /// <param name="buildResult">The BuildResult to parse.</param>
+    /// <returns>A ProjectInfo parsed from the BuildResult.</returns>
     static member Parse(buildResult: BuildResult) =
         buildResult
         |> ProjectLoader2.GetProjectInstance
         |> ProjectLoader2.Parse
 
+    /// <summary>
+    /// Parses a sequence of ProjectInstances into a sequence of ProjectInfo.
+    /// </summary>
+    /// <param name="projectInstances">The sequence of ProjectInstances to parse.</param>
+    /// <returns>A sequence of ProjectInfo parsed from the ProjectInstances.</returns>
     static member Parse(projectInstances: ProjectInstance seq) =
         projectInstances
         |> Seq.toArray
         |> Array.Parallel.map ProjectLoader2.Parse
 
+    /// <summary>
+    /// Parses a ProjectInstance into a ProjectInfo.
+    /// </summary>
+    /// <param name="projectInstances">The ProjectInstance to parse.</param>
+    /// <returns>A ProjectInfo parsed from the ProjectInstance.</returns>
     static member Parse(projectInstances: ProjectInstance) =
         ProjectLoader.getLoadedProjectInfo projectInstances.FullPath [] (ProjectLoader.StandardProject projectInstances)
