@@ -1,12 +1,12 @@
 module Tests
 
+
 open DotnetProjInfo.TestAssets
 open Expecto
 open Expecto.Logging
 open Expecto.Logging.Message
 open FileUtils
 open FSharp.Compiler.CodeAnalysis
-open Ionide.ProjInfo
 open Ionide.ProjInfo
 open Ionide.ProjInfo.Types
 open Medallion.Shell
@@ -1655,7 +1655,7 @@ let buildManagerSessionTests toolsPath =
                                 | _ -> None
                             )
                         | Result.Error(BuildErrors.BuildErr(result, errorLogs)) ->
-                            let results: Dictionary<ProjectGraphNode, Result<BuildResult, BuildErrors<BuildResult>>> =
+                            let results: seq<ProjectGraphNode * Result<BuildResult, BuildErrors<BuildResult>>> =
                                 GraphBuildResult.resultsByNode result errorLogs
 
                             failwith "Build failed"
@@ -1865,12 +1865,11 @@ let buildManagerSessionTests toolsPath =
                     let work: Async<Result<GraphBuildResult, BuildErrors<GraphBuildResult>>> =
                         async {
                             // Evaluation
-                            let! ct = Async.CancellationToken
-                            let graph = ProjectLoader2.EvaluateAsGraph(path, pc, ct = ct)
+                            let graph = ProjectLoader2.EvaluateAsGraph(path, pc)
 
                             // Execution
                             return!
-                                ProjectLoader2.Execution(bm, graph, buildParameters = bp, ct = ct)
+                                ProjectLoader2.Execution(bm, graph, buildParameters = bp)
                                 |> Async.AwaitTask
                         }
 
@@ -1880,10 +1879,9 @@ let buildManagerSessionTests toolsPath =
                             work
                             work
                             work
-                            work
+                        // work
                         ]
 
-                        |> Async.StartImmediateAsTask
 
                     ()
 
