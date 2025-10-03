@@ -3,12 +3,25 @@ module DotnetProjInfo.TestAssets
 open FileUtils
 open Ionide.ProjInfo.Types
 open Expecto
+open Microsoft.Build.Graph
+open Microsoft.Build.Framework
+open Ionide.ProjInfo
+open Microsoft.Build.Execution
+open System.Threading.Tasks
 
+
+type BuildErrors<'BuildResult> =
+    | BuildErr of 'BuildResult * BuildErrorEventArgs list
+
+    interface BuildResultFailure<BuildErrors<'BuildResult>, 'BuildResult> with
+        static member BuildFailure(result, errorLogs) = BuildErr(result, errorLogs)
 
 type TestAssetProjInfo2 = {
     ProjDir: string
     EntryPoints: string seq
-    Expects: ProjectOptions seq -> unit
+    ExpectsGraphResult: Result<GraphBuildResult, BuildErrors<GraphBuildResult>> -> ValueTask
+    ExpectsProjectResult: Result<BuildResult, BuildErrors<BuildResult>> array -> ValueTask
+    ExpectsProjectOptions: ProjectOptions seq -> ValueTask
 }
 
 type TestAssetProjInfo = {
@@ -407,7 +420,7 @@ let ``sample 16 solution folders (.slnx)`` = {
 let ``loader2-solution-with-2-projects`` = {
     ProjDir = "loader2-solution-with-2-projects"
     EntryPoints = [ "loader2-solution-with-2-projects.sln" ]
-    Expects =
+    ExpectsProjectOptions =
         fun projectsAfterBuild ->
             Expect.equal (Seq.length projectsAfterBuild) 3 "projects count"
 
@@ -436,6 +449,9 @@ let ``loader2-solution-with-2-projects`` = {
 
             Expect.equal classlibf2.SourceFiles.Length 3 "classlibf2 source files"
             Expect.equal classlibf2.TargetFramework "netstandard2.0" "classlibf1 target framework"
+            ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
 }
 
 
@@ -446,7 +462,7 @@ let ``loader2-no-solution-with-2-projects`` = {
         / "classlibf1"
         / "classlibf1.fsproj"
     ]
-    Expects =
+    ExpectsProjectOptions =
         fun projectsAfterBuild ->
             let projectPaths =
                 projectsAfterBuild
@@ -480,6 +496,9 @@ let ``loader2-no-solution-with-2-projects`` = {
 
             Expect.equal classlibf2.SourceFiles.Length 3 "classlibf2 source files"
             Expect.equal classlibf2.TargetFramework "netstandard2.0" "classlibf1 target framework"
+            ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
 }
 
 
@@ -489,7 +508,9 @@ let ``loader2-cancel-slow`` = {
         "classlibf1"
         / "classlibf1.fsproj"
     ]
-    Expects = ignore
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
 }
 
 let ``loader2-concurrent`` = {
@@ -498,65 +519,96 @@ let ``loader2-concurrent`` = {
         "classlibf1"
         / "classlibf1.fsproj"
     ]
-    Expects = ignore
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
 }
 
 let ``loader2-failure-case1`` = {
     ProjDir = "loader2-failure-case1"
     EntryPoints = [ "loader2-failure-case1.fsproj" ]
-    Expects = ignore
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
 }
 
 let ``sample2-NetSdk-library2`` = {
     ProjDir = ``sample2 NetSdk library``.ProjDir
     EntryPoints = [ ``sample2 NetSdk library``.ProjectFile ]
-    Expects = ignore
+
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
 }
 
 let ``sample3-Netsdk-projs-2`` = {
     ProjDir = ``sample3 Netsdk projs``.ProjDir
     EntryPoints = [ ``sample3 Netsdk projs``.ProjectFile ]
-    Expects = ignore
+
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
 }
 
 let ``sample4-NetSdk-multitfm-2`` = {
     ProjDir = ``sample4 NetSdk multi tfm``.ProjDir
     EntryPoints = [ ``sample4 NetSdk multi tfm``.ProjectFile ]
-    Expects = ignore
+
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
 }
 
 let ``sample5-NetSdk-lib-cs-2`` = {
     ProjDir = ``sample5 NetSdk CSharp library``.ProjDir
     EntryPoints = [ ``sample5 NetSdk CSharp library``.ProjectFile ]
-    Expects = ignore
+
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
 }
 
 let ``sample6-Netsdk-Sparse-sln-2`` = {
     ProjDir = ``sample6 Netsdk Sparse/sln``.ProjDir
     EntryPoints = [ ``sample6 Netsdk Sparse/sln``.ProjectFile ]
-    Expects = ignore
+
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
 }
 
 let ``sample7-legacy-framework-multi-project-2`` = {
     ProjDir = ``sample7 legacy framework multi-project``.ProjDir
     EntryPoints = [ ``sample7 legacy framework multi-project``.ProjectFile ]
-    Expects = ignore
+
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
 }
 
 let ``sample8-NetSdk-Explorer-2`` = {
     ProjDir = ``sample8 NetSdk Explorer``.ProjDir
     EntryPoints = [ ``sample8 NetSdk Explorer``.ProjectFile ]
-    Expects = ignore
+
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
 }
 
 let ``sample9-NetSdk-library-2`` = {
     ProjDir = ``sample9 NetSdk library``.ProjDir
     EntryPoints = [ ``sample9 NetSdk library``.ProjectFile ]
-    Expects = ignore
+
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
 }
 
 let ``sample10-NetSdk-library-with-custom-targets-2`` = {
     ProjDir = ``sample10 NetSdk library with custom targets``.ProjDir
     EntryPoints = [ ``sample10 NetSdk library with custom targets``.ProjectFile ]
-    Expects = ignore
+
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
 }
