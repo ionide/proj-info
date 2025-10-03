@@ -512,3 +512,51 @@ let ``sample2-NetSdk-library2`` = {
     EntryPoints = [ ``sample2 NetSdk library``.ProjectFile ]
     Expects = ignore
 }
+
+let ``sample3-Netsdk-projs-2`` = {
+    ProjDir = ``sample3 Netsdk projs``.ProjDir
+    EntryPoints = [ ``sample3 Netsdk projs``.ProjectFile ]
+    Expects = ignore
+}
+
+let ``sample4-NetSdk-multitfm-2`` = {
+    ProjDir = ``sample4 NetSdk multi tfm``.ProjDir
+    EntryPoints = [ ``sample4 NetSdk multi tfm``.ProjectFile ]
+    Expects = ignore
+}
+
+let ``sample5-NetSdk-lib-cs-2`` = {
+    ProjDir = ``sample5 NetSdk CSharp library``.ProjDir
+    EntryPoints = [ ``sample5 NetSdk CSharp library``.ProjectFile ]
+    Expects = ignore
+}
+
+let ``sample6-Netsdk-Sparse-sln-2`` = {
+    ProjDir = ``sample6 Netsdk Sparse/sln``.ProjDir
+    EntryPoints = [ ``sample6 Netsdk Sparse/sln``.ProjectFile ]
+    Expects = ignore
+}
+
+let ``sample7-legacy-framework-multi-project-2`` = {
+    ProjDir = ``sample7 legacy framework multi-project``.ProjDir
+    EntryPoints = [ ``sample7 legacy framework multi-project``.ProjectFile ]
+    Expects = ignore
+}
+
+let ``sample8-NetSdk-Explorer-2`` = {
+    ProjDir = ``sample8 NetSdk Explorer``.ProjDir
+    EntryPoints = [ ``sample8 NetSdk Explorer``.ProjectFile ]
+    Expects = ignore
+}
+
+let ``sample9-NetSdk-library-2`` = {
+    ProjDir = ``sample9 NetSdk library``.ProjDir
+    EntryPoints = [ ``sample9 NetSdk library``.ProjectFile ]
+    Expects = ignore
+}
+
+let ``sample10-NetSdk-library-with-custom-targets-2`` = {
+    ProjDir = ``sample10 NetSdk library with custom targets``.ProjDir
+    EntryPoints = [ ``sample10 NetSdk library with custom targets``.ProjectFile ]
+    Expects = ignore
+}
