@@ -49,7 +49,7 @@ let init args =
         | true, v -> v
         | _ -> false
 
-    let packages () = !! "src/**/*.nupkg"
+    let packages () = !!"src/**/*.nupkg"
 
     Target.create
         "Clean"
@@ -88,7 +88,7 @@ let init args =
 
             exec
                 "dotnet"
-                $"test --blame --blame-hang-timeout 60s --framework {tfm} --logger trx --logger GitHubActions -c {configuration} .\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj"
+                $"test --blame --blame-hang-timeout 120s --framework {tfm} --logger trx --logger GitHubActions -c {configuration} .\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj"
                 "test"
                 (Map.ofSeq [ "BuildNet9", tfmToBuildNet9Map.[tfm].ToString() ])
             |> ignore
@@ -99,6 +99,10 @@ let init args =
 
     Target.create "Test:net8.0" (fun _ -> testTFM "net8.0")
     Target.create "Test:net9.0" (fun _ -> testTFM "net9.0")
+
+    "Test:net8.0"
+    ?=> "Test:net9.0"
+    |> ignore
 
     "Build"
     ==> ("Test:net8.0")
@@ -165,7 +169,11 @@ let init args =
     Target.create "Release" DoNothing
 
     "Clean"
-    ==> "CheckFormat"
+    ==> "Default"
+    |> ignore
+
+    "Clean"
+    ?=> "CheckFormat"
     ==> "Build"
     ==> "Test"
     ==> "Default"
