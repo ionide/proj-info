@@ -134,6 +134,10 @@ let init args =
     Target.create "Test:net9.0" (fun _ -> testTFM "net9.0")
     Target.create "Test:net10.0" (fun _ -> testTFM "net10.0")
 
+    "Test:net8.0"
+    ?=> "Test:net9.0"
+    |> ignore
+
     "Build"
     ==> ("Test:net8.0")
     =?> ("Test", not ignoreTests)
@@ -204,7 +208,11 @@ let init args =
     Target.create "Release" DoNothing
 
     "Clean"
-    ==> "CheckFormat"
+    ==> "Default"
+    |> ignore
+
+    "Clean"
+    ?=> "CheckFormat"
     ==> "Build"
     ==> "Test"
     ==> "Default"
