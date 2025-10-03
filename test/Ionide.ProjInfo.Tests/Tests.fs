@@ -1469,6 +1469,7 @@ module Task =
     let RunSynchronously (task: Task<'T>) = task.GetAwaiter().GetResult()
 
 module File =
+
     let combinePaths path1 (path2: string) =
         Path.Combine(
             path1,
@@ -1669,7 +1670,6 @@ let buildManagerSessionTests toolsPath =
             ``loader2-no-solution-with-2-projects``
             (fun env ->
                 task {
-
                     let path = env.Entrypoints
 
                     let entrypoints =
@@ -1683,11 +1683,8 @@ let buildManagerSessionTests toolsPath =
                             else
                                 [ p ]
                         )
-
-
                     // Evaluation
                     use pc = projectCollection ()
-
 
                     let allprojects =
                         ProjectLoader2.EvaluateAsProjectsAllTfms(entrypoints, projectCollection = pc)
@@ -1703,11 +1700,9 @@ let buildManagerSessionTests toolsPath =
                             | _ -> ""
 
                         let normalized = $"{projectName}-{tfm}"
-
                         Some(BuildParameters(Loggers = env.Binlog.Loggers normalized))
                     // Execution
                     let bm = new BuildManagerSession()
-
                     let! (results: Result<BuildResult, BuildErrors<BuildResult>> array) = ProjectLoader2.ExecutionWalkReferences(bm, allprojects, createBuildParametersFromProject)
 
                     let projectsAfterBuild =
@@ -1724,6 +1719,301 @@ let buildManagerSessionTests toolsPath =
                     env.Data.Expects projectsAfterBuild
                 }
             )
+
+        // Ported testSample3
+        testCaseTask
+        |> testWithEnv
+            "sample3-Netsdk-projs"
+            ``sample3-Netsdk-projs-2``
+            (fun env ->
+                task {
+                    let projPath =
+                        env.TestDir.FullName
+                        / env.Data.EntryPoints.Single()
+
+                    let projDir = Path.GetDirectoryName projPath
+
+                    let path =
+                        env.Entrypoints
+                        |> Seq.map ProjectGraphEntryPoint
+
+                    let loggers = env.Binlog.Loggers env.Binlog.File.Name
+                    use pc = projectCollection ()
+                    let graph = ProjectLoader2.EvaluateAsGraphAllTfms(path, pc)
+                    let bp = BuildParameters(Loggers = loggers)
+                    let bm = new BuildManagerSession()
+                    let! (result: Result<GraphBuildResult, BuildErrors<GraphBuildResult>>) = ProjectLoader2.Execution(bm, graph, bp)
+
+                    match result with
+                    | Result.Error _ -> failwith "expected success"
+                    | Ok result ->
+                        ProjectLoader2.Parse result
+                        |> Seq.choose (
+                            function
+                            | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
+                            | _ -> None
+                        )
+                        |> Seq.iter (fun x -> Expect.isNonEmpty x.SourceFiles "should have sources")
+                }
+            )
+
+        // Ported testSample4
+        testCaseTask
+        |> testWithEnv
+            "sample4-NetSdk-multitfm"
+            ``sample4-NetSdk-multitfm-2``
+            (fun env ->
+                task {
+                    let projPath =
+                        env.TestDir.FullName
+                        / env.Data.EntryPoints.Single()
+
+                    let projDir = Path.GetDirectoryName projPath
+
+                    let path =
+                        env.Entrypoints
+                        |> Seq.map ProjectGraphEntryPoint
+
+                    let loggers = env.Binlog.Loggers env.Binlog.File.Name
+                    use pc = projectCollection ()
+                    let graph = ProjectLoader2.EvaluateAsGraphAllTfms(path, pc)
+                    let bp = BuildParameters(Loggers = loggers)
+                    let bm = new BuildManagerSession()
+                    let! (result: Result<GraphBuildResult, BuildErrors<GraphBuildResult>>) = ProjectLoader2.Execution(bm, graph, bp)
+
+                    match result with
+                    | Result.Error _ -> failwith "expected success"
+                    | Ok result ->
+                        ProjectLoader2.Parse result
+                        |> Seq.choose (
+                            function
+                            | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
+                            | _ -> None
+                        )
+                        |> Seq.iter (fun x -> Expect.isNonEmpty x.SourceFiles "should have sources")
+                }
+            )
+
+        // Ported testSample5
+        testCaseTask
+        |> testWithEnv
+            "sample5-NetSdk-lib-cs"
+            ``sample5-NetSdk-lib-cs-2``
+            (fun env ->
+                task {
+                    let projPath =
+                        env.TestDir.FullName
+                        / env.Data.EntryPoints.Single()
+
+                    let projDir = Path.GetDirectoryName projPath
+
+                    let path =
+                        env.Entrypoints
+                        |> Seq.map ProjectGraphEntryPoint
+
+                    let loggers = env.Binlog.Loggers env.Binlog.File.Name
+                    use pc = projectCollection ()
+                    let graph = ProjectLoader2.EvaluateAsGraphAllTfms(path, pc)
+                    let bp = BuildParameters(Loggers = loggers)
+                    let bm = new BuildManagerSession()
+                    let! (result: Result<GraphBuildResult, BuildErrors<GraphBuildResult>>) = ProjectLoader2.Execution(bm, graph, bp)
+
+                    match result with
+                    | Result.Error _ -> failwith "expected success"
+                    | Ok result ->
+                        ProjectLoader2.Parse result
+                        |> Seq.choose (
+                            function
+                            | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
+                            | _ -> None
+                        )
+                        |> Seq.iter (fun x -> Expect.isNonEmpty x.SourceFiles "should have sources")
+                }
+            )
+
+        // Ported testSample6
+        testCaseTask
+        |> testWithEnv
+            "sample6-NetSdk-sparse"
+            ``sample6-Netsdk-Sparse-sln-2``
+            (fun env ->
+                task {
+                    let slnPath =
+                        env.TestDir.FullName
+                        / env.Data.EntryPoints.Single()
+
+                    let path =
+                        seq { yield slnPath }
+                        |> Seq.map ProjectGraphEntryPoint
+
+                    let loggers = env.Binlog.Loggers env.Binlog.File.Name
+                    use pc = projectCollection ()
+                    let graph = ProjectLoader2.EvaluateAsGraphAllTfms(path, pc)
+                    let bp = BuildParameters(Loggers = loggers)
+                    let bm = new BuildManagerSession()
+                    let! (result: Result<GraphBuildResult, BuildErrors<GraphBuildResult>>) = ProjectLoader2.Execution(bm, graph, bp)
+
+                    match result with
+                    | Result.Error _ -> failwith "expected success"
+                    | Ok result ->
+                        ProjectLoader2.Parse result
+                        |> Seq.choose (
+                            function
+                            | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
+                            | _ -> None
+                        )
+                        |> Seq.iter (fun x -> Expect.isNonEmpty x.SourceFiles "should have sources")
+                }
+            )
+
+        // Ported testSample7
+        testCaseTask
+        |> testWithEnv
+            "sample7-oldsdk-projs"
+            ``sample7-legacy-framework-multi-project-2``
+            (fun env ->
+                task {
+                    let projPath =
+                        env.TestDir.FullName
+                        / env.Data.EntryPoints.Single()
+
+                    let projDir = Path.GetDirectoryName projPath
+
+                    let path =
+                        env.Entrypoints
+                        |> Seq.map ProjectGraphEntryPoint
+
+                    let loggers = env.Binlog.Loggers env.Binlog.File.Name
+                    use pc = projectCollection ()
+                    let graph = ProjectLoader2.EvaluateAsGraphAllTfms(path, pc)
+                    let bp = BuildParameters(Loggers = loggers)
+                    let bm = new BuildManagerSession()
+                    let! (result: Result<GraphBuildResult, BuildErrors<GraphBuildResult>>) = ProjectLoader2.Execution(bm, graph, bp)
+
+                    match result with
+                    | Result.Error _ -> failwith "expected success"
+                    | Ok result ->
+                        ProjectLoader2.Parse result
+                        |> Seq.choose (
+                            function
+                            | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
+                            | _ -> None
+                        )
+                        |> Seq.iter (fun x -> Expect.isNonEmpty x.SourceFiles "should have sources")
+                }
+            )
+
+        // Ported testSample8
+        testCaseTask
+        |> testWithEnv
+            "sample8-NetSdk-Explorer"
+            ``sample8-NetSdk-Explorer-2``
+            (fun env ->
+                task {
+                    let projPath =
+                        env.TestDir.FullName
+                        / env.Data.EntryPoints.Single()
+
+                    let projDir = Path.GetDirectoryName projPath
+
+                    let path =
+                        env.Entrypoints
+                        |> Seq.map ProjectGraphEntryPoint
+
+                    let loggers = env.Binlog.Loggers env.Binlog.File.Name
+                    use pc = projectCollection ()
+                    let graph = ProjectLoader2.EvaluateAsGraphAllTfms(path, pc)
+                    let bp = BuildParameters(Loggers = loggers)
+                    let bm = new BuildManagerSession()
+                    let! (result: Result<GraphBuildResult, BuildErrors<GraphBuildResult>>) = ProjectLoader2.Execution(bm, graph, bp)
+
+                    match result with
+                    | Result.Error _ -> failwith "expected success"
+                    | Ok result ->
+                        ProjectLoader2.Parse result
+                        |> Seq.choose (
+                            function
+                            | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
+                            | _ -> None
+                        )
+                        |> Seq.iter (fun x -> Expect.isNonEmpty x.SourceFiles "should have sources")
+                }
+            )
+
+        // Ported testSample9
+        testCaseTask
+        |> testWithEnv
+            "sample9-NetSdk-library"
+            ``sample9-NetSdk-library-2``
+            (fun env ->
+                task {
+                    let projPath =
+                        env.TestDir.FullName
+                        / env.Data.EntryPoints.Single()
+
+                    let projDir = Path.GetDirectoryName projPath
+
+                    let path =
+                        env.Entrypoints
+                        |> Seq.map ProjectGraphEntryPoint
+
+                    let loggers = env.Binlog.Loggers env.Binlog.File.Name
+                    use pc = projectCollection ()
+                    let graph = ProjectLoader2.EvaluateAsGraphAllTfms(path, pc)
+                    let bp = BuildParameters(Loggers = loggers)
+                    let bm = new BuildManagerSession()
+                    let! (result: Result<GraphBuildResult, BuildErrors<GraphBuildResult>>) = ProjectLoader2.Execution(bm, graph, bp)
+
+                    match result with
+                    | Result.Error _ -> failwith "expected success"
+                    | Ok result ->
+                        ProjectLoader2.Parse result
+                        |> Seq.choose (
+                            function
+                            | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
+                            | _ -> None
+                        )
+                        |> Seq.iter (fun x -> Expect.isNonEmpty x.SourceFiles "should have sources")
+                }
+            )
+
+        // Ported testSample10
+        testCaseTask
+        |> testWithEnv
+            "sample10-NetSdk-custom-targets"
+            ``sample10-NetSdk-library-with-custom-targets-2``
+            (fun env ->
+                task {
+                    let projPath =
+                        env.TestDir.FullName
+                        / env.Data.EntryPoints.Single()
+
+                    let projDir = Path.GetDirectoryName projPath
+
+                    let path =
+                        env.Entrypoints
+                        |> Seq.map ProjectGraphEntryPoint
+
+                    let loggers = env.Binlog.Loggers env.Binlog.File.Name
+                    use pc = projectCollection ()
+                    let graph = ProjectLoader2.EvaluateAsGraphAllTfms(path, pc)
+                    let bp = BuildParameters(Loggers = loggers)
+                    let bm = new BuildManagerSession()
+                    let! (result: Result<GraphBuildResult, BuildErrors<GraphBuildResult>>) = ProjectLoader2.Execution(bm, graph, bp)
+
+                    match result with
+                    | Result.Error _ -> failwith "expected success"
+                    | Ok result ->
+                        ProjectLoader2.Parse result
+                        |> Seq.choose (
+                            function
+                            | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
+                            | _ -> None
+                        )
+                        |> Seq.iter (fun x -> Expect.isNonEmpty x.SourceFiles "should have sources")
+                }
+            )
+
 
         testCaseTask
         |> testWithEnv
@@ -1745,6 +2035,7 @@ let buildManagerSessionTests toolsPath =
 
                     // Evaluation
                     use pc = projectCollection ()
+
                     let graph = ProjectLoader2.EvaluateAsGraphAllTfms(path, pc)
 
                     // Execution
@@ -1769,6 +2060,7 @@ let buildManagerSessionTests toolsPath =
                     | Ok result ->
                         ProjectLoader2.Parse result
                         |> Seq.choose (
+
                             function
                             | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
                             | _ -> None
@@ -1793,6 +2085,7 @@ let buildManagerSessionTests toolsPath =
 
                     let projDir = Path.GetDirectoryName projPath
 
+
                     let entryPoints = env.Entrypoints
 
                     let loggers = env.Binlog.Loggers
@@ -1816,6 +2109,7 @@ let buildManagerSessionTests toolsPath =
                     let projs = ProjectLoader2.EvaluateAsProjectsAllTfms(entryPoints, projectCollection = pc)
 
                     // Execution
+
                     let bm = new BuildManagerSession()
 
                     let! (results: Result<_, BuildErrors<BuildResult>> array) = ProjectLoader2.ExecutionWalkReferences(bm, projs, createBuildParametersFromProject)
@@ -1839,6 +2133,7 @@ let buildManagerSessionTests toolsPath =
                     | Result.Error _ -> failwith "expected success"
                     | Ok result ->
                         match ProjectLoader2.Parse result with
+
 
                         | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Expect.equal x.SourceFiles expectedSources ""
                         | _ -> failwith "lol"
@@ -1864,6 +2159,7 @@ let buildManagerSessionTests toolsPath =
 
                     let work: Async<Result<GraphBuildResult, BuildErrors<GraphBuildResult>>> =
                         async {
+
                             // Evaluation
                             let graph = ProjectLoader2.EvaluateAsGraph(path, pc)
 
@@ -1962,6 +2258,7 @@ let buildManagerSessionTests toolsPath =
 
                 }
             )
+
     ]
 
 
