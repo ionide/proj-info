@@ -2387,12 +2387,12 @@ let sample15NugetAnalyzers toolsPath loaderType workspaceFactory =
             Expect.isSome
                 (analyzerDlls
                  |> List.tryFind (fun a -> a.PropertyName = "PkgG-Research_FSharp_Analyzers"))
-                "Should have found the PkgG-Research_FSharp_Analyzers key in the analyzers map"
+                "Should have found the PkgG-Research_FSharp_Analyzers key in the analyzers list"
 
             Expect.isSome
                 (analyzerDlls
                  |> List.tryFind (fun a -> a.PropertyName = "PkgIonide_Analyzers"))
-                "Should have found the PkgIonide_Analyzers key in the analyzers map"
+                "Should have found the PkgIonide_Analyzers key in the analyzers list"
 
 
         )

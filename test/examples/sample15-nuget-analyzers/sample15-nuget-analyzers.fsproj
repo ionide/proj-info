@@ -4,6 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>sample14_nuget_analyzers</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,12 +13,12 @@
 
   <ItemGroup>
     <PackageReference Include="G-Research.FSharp.Analyzers" Version="0.18.0">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>analyzers</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Ionide.Analyzers" Version="0.14.7">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>analyzers</IncludeAssets>
     </PackageReference>
   </ItemGroup>
 
