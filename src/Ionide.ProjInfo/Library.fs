@@ -873,7 +873,48 @@ module ProjectLoader =
             IsPublishable = msbuildPropBool "IsPublishable"
         }
 
-    let mapToProject (path: string) (compilerArgs: string seq) (p2p: ProjectReference seq) (compile: CompileItem seq) (nugetRefs: PackageReference seq) (sdkInfo: ProjectSdkInfo) (props: Property seq) (customProps: Property seq) =
+#if DEBUG
+    let private printProperties (props: Map<string, Set<string>>) =
+        let file = Path.Combine(__SOURCE_DIRECTORY__, "props.txt")
+
+        props
+        |> Map.iter (fun key value ->
+            IO.File.AppendAllLines(file, [ $"Property: {key}" ])
+
+            value
+            |> Set.iter (fun v -> IO.File.AppendAllLines(file, [ $"  Value: {v}" ]))
+        )
+
+    let private printItems (items: Map<string, Set<string * Map<string, string>>>) =
+        let file = Path.Combine(__SOURCE_DIRECTORY__, "items.txt")
+
+        items
+        |> Map.iter (fun key value ->
+            IO.File.AppendAllLines(file, [ $"ItemType: {key}" ])
+
+            value
+            |> Set.iter (fun (include_, metadata) ->
+                IO.File.AppendAllLines(file, [ $"  Value: {include_}" ])
+
+                metadata
+                |> Map.iter (fun mk mv -> IO.File.AppendAllLines(file, [ $"    {mk}: {mv}" ]))
+            )
+        )
+#endif
+
+    let mapToProject
+        (path: string)
+        (compilerArgs: string seq)
+        (p2p: ProjectReference seq)
+        (compile: CompileItem seq)
+        (nugetRefs: PackageReference seq)
+        (sdkInfo: ProjectSdkInfo)
+        (props: Property seq)
+        (customProps: Property seq)
+        (analyzers: Analyzer list)
+        (allProps: Map<string, Set<string>>)
+        (allItems: Map<string, Set<string * Map<string, string>>>)
+        =
         let projDir = Path.GetDirectoryName path
 
         let outputType, sourceFiles, otherOptions =
@@ -944,6 +985,9 @@ module ProjectLoader =
             Items = compileItems
             Properties = List.ofSeq props
             CustomProperties = List.ofSeq customProps
+            Analyzers = analyzers
+            AllProperties = allProps
+            AllItems = allItems
         }
 
 
@@ -1005,10 +1049,78 @@ module ProjectLoader =
             let sdkInfo = getSdkInfo props
             let customProps = getProperties p customProperties
 
+            let allProperties =
+                (Map.empty, p.Properties)
+                ||> Seq.fold (fun acc p ->
+                    Map.change
+                        p.Name
+                        (function
+                        | None ->
+                            Set.singleton p.EvaluatedValue
+                            |> Some
+                        | Some v ->
+                            v
+                            |> Set.add p.EvaluatedValue
+                            |> Some)
+                        acc
+                )
+
+            let allItems =
+                (Map.empty, p.Items)
+                ||> Seq.fold (fun acc item ->
+                    let value = item.EvaluatedInclude
+
+                    let metadata =
+                        item.Metadata
+                        |> Seq.map (fun m -> m.Name, m.EvaluatedValue)
+                        |> Map.ofSeq
+
+                    Map.change
+                        item.ItemType
+                        (function
+                        | None ->
+                            Set.singleton (value, metadata)
+                            |> Some
+                        | Some items ->
+                            items
+                            |> Set.add (value, metadata)
+                            |> Some)
+                        acc
+
+                )
+
+
+            let analyzers =
+                let analyzerLikePath = Path.Combine("analyzers", "dotnet", "fs")
+
+                allProperties
+                |> Map.filter (fun k v ->
+                    k.StartsWith("Pkg")
+                    && v
+                       |> Set.exists (fun s -> Path.Exists(Path.Combine(s, analyzerLikePath)))
+                )
+                |> Seq.collect (fun (KeyValue(k, v)) ->
+                    v
+                    |> Seq.map (fun v ->
+                        let analyzerPath = Path.Combine(v, analyzerLikePath)
+
+                        {
+                            PropertyName = k
+                            NugetPackageRoot = v
+                            DllRootPath = analyzerPath
+                        }
+
+                    )
+                )
+                |> Seq.toList
+
+
             if not sdkInfo.RestoreSuccess then
                 Error "not restored"
             else
-                let proj = mapToProject path commandLineArgs p2pRefs compileItems nuGetRefs sdkInfo props customProps
+                let proj =
+                    mapToProject path commandLineArgs p2pRefs compileItems nuGetRefs sdkInfo props customProps analyzers allProperties allItems
+
                 Ok(LoadedProjectInfo.StandardProjectInfo proj)
         | LoadedProject.Other p -> Ok(LoadedProjectInfo.OtherProjectInfo p)
 
