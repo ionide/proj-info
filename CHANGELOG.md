@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [Add support for F# analyzers in project evaluation](https://github.com/ionide/proj-info/pull/238) (thanks @TheAngryByrd)
 
+## [Unreleased]
+
+### Changed
+
+- [FSharp.Compiler.Service update to 43.10.100-rc2.25502.107 for .NET 10 support]
+
 ## [0.71.2] - 2025-06-01
 
 ### Fixed
