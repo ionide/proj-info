@@ -46,77 +46,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-* We now use the [Microsoft.VisualStudio.SolutionPersistence](https://github.com/microsoft/vs-solutionpersistence) library to parse solution files. This should be more reliable and faster than the previous implementation.
+- We now use the [Microsoft.VisualStudio.SolutionPersistence](https://github.com/microsoft/vs-solutionpersistence) library to parse solution files. This should be more reliable and faster than the previous implementation.
 
 ## [0.68.0] - 2024-11-18
 
 ### Added
 
-* [Support for F# 9 and .NET 9](https://github.com/ionide/proj-info/pull/219)
+- [Support for F# 9 and .NET 9](https://github.com/ionide/proj-info/pull/219)
 
 ### Removed
 
-* [Support for .NET 6 and 7 targets](https://github.com/ionide/proj-info/pull/219)
+- [Support for .NET 6 and 7 targets](https://github.com/ionide/proj-info/pull/219)
 
 
 ## [0.67.0] - 2024-10-02
 
-* [Add CompileItem metadata to types](https://github.com/ionide/proj-info/pull/213) (thanks @Smaug123)
+### Changed
+
+- [Add CompileItem metadata to types](https://github.com/ionide/proj-info/pull/213) (thanks @Smaug123)
 
 ## [0.66.1] - 2024-09-02
 
 ### Changed
 
-* [Add clearer message on some failure cases](https://github.com/ionide/proj-info/pull/210) (thanks @Smaug123)
+- [Add clearer message on some failure cases](https://github.com/ionide/proj-info/pull/210) (thanks @Smaug123)
 
 ## [0.66.0] - 2024-08-17
 
 ### Changed
 
-* [Update FSharp packages for the .NET SDK 8.0.400 release](https://github.com/ionide/proj-info/pull/209)
+- [Update FSharp packages for the .NET SDK 8.0.400 release](https://github.com/ionide/proj-info/pull/209)
 
 ## [0.65.0] - 2024-05-15
 
 ### Changed
 
-* Updated F# Packages
-  * FSharp.Compiler.Service to 43.8.300
-  * FSharp.Core to 8.0.300
+- Updated F# Packages
+  - FSharp.Compiler.Service to 43.8.300
+  - FSharp.Core to 8.0.300
 
 ## [0.64.0] - 2024-04-21
 
 ### Added
 
-* [Support for loading projects that are missing or have invalid Imports](https://github.com/ionide/proj-info/pull/206)
-* [Traversal projects can now be loaded successfully](https://github.com/ionide/proj-info/pull/207)
+- [Support for loading projects that are missing or have invalid Imports](https://github.com/ionide/proj-info/pull/206)
+- [Traversal projects can now be loaded successfully](https://github.com/ionide/proj-info/pull/207)
 
 ### Changed
 
-* [Removed some uses of APIs that do not work from single-file publishing](https://github.com/ionide/proj-info/pull/204)
+- [Removed some uses of APIs that do not work from single-file publishing](https://github.com/ionide/proj-info/pull/204)
 
 ## [0.63.0] - 2024-02-06
 
 ### Changed
 
-* [Add support for reference assemblies to project cracking and FCS ProjectOptions mapping](https://github.com/ionide/proj-info/pull/200)
+- [Add support for reference assemblies to project cracking and FCS ProjectOptions mapping](https://github.com/ionide/proj-info/pull/200)
 
 ## [0.62.0] - 2023-08-21
 
 ### Changed
 
-* Updated to FSharp.Compiler.Service version 7.0.400
+- Updated to FSharp.Compiler.Service version 7.0.400
 
 ## [0.61.3] - 2022-04-01
 
 ### Fixed
 
-* [Pulling logs from MsBuild](https://github.com/ionide/proj-info/pull/189)
+- [Pulling logs from MsBuild](https://github.com/ionide/proj-info/pull/189)
 
 ## [0.61.2] - 2022-02-20
 
 ### Fixed
 
-* Updated version constraint for FSharp.Compiler.Service so that it doesn't have an upper bound
+- Updated version constraint for FSharp.Compiler.Service so that it doesn't have an upper bound
 
 ## [0.61.1] - 2022-12-09
 
@@ -146,47 +148,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-* [Fix project file loading for Graph Build](https://github.com/ionide/proj-info/pull/169) (Thanks @TheAngryByrd!)
+- [Fix project file loading for Graph Build](https://github.com/ionide/proj-info/pull/169) (Thanks @TheAngryByrd!)
 
 ## [0.60.0] - 2022-08-21
 
 ### Added
 
-* [Logging for solution parsing failures](https://github.com/ionide/proj-info/pull/161) (Thanks @TheAngryByrd!)
+- [Logging for solution parsing failures](https://github.com/ionide/proj-info/pull/161) (Thanks @TheAngryByrd!)
 
 ### Fixed
 
-* [Support running on 6.0.400 by always performing Clean builds](https://github.com/ionide/proj-info/pull/162) (Thanks @TheAngryByrd!)
-* [Graph builder works for more types of projects](https://github.com/ionide/proj-info/pull/165) (Thanks @TheAngryByrd!)
-* [.NET 7 previews support](https://github.com/ionide/proj-info/pull/167)
+- [Support running on 6.0.400 by always performing Clean builds](https://github.com/ionide/proj-info/pull/162) (Thanks @TheAngryByrd!)
+- [Graph builder works for more types of projects](https://github.com/ionide/proj-info/pull/165) (Thanks @TheAngryByrd!)
+- [.NET 7 previews support](https://github.com/ionide/proj-info/pull/167)
 
 ## [0.59.2] - 2022-08-04
 
 ### Changed
 
-* [Add a method to efficiently map many ProjectOptions into FSharpProjectOptions](https://github.com/ionide/proj-info/pull/156) and [test it](https://github.com/ionide/proj-info/pull/159) (thanks @safesparrow!)
+- [Add a method to efficiently map many ProjectOptions into FSharpProjectOptions](https://github.com/ionide/proj-info/pull/156) and [test it](https://github.com/ionide/proj-info/pull/159) (thanks @safesparrow!)
 
 ## [0.59.1] - 2022-04-16
 
 ### Changed
 
-* [Better handling for C#/VB references](https://github.com/ionide/proj-info/pull/153)
+- [Better handling for C#/VB references](https://github.com/ionide/proj-info/pull/153)
 
 ## [0.59.0] - 2022-04-16
 
 ### Added
 
-* [Support JSON output for the proj-info tool](https://github.com/ionide/proj-info/pull/150)
-* [Support C#/VB project dll references in FCS APIs](https://github.com/ionide/proj-info/pull/148) (Thanks @nojaf!)
-* [Support for projects that use references from .NET Workloads](https://github.com/ionide/proj-info/pull/152)
+- [Support JSON output for the proj-info tool](https://github.com/ionide/proj-info/pull/150)
+- [Support C#/VB project dll references in FCS APIs](https://github.com/ionide/proj-info/pull/148) (Thanks @nojaf!)
+- [Support for projects that use references from .NET Workloads](https://github.com/ionide/proj-info/pull/152)
 
 ### Fixed
 
-* [Potential NullRef in the project system](https://github.com/ionide/proj-info/pull/143) (Thanks @knocte!)
+- [Potential NullRef in the project system](https://github.com/ionide/proj-info/pull/143) (Thanks @knocte!)
 
 ### Changed
 
-* [Perf improvement on translating project data for Graph Workspaces](https://github.com/ionide/proj-info/pull/144) (Thanks @nojaf!)
+- [Perf improvement on translating project data for Graph Workspaces](https://github.com/ionide/proj-info/pull/144) (Thanks @nojaf!)
 
 ## [0.58.2] - 2022-04-04
 
