@@ -50,6 +50,15 @@ module Types =
 
     type ProjectItem = Compile of name: string * fullpath: string * metadata: Map<string, string> option
 
+    type Analyzer = {
+        /// The name of the Property from the Project like "PkgIonide_Analyzers"
+        PropertyName: string
+        /// The Path to the nuget root folder for this package, like "C:\Users\username\.nuget\packages\ionide.analyzers\0.14.7"
+        NugetPackageRoot: string
+        /// The Path that contains the actual analyzer DLLs, like "C:\Users\username\.nuget\packages\ionide.analyzers\0.14.7\analyzers\dotnet\fs"
+        DllRootPath: string
+    }
+
     type ProjectOptions = {
         ProjectId: string option
         ProjectFileName: string
@@ -68,6 +77,13 @@ module Types =
         Items: ProjectItem list
         Properties: Property list
         CustomProperties: Property list
+        /// This contains all Project Properties seen during evaluation
+        AllProperties: Map<string, Set<string>>
+        /// This contains all Project Items seen during evaluation with their values and associated metadata
+        AllItems: Map<string, Set<string * Map<string, string>>>
+        /// Will have Key Value pairs like "PkgIonide_Analyzers" -> "C:\Users\username\.nuget\packages\ionide.analyzers\0.14.7"
+        /// The "analyzers/dotnet/fs" subfolder is not included here, just the package root
+        Analyzers: Analyzer list
     } with
 
         /// ResolvedTargetPath is the path to the primary reference assembly for this project.

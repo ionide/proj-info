@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>sample14_nuget_analyzers</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Library.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="G-Research.FSharp.Analyzers" Version="0.18.0">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>analyzers</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Ionide.Analyzers" Version="0.14.7">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

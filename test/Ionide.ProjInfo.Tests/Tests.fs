@@ -1506,6 +1506,9 @@ let testFCSmapManyProjCheckCaching =
                 Items = []
                 Properties = []
                 CustomProperties = []
+                Analyzers = []
+                AllProperties = Map.empty
+                AllItems = Map.empty
             }
 
             let makeReference (options: ProjectOptions) = {
@@ -2353,6 +2356,48 @@ let sample14SlnxFileTest toolsPath loaderType workspaceFactory =
             | _ -> failtestf "Expected a project, but got %A" expectedProject.Kind
         )
 
+let sample15NugetAnalyzers toolsPath loaderType workspaceFactory =
+    testCase
+    |> withLog
+        $"Can load sample15 with nuget analyzers - {loaderType}"
+        (fun log fs ->
+
+            let projPath = pathForProject ``sample 15 nuget analyzers``
+            let projDir = Path.GetDirectoryName projPath
+
+            // need to build the projects first so that there's something to latch on to
+            dotnet fs [
+                "restore"
+                projPath
+            ]
+            |> checkExitCodeZero
+
+            let loader: IWorkspaceLoader = workspaceFactory toolsPath
+
+            let parsed =
+                loader.LoadProjects [ projPath ]
+                |> Seq.toList
+
+            Expect.hasLength parsed 1 "Should have loaded the F# lib"
+
+            let fsharpProject = parsed[0]
+
+            let analyzerDlls = fsharpProject.Analyzers
+
+            Expect.isSome
+                (analyzerDlls
+                 |> List.tryFind (fun a -> a.PropertyName = "PkgG-Research_FSharp_Analyzers"))
+                "Should have found the PkgG-Research_FSharp_Analyzers key in the analyzers list"
+
+            Expect.isSome
+                (analyzerDlls
+                 |> List.tryFind (fun a -> a.PropertyName = "PkgIonide_Analyzers"))
+                "Should have found the PkgIonide_Analyzers key in the analyzers list"
+
+
+        )
+
+
 let tests toolsPath =
     let testSample3WorkspaceLoaderExpected = [
         ExpectNotification.loading "c1.fsproj"
@@ -2491,4 +2536,7 @@ let tests toolsPath =
 
         sample14SlnxFileTest toolsPath (nameof (WorkspaceLoader)) WorkspaceLoader.Create
         sample14SlnxFileTest toolsPath (nameof (WorkspaceLoaderViaProjectGraph)) WorkspaceLoaderViaProjectGraph.Create
+
+        sample15NugetAnalyzers toolsPath (nameof (WorkspaceLoader)) WorkspaceLoader.Create
+        sample15NugetAnalyzers toolsPath (nameof (WorkspaceLoaderViaProjectGraph)) WorkspaceLoaderViaProjectGraph.Create
     ]

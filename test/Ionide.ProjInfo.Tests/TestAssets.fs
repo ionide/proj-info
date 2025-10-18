@@ -366,3 +366,13 @@ let ``sample 14 slnx solution`` = {
     TargetFrameworks = Map.empty
     ProjectReferences = []
 }
+
+
+/// A test with f# analyzers
+let ``sample 15 nuget analyzers`` = {
+    ProjDir = "sample15-nuget-analyzers"
+    AssemblyName = ""
+    ProjectFile = "sample15-nuget-analyzers.fsproj"
+    TargetFrameworks = Map.empty
+    ProjectReferences = []
+}
