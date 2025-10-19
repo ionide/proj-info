@@ -111,7 +111,17 @@ module InspectSln =
                             // for anything else, just use a generic item
                             match p with
                             | :? Model.SolutionFolderModel as childFolder -> Some(parseFolder childFolder)
-                            | :? Model.SolutionProjectModel as childProject -> Some(parseProject childProject)
+                            | :? Model.SolutionProjectModel as childProject ->
+                                if
+                                    projectsWeCareAbout
+                                    |> Seq.exists (
+                                        _.Id
+                                        >> (=) childProject.Id
+                                    )
+                                then
+                                    Some(parseProject childProject)
+                                else
+                                    None
                             | _ -> Some(parseItem p)
                         )
                         |> List.ofSeq,
