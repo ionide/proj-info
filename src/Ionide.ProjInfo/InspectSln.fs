@@ -75,6 +75,14 @@ module InspectSln =
         let parseSln (sln: Model.SolutionModel) (projectsToRead: string Set option) =
             sln.DistillProjectConfigurations()
 
+            // Work out the subset of projects that we care about
+            let projectsWeCareAbout =
+                match projectsToRead with
+                | None -> sln.SolutionProjects :> seq<_>
+                | Some filteredProjects ->
+                    sln.SolutionProjects
+                    |> Seq.filter (fun slnProject -> filteredProjects.Contains(makeAbsoluteFromSlnDir slnProject.FilePath))
+
             let parseItem (item: Model.SolutionItemModel) : SolutionItem = {
                 Guid = item.Id
                 Name = ""
@@ -87,7 +95,7 @@ module InspectSln =
                 Kind = SolutionItemKind.MSBuildFormat [] // TODO: could theoretically parse configurations here
             }
 
-            let parseFolder (folder: Model.SolutionFolderModel) : SolutionItem = {
+            let rec parseFolder (folder: Model.SolutionFolderModel) : SolutionItem = {
                 Guid = folder.Id
                 Name = folder.ActualDisplayName
                 Kind =
@@ -97,7 +105,25 @@ module InspectSln =
                             not (isNull item.Parent)
                             && item.Parent.Id = folder.Id
                         )
-                        |> Seq.map (fun p -> parseItem p)
+                        |> Seq.choose (fun p ->
+                            // If this item is a subfolder, map it recursively
+                            // if it's a project, map it if it's in the 'projectsWeCareAbout' collection
+                            // for anything else, just use a generic item
+                            match p with
+                            | :? Model.SolutionFolderModel as childFolder -> Some(parseFolder childFolder)
+                            | :? Model.SolutionProjectModel as childProject ->
+                                if
+                                    projectsWeCareAbout
+                                    |> Seq.exists (
+                                        _.Id
+                                        >> (=) childProject.Id
+                                    )
+                                then
+                                    Some(parseProject childProject)
+                                else
+                                    None
+                            | _ -> Some(parseItem p)
+                        )
                         |> List.ofSeq,
 
                         folder.Files
@@ -112,23 +138,45 @@ module InspectSln =
 
             // three kinds of items - projects, folders, items
             // yield them all here
-            let projectsWeCareAbout =
-                match projectsToRead with
-                | None -> sln.SolutionProjects :> seq<_>
-                | Some filteredProjects ->
-                    sln.SolutionProjects
-                    |> Seq.filter (fun slnProject -> filteredProjects.Contains(makeAbsoluteFromSlnDir slnProject.FilePath))
-
             let allItems = [
+                // Projects at solution level get returned directly
                 yield!
                     projectsWeCareAbout
+                    |> Seq.filter (
+                        _.Parent
+                        >> isNull
+                    )
                     |> Seq.map parseProject
+
+                // parseFolder will parse any projects or folders within the specified folder itself, so just process the root folders here
                 yield!
                     sln.SolutionFolders
+                    |> Seq.filter (
+                        _.Parent
+                        >> isNull
+                    )
                     |> Seq.map parseFolder
+
+                // 'SolutionItems' contains all of SolutionFolders and SolutionProjects, so only include things that aren't in those to avoid duplication
                 yield!
                     sln.SolutionItems
-                    |> Seq.filter (fun item -> isNull item.Parent)
+                    |> Seq.filter (fun item ->
+                        isNull item.Parent
+                        && not (
+                            sln.SolutionFolders
+                            |> Seq.exists (
+                                _.Id
+                                >> (=) item.Id
+                            )
+                        )
+                        && not (
+                            sln.SolutionProjects
+                            |> Seq.exists (
+                                _.Id
+                                >> (=) item.Id
+                            )
+                        )
+                    )
                     |> Seq.map parseItem
             ]
 

@@ -2397,6 +2397,71 @@ let sample15NugetAnalyzers toolsPath loaderType workspaceFactory =
 
         )
 
+/// Common code for sample16SolutionFoldersSlnTest/sample16SolutionFoldersSlnxTest - they are the same test, but for both /sln/slnx files
+let sample16SolutionFoldersTest testAsset =
+
+    let projPath = pathForProject testAsset
+    let slnDir = Path.GetDirectoryName projPath
+
+    let solutionContents =
+        InspectSln.tryParseSln projPath
+        |> getResult
+
+    let solutionData = solutionContents
+
+    // There should be 3 items at the solution level - build.fsproj, a 'src' folder and a 'tests' folder
+    Expect.equal solutionData.Items.Length 3 "There should be 3 items in the solution"
+
+    // The first item should be "build.fsproj
+    let firstItem = solutionData.Items[0]
+    let expectedBuildProjectPath = Path.Combine(slnDir, "build.fsproj")
+    Expect.equal firstItem.Name expectedBuildProjectPath "Should have the expected build project path"
+
+    match firstItem.Kind with
+    | InspectSln.MSBuildFormat items -> Expect.isEmpty items "we don't currently store anything here"
+    | unexpected -> failtestf "Expected a project, but got %A" unexpected
+
+    // The second item should be the 'src' folder, which should contain proj1.fsproj
+    let secondItem = solutionData.Items[1]
+    Expect.equal secondItem.Name "src" "Should have the src folder"
+
+    match secondItem.Kind with
+    | InspectSln.Folder(solutionItems, _) ->
+        match solutionItems with
+        | [ {
+                Name = folderName
+                Kind = InspectSln.MSBuildFormat []
+            } ] ->
+            let expectedProjectPath = Path.Combine(slnDir, "src", "proj1", "proj1.fsproj")
+            Expect.equal folderName expectedProjectPath "Should have the expected project path"
+        | _ -> failtestf "Expected one folder item, but got %A" solutionItems
+    | unexpected -> failtestf "Expected a folder, but got %A" unexpected
+
+    // The third item should be the 'src' folder, which should contain proj1.fsproj
+    let thirdItem = solutionData.Items[2]
+    Expect.equal thirdItem.Name "tests" "Should have the tests folder"
+
+    match thirdItem.Kind with
+    | InspectSln.Folder(solutionItems, _) ->
+        match solutionItems with
+        | [ {
+                Name = folderName
+                Kind = InspectSln.MSBuildFormat []
+            } ] ->
+            let expectedProjectPath = Path.Combine(slnDir, "test", "proj1.tests", "proj1.tests.fsproj")
+            Expect.equal folderName expectedProjectPath "Should have the expected test project path"
+        | _ -> failtestf "Expected one folder item, but got %A" solutionItems
+    | unexpected -> failtestf "Expected a folder, but got %A" unexpected
+
+/// A test that we can load a solution that contains projects inside solution folders, and get the expected structure
+let sample16SolutionFoldersSlnTest toolsPath loaderType workspaceFactory =
+
+    testCase $"Can load sample16 solution folders test (.sln) - {loaderType}" (fun () -> sample16SolutionFoldersTest ``sample 16 solution folders (.sln)``)
+
+/// As above, but for a .slnx format solution
+let sample16SolutionFoldersSlnxTest toolsPath loaderType workspaceFactory =
+
+    testCase $"Can load sample16 solution folders test (.slnx) - {loaderType}" (fun () -> sample16SolutionFoldersTest ``sample 16 solution folders (.slnx)``)
 
 let tests toolsPath =
     let testSample3WorkspaceLoaderExpected = [
@@ -2539,4 +2604,10 @@ let tests toolsPath =
 
         sample15NugetAnalyzers toolsPath (nameof (WorkspaceLoader)) WorkspaceLoader.Create
         sample15NugetAnalyzers toolsPath (nameof (WorkspaceLoaderViaProjectGraph)) WorkspaceLoaderViaProjectGraph.Create
+
+        sample16SolutionFoldersSlnTest toolsPath (nameof (WorkspaceLoader)) WorkspaceLoader.Create
+        sample16SolutionFoldersSlnTest toolsPath (nameof (WorkspaceLoaderViaProjectGraph)) WorkspaceLoaderViaProjectGraph.Create
+
+        sample16SolutionFoldersSlnxTest toolsPath (nameof (WorkspaceLoader)) WorkspaceLoader.Create
+        sample16SolutionFoldersSlnxTest toolsPath (nameof (WorkspaceLoaderViaProjectGraph)) WorkspaceLoaderViaProjectGraph.Create
     ]
