@@ -377,7 +377,7 @@ let ``sample 15 nuget analyzers`` = {
     ProjectReferences = []
 }
 
-/// A test for a solution with projects 
+/// A test for a solution with projects
 let ``sample 16 solution folders`` = {
     ProjDir = "sample16-solution-with-solution-folders"
     AssemblyName = ""

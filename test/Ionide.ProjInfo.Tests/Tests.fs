@@ -2429,9 +2429,12 @@ let sample16SolutionFoldersTest toolsPath loaderType workspaceFactory =
             Expect.equal secondItem.Name "src" "Should have the src folder"
 
             match secondItem.Kind with
-            | InspectSln.Folder (solutionItems, _) ->
+            | InspectSln.Folder(solutionItems, _) ->
                 match solutionItems with
-                | [ { Name = folderName; Kind = InspectSln.MSBuildFormat [] } ] ->
+                | [ {
+                        Name = folderName
+                        Kind = InspectSln.MSBuildFormat []
+                    } ] ->
                     let expectedProjectPath = Path.Combine(slnDir, "src", "proj1", "proj1.fsproj")
                     Expect.equal folderName expectedProjectPath "Should have the expected project path"
                 | _ -> failtestf "Expected one folder item, but got %A" solutionItems
@@ -2442,9 +2445,12 @@ let sample16SolutionFoldersTest toolsPath loaderType workspaceFactory =
             Expect.equal thirdItem.Name "tests" "Should have the tests folder"
 
             match thirdItem.Kind with
-            | InspectSln.Folder (solutionItems, _) ->
+            | InspectSln.Folder(solutionItems, _) ->
                 match solutionItems with
-                | [ { Name = folderName; Kind = InspectSln.MSBuildFormat [] } ] ->
+                | [ {
+                        Name = folderName
+                        Kind = InspectSln.MSBuildFormat []
+                    } ] ->
                     let expectedProjectPath = Path.Combine(slnDir, "test", "proj1.tests", "proj1.tests.fsproj")
                     Expect.equal folderName expectedProjectPath "Should have the expected test project path"
                 | _ -> failtestf "Expected one folder item, but got %A" solutionItems

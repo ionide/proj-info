@@ -109,7 +109,7 @@ module InspectSln =
                             // If this item is a subfolder, map it recursively
                             // if it's a project, map it if it's in the 'projectsWeCareAbout' collection
                             // for anything else, just use a generic item
-                            match p with 
+                            match p with
                             | :? Model.SolutionFolderModel as childFolder -> Some(parseFolder childFolder)
                             | :? Model.SolutionProjectModel as childProject -> Some(parseProject childProject)
                             | _ -> Some(parseItem p)
@@ -132,22 +132,41 @@ module InspectSln =
                 // Projects at solution level get returned directly
                 yield!
                     projectsWeCareAbout
-                    |> Seq.filter (_.Parent >> isNull)
+                    |> Seq.filter (
+                        _.Parent
+                        >> isNull
+                    )
                     |> Seq.map parseProject
 
                 // parseFolder will parse any projects or folders within the specified folder itself, so just process the root folders here
                 yield!
                     sln.SolutionFolders
-                    |> Seq.filter (_.Parent >> isNull)
+                    |> Seq.filter (
+                        _.Parent
+                        >> isNull
+                    )
                     |> Seq.map parseFolder
 
                 // 'SolutionItems' contains all of SolutionFolders and SolutionProjects, so only include things that aren't in those to avoid duplication
                 yield!
                     sln.SolutionItems
                     |> Seq.filter (fun item ->
-                        isNull item.Parent &&
-                        not(sln.SolutionFolders |> Seq.exists (_.Id >> (=) item.Id)) &&
-                        not(sln.SolutionProjects |> Seq.exists (_.Id >> (=) item.Id)))
+                        isNull item.Parent
+                        && not (
+                            sln.SolutionFolders
+                            |> Seq.exists (
+                                _.Id
+                                >> (=) item.Id
+                            )
+                        )
+                        && not (
+                            sln.SolutionProjects
+                            |> Seq.exists (
+                                _.Id
+                                >> (=) item.Id
+                            )
+                        )
+                    )
                     |> Seq.map parseItem
             ]
 
