@@ -139,23 +139,27 @@ module InspectSln =
             // three kinds of items - projects, folders, items
             // yield them all here
             let allItems = [
-                // Projects at solution level get returned directly
-                yield!
-                    projectsWeCareAbout
-                    |> Seq.filter (
-                        _.Parent
-                        >> isNull
-                    )
-                    |> Seq.map parseProject
+                // Return solution folders first, and solution level projects second, see https://github.com/ionide/ionide-vscode-fsharp/issues/2109
 
                 // parseFolder will parse any projects or folders within the specified folder itself, so just process the root folders here
                 yield!
                     sln.SolutionFolders
-                    |> Seq.filter (
-                        _.Parent
-                        >> isNull
+                    |> Seq.choose (fun folder ->
+                        if isNull folder.Parent then
+                            Some(parseFolder folder)
+                        else
+                            None
                     )
-                    |> Seq.map parseFolder
+
+                // Projects at solution level get returned directly
+                yield!
+                    projectsWeCareAbout
+                    |> Seq.choose (fun project ->
+                        if isNull project.Parent then
+                            Some(parseProject project)
+                        else
+                            None
+                    )
 
                 // 'SolutionItems' contains all of SolutionFolders and SolutionProjects, so only include things that aren't in those to avoid duplication
                 yield!
