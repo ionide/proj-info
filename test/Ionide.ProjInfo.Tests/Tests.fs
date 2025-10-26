@@ -2412,20 +2412,12 @@ let sample16SolutionFoldersTest testAsset =
     // There should be 3 items at the solution level - build.fsproj, a 'src' folder and a 'tests' folder
     Expect.equal solutionData.Items.Length 3 "There should be 3 items in the solution"
 
-    // The first item should be "build.fsproj
+    // The solution folders are first
+    // The first item should be the 'src' folder, which should contain proj1.fsproj
     let firstItem = solutionData.Items[0]
-    let expectedBuildProjectPath = Path.Combine(slnDir, "build.fsproj")
-    Expect.equal firstItem.Name expectedBuildProjectPath "Should have the expected build project path"
+    Expect.equal firstItem.Name "src" "Should have the src folder"
 
     match firstItem.Kind with
-    | InspectSln.MSBuildFormat items -> Expect.isEmpty items "we don't currently store anything here"
-    | unexpected -> failtestf "Expected a project, but got %A" unexpected
-
-    // The second item should be the 'src' folder, which should contain proj1.fsproj
-    let secondItem = solutionData.Items[1]
-    Expect.equal secondItem.Name "src" "Should have the src folder"
-
-    match secondItem.Kind with
     | InspectSln.Folder(solutionItems, _) ->
         match solutionItems with
         | [ {
@@ -2438,10 +2430,10 @@ let sample16SolutionFoldersTest testAsset =
     | unexpected -> failtestf "Expected a folder, but got %A" unexpected
 
     // The third item should be the 'src' folder, which should contain proj1.fsproj
-    let thirdItem = solutionData.Items[2]
-    Expect.equal thirdItem.Name "tests" "Should have the tests folder"
+    let secondItem = solutionData.Items[1]
+    Expect.equal secondItem.Name "tests" "Should have the tests folder"
 
-    match thirdItem.Kind with
+    match secondItem.Kind with
     | InspectSln.Folder(solutionItems, _) ->
         match solutionItems with
         | [ {
@@ -2452,6 +2444,16 @@ let sample16SolutionFoldersTest testAsset =
             Expect.equal folderName expectedProjectPath "Should have the expected test project path"
         | _ -> failtestf "Expected one folder item, but got %A" solutionItems
     | unexpected -> failtestf "Expected a folder, but got %A" unexpected
+
+    // Then projects at the root level of the solution.
+    // The first item should be "build.fsproj
+    let thirdItem = solutionData.Items[2]
+    let expectedBuildProjectPath = Path.Combine(slnDir, "build.fsproj")
+    Expect.equal thirdItem.Name expectedBuildProjectPath "Should have the expected build project path"
+
+    match thirdItem.Kind with
+    | InspectSln.MSBuildFormat items -> Expect.isEmpty items "we don't currently store anything here"
+    | unexpected -> failtestf "Expected a project, but got %A" unexpected
 
 /// A test that we can load a solution that contains projects inside solution folders, and get the expected structure
 let sample16SolutionFoldersSlnTest toolsPath loaderType workspaceFactory =
