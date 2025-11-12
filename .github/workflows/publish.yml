@@ -15,8 +15,10 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
-            8.0.x
-            9.0.x
+            8.x
+            9.x
+            10.x
+
       # since we're packaging for net7 now...
       - name: remove global.json
         run: rm global.json
@@ -28,6 +30,7 @@ jobs:
         run: dotnet run --project build
         env:
           BuildNet9: true
+          BuildNet10: true
           IgnoreTests: true
       - name: Get version from tag
         id: tag_name
