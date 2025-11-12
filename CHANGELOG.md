@@ -5,17 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- [FSharp.Compiler.Service update to 43.10.100 for .NET 10 support](https://github.com/ionide/proj-info/pull/239/) (thanks @TheAngryByrd)
+
+
 ## [0.72.0] - 2025-10-18
 
 ### Changed
 
 - [Add support for F# analyzers in project evaluation](https://github.com/ionide/proj-info/pull/238) (thanks @TheAngryByrd)
-
-## [Unreleased]
-
-### Changed
-
-- [FSharp.Compiler.Service update to 43.10.100-rc2.25502.107 for .NET 10 support]
 
 ## [0.71.2] - 2025-06-01
 
@@ -200,27 +201,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - [Perf improvement on translating project data for Graph Workspaces](https://github.com/ionide/proj-info/pull/144) (Thanks @nojaf!)
-
-## [0.58.2] - 2022-04-04
-
-### Fixed
-- Make `LegacyFrameworkDiscovery.msbuildBinary` lazy
-
-## [0.58.1] - 2022-04-03
-
-### Fixed
-
-- Invalid project cache files from previous versions of this library can be detected and removed.
-
-## [0.58.0] - 2022-04-02
-
-### Added
-
-- Support for loading legacy project files
-
-### Fixed
-
-- Saving/loading of project file caches. Perf (especially initial load) should improve massively.
+l load) should improve massively.
 
 ## [0.57.2] - 2022-03-21
 

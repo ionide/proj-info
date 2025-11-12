@@ -94,12 +94,14 @@ let init args =
         Map.ofSeq [
             "net8.0", "8.0.100"
             "net9.0", "9.0.100"
+            "net10.0", "10.0.100"
         ]
 
-    let tfmToBuildNet9Map =
+    let tfmToEnvVar =
         Map.ofSeq [
-            "net8.0", false
-            "net9.0", true
+            "net8.0", None
+            "net9.0", Some "BuildNet9"
+            "net10.0", Some "BuildNet10"
         ]
 
     let testTFM tfm =
@@ -112,11 +114,16 @@ let init args =
                 else
                     ""
 
-            exec
-                "dotnet"
-                $"test --blame --blame-hang-timeout 120s --framework {tfm} --logger trx --logger GitHubActions -c %s{configuration} .\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj -- %s{failedOnFocus}"
-                "test"
-                (Map.ofSeq [ "BuildNet9", tfmToBuildNet9Map.[tfm].ToString() ])
+            let envs =
+                match
+                    tfmToEnvVar
+                    |> Map.tryFind tfm
+                    |> Option.flatten
+                with
+                | Some envVar -> Map.ofSeq [ envVar, "true" ]
+                | None -> Map.empty
+
+            exec "dotnet" $"test --blame --blame-hang-timeout 120s --framework {tfm} --logger trx --logger GitHubActions -c %s{configuration} .\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj -- %s{failedOnFocus}" "test" envs
             |> ignore
         finally
             System.IO.File.Delete "test\\global.json"
@@ -125,6 +132,7 @@ let init args =
 
     Target.create "Test:net8.0" (fun _ -> testTFM "net8.0")
     Target.create "Test:net9.0" (fun _ -> testTFM "net9.0")
+    Target.create "Test:net10.0" (fun _ -> testTFM "net10.0")
 
     "Build"
     ==> ("Test:net8.0")
@@ -133,6 +141,11 @@ let init args =
 
     "Build"
     ==> ("Test:net9.0")
+    =?> ("Test", not ignoreTests)
+    |> ignore
+
+    "Build"
+    ==> ("Test:net10.0")
     =?> ("Test", not ignoreTests)
     |> ignore
 

@@ -19,7 +19,10 @@ So if you set global.json to a 9.0.xxx SDK, you'll _always_ use the 9.x MSBuild 
 Our FAKE build project will handle creating/deleting a temporary `global.json` file in the `test` directory for you.
 
 1. `dotnet run --project .\build\ -- -t Test`
-    1. This should chose the `Test:net8.0` and `Test:net9.0` targets and run against that respective runtime.
+    1. This will run the following test targets against their respective runtime.
+        * `Test:net8.0` 
+        * `Test:net9.0` 
+        * `Test:net10.0`
 
 ### Manually invoking dotnet test
 
@@ -36,8 +39,7 @@ If you want to run `dotnet test` directly, you'll need to set the `global.json` 
     ```json
         "sdk": {
             "version": "9.0.100",
-            "rollForward": "latestMinor",
-            "allowPrerelease": true
+            "rollForward": "latestMinor"
         }
     ```
 1. Move to the test project
@@ -48,7 +50,20 @@ If you want to run `dotnet test` directly, you'll need to set the `global.json` 
 4. Run tests with `dotnet test`
 
 
-
+#### Against LTS (net10.0)
+1. Change global.json to use net10.0
+    ```json
+        "sdk": {
+            "version": "10.0.100",
+            "rollForward": "latestMinor"
+        }
+    ```
+1. Move to the test project
+    1. `cd test/Ionide.ProjInfo.Tests`
+3. Set environment variable `BuildNet10` to `true`
+    1. Bash: `export BuildNet10=true`
+    2. PowerShell: `$env:BuildNet10 = "true"`
+4. Run tests with `dotnet test`
 
 
 ## Release
