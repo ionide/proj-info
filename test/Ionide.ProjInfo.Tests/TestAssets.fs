@@ -376,3 +376,21 @@ let ``sample 15 nuget analyzers`` = {
     TargetFrameworks = Map.empty
     ProjectReferences = []
 }
+
+/// A test for a solution with projects
+let ``sample 16 solution folders (.sln)`` = {
+    ProjDir = "sample16-solution-with-solution-folders"
+    AssemblyName = ""
+    ProjectFile = "sample16-solution-with-solution-folders.sln"
+    TargetFrameworks = Map.empty
+    ProjectReferences = []
+}
+
+/// and the same with a slnc format solution
+let ``sample 16 solution folders (.slnx)`` = {
+    ProjDir = "sample16-solution-with-solution-folders"
+    AssemblyName = ""
+    ProjectFile = "sample16-solution-with-solution-folders.slnx"
+    TargetFrameworks = Map.empty
+    ProjectReferences = []
+}
