@@ -2,6 +2,7 @@ namespace Ionide.ProjInfo.Tests
 
 module ProjectLoader2Tests =
 
+
     open System
     open System.IO
     open System.Diagnostics
@@ -92,9 +93,10 @@ module ProjectLoader2Tests =
                 match result with
                 | Ok result ->
                     ProjectLoader2.Parse result
-                    |> Seq.choose (
-                        function
+                    |> Seq.choose (fun x ->
+                        match x with
                         | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
+                        | Result.Error(ProjectNotRestoredDU.BuildErr _) -> None
                         | _ -> None
                     )
                 | Result.Error(BuildErrors.BuildErr(result, errorLogs)) ->
@@ -149,6 +151,7 @@ module ProjectLoader2Tests =
                     | Ok result ->
                         match ProjectLoader2.Parse result with
                         | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
+                        | Result.Error(ProjectNotRestoredDU.BuildErr _) -> None
                         | _ -> None
                     | _ -> None
                 )
@@ -156,7 +159,11 @@ module ProjectLoader2Tests =
             return results, projectsAfterBuild
         }
 
-    let testWithEnv name (data: TestAssetProjInfo2) f test =
+    type RestoreCfg =
+        | DoRestore
+        | SkipRestore
+
+    let testWithEnv2 restore name (data: TestAssetProjInfo2) f test =
         test
             name
             (fun () ->
@@ -174,14 +181,17 @@ module ProjectLoader2Tests =
                             / x
                         )
 
-                    entrypoints
-                    |> Seq.iter (fun x ->
-                        dotnet fs [
-                            "restore"
-                            x
-                        ]
-                        |> checkExitCodeZero
-                    )
+                    match restore with
+                    | DoRestore ->
+                        entrypoints
+                        |> Seq.iter (fun x ->
+                            dotnet fs [
+                                "restore"
+                                x
+                            ]
+                            |> checkExitCodeZero
+                        )
+                    | SkipRestore -> ()
 
                     let binlog = new FileInfo(Path.Combine(testDir, $"{name}.binlog"))
                     use blc = new Binlogs(binlog)
@@ -207,6 +217,8 @@ module ProjectLoader2Tests =
                         Exception.reraiseAny e
                 }
             )
+
+    let testWithEnv name (data: TestAssetProjInfo2) f test = testWithEnv2 DoRestore name data f test
 
 
     let applyTests name (info: TestAssetProjInfo2) = [
@@ -301,6 +313,7 @@ module ProjectLoader2Tests =
 
                                 function
                                 | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
+                                | Result.Error(ProjectNotRestoredDU.BuildErr _) -> None
                                 | _ -> None
                             )
                             |> Seq.iter (fun x -> Expect.equal x.SourceFiles expectedSources "")
@@ -374,7 +387,8 @@ module ProjectLoader2Tests =
 
 
                             | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Expect.equal x.SourceFiles expectedSources ""
-                            | _ -> failwith "lol"
+                            | Result.Error(ProjectNotRestoredDU.BuildErr e) -> failwith "%A" e
+                            | otherwise -> failwith $"Unexpected result {otherwise}"
 
                     }
                 )
@@ -493,6 +507,68 @@ module ProjectLoader2Tests =
                         with
                         | :? OperationCanceledException as oce -> Expect.equal oce.CancellationToken cts.Token "expected cancellation"
                         | e -> Exception.reraiseAny e
+
+                    }
+                )
+
+            testCaseTask
+            |> testWithEnv2
+                SkipRestore
+                "Handle non-restored projects gracefully"
+                ``sample2-NetSdk-library2``
+                (fun env ->
+                    task {
+                        let path =
+                            env.Entrypoints
+                            |> Seq.map ProjectGraphEntryPoint
+
+                        let entryPoints = env.Entrypoints
+                        // Evaluation
+                        use pc = projectCollection ()
+
+                        // let graph = ProjectLoader2.EvaluateAsGraph(path, pc)
+
+                        // Execution
+                        let bp = BuildParameters(Loggers = env.Binlog.Loggers env.Binlog.File.Name)
+                        let bm = new BuildManagerSession()
+
+                        let createBuildParametersFromProject (p: Project) =
+                            let fi = FileInfo p.FullPath
+                            let projectName = Path.GetFileNameWithoutExtension fi.Name
+
+                            let tfm =
+                                match p.GlobalProperties.TryGetValue("TargetFramework") with
+                                | true, tfm -> tfm.Replace('.', '_')
+                                | _ -> ""
+
+                            let normalized = $"{projectName}-{tfm}"
+
+                            Some(BuildParameters(Loggers = env.Binlog.Loggers normalized))
+
+                        let projs = ProjectLoader2.EvaluateAsProjectsAllTfms(entryPoints, projectCollection = pc)
+
+
+                        let! (results: Result<_, BuildErrors<BuildResult>> array) = ProjectLoader2.ExecutionWalkReferences(bm, projs, createBuildParametersFromProject)
+
+
+                        let result =
+                            results
+                            |> Seq.head
+
+                        let result = Ionide.ProjInfo.Tests.Expect.isOk result "expected success on non-restored project"
+
+                        match ProjectLoader2.Parse result with
+                        // | Ok(LoadedProjectInfo.StandardProjectInfo x) ->
+                        //     ignore x
+
+                        //     let validProjectRestore = Newtonsoft.Json.JsonConvert.SerializeObject x
+
+                        //     File.WriteAllText(Path.Combine(env.TestDir.FullName, "non-restored-project.json"), validProjectRestore)
+                        //     Expect.isFalse x.ProjectSdkInfo.RestoreSuccess "expected restore to fail"
+                        | Result.Error(ProjectNotRestoredDU.BuildErr(StandardProject e)) -> ()
+                        | e -> failwithf "%A" e
+
+                        return ()
 
                     }
                 )

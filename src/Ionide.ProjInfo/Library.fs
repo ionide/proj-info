@@ -14,6 +14,16 @@ open System.Runtime.InteropServices
 open Ionide.ProjInfo.Logging
 open Patterns
 
+type ProjectNotRestoredError<'e, 'buildResult> =
+    static abstract NotRestored: 'buildResult -> 'e
+
+type ProjectNotRestoredDU<'BuildResult> =
+    | BuildErr of 'BuildResult
+
+    interface ProjectNotRestoredError<ProjectNotRestoredDU<'BuildResult>, 'BuildResult> with
+        static member NotRestored(result) = BuildErr result
+
+
 /// functions for .net sdk probing
 module SdkDiscovery =
 
@@ -341,7 +351,7 @@ type BinaryLogGeneration =
 module ProjectLoader =
 
     type LoadedProject =
-        internal
+
         | StandardProject of ProjectInstance
         | TraversalProject of ProjectInstance
         /// This could be things like shproj files, or other things that aren't standard projects
@@ -896,11 +906,11 @@ module ProjectLoader =
                 msbuildPropString "ProjectAssetsFile"
                 |> Option.defaultValue ""
             RestoreSuccess =
-                match msbuildPropString "TargetFrameworkVersion" with
-                | Some _ -> true
-                | None ->
-                    msbuildPropBool "RestoreSuccess"
-                    |> Option.defaultValue false
+                // match msbuildPropString "TargetFrameworkVersion" with
+                // | Some _ -> true
+                // | None ->
+                msbuildPropBool "RestoreSuccess"
+                |> Option.defaultValue false
 
             Configurations =
                 msbuildPropStringList "Configurations"
@@ -1042,9 +1052,8 @@ module ProjectLoader =
         | TraversalProjectInfo of ProjectReference list
         | OtherProjectInfo of ProjectInstance
 
-    let getLoadedProjectInfo (path: string) customProperties project : Result<LoadedProjectInfo, string> =
-        // let (LoadedProject p) = project
-        // let path = p.FullPath
+
+    let getLoadedProjectInfo<'e when ProjectNotRestoredError<'e, LoadedProject>> (path: string) customProperties project =
 
         match project with
         | LoadedProject.TraversalProject t ->
@@ -1159,7 +1168,7 @@ module ProjectLoader =
 
 
             if not sdkInfo.RestoreSuccess then
-                Error "not restored"
+                Error('e.NotRestored project)
             else
                 let proj =
                     mapToProject path commandLineArgs p2pRefs compileItems nuGetRefs sdkInfo props customProps analyzers allProperties allItems
@@ -1311,6 +1320,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
 
             pg
 
+
     let loadProjects (projects: ProjectGraph, customProperties: string list, binaryLogs: BinaryLogGeneration) =
         let handleError (msbuildErrors: string) (e: exn) =
             let msg = e.Message
@@ -1422,13 +1432,13 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                             | Ok projectOptions ->
 
                                 Some projectOptions
-                            | Error e ->
+                            | Error(ProjectNotRestoredDU.BuildErr e) ->
                                 logger.error (
                                     Log.setMessage "Failed loading projects {error}"
                                     >> Log.addContextDestructured "error" e
                                 )
 
-                                loadingNotification.Trigger(WorkspaceProjectState.Failed(projectPath, GenericError(projectPath, e)))
+                                loadingNotification.Trigger(WorkspaceProjectState.Failed(projectPath, GenericError(projectPath, "not restored")))
                                 None
                         )
 
@@ -1598,8 +1608,8 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
                             | ProjectLoader.LoadedProjectInfo.OtherProjectInfo p -> None
 
                         lst, info
-                    | Error msg ->
-                        loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, msg)))
+                    | Error(ProjectNotRestoredDU.BuildErr e) ->
+                        loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, "Not restored")))
                         [], None
 
             let rec loadProjectList (projectList: string list) =

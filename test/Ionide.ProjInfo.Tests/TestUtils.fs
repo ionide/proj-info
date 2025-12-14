@@ -216,3 +216,15 @@ module TestUtils =
     let sleepABit () =
         // CI has apparent occasional slowness
         System.Threading.Thread.Sleep 5000
+
+
+module Expect =
+    open Expecto
+
+    let isOk result msg =
+        Expecto.Expect.isOk result msg
+
+        match result with
+        | Ok v -> v
+        | Error _ -> failwith "unreachable"
+
