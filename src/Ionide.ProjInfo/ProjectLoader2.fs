@@ -45,14 +45,14 @@ module SemaphoreSlimExtensions =
             )
 
 
-module Map =
+module internal Map =
 
-    let mapAddSome key value map =
+    let inline mapAddSome key value map =
         match value with
         | Some v -> Map.add key v map
         | None -> map
 
-    let union loses wins =
+    let inline union loses wins =
         Map.fold (fun acc key value -> Map.add key value acc) loses wins
 
     let inline ofDict dictionary =
@@ -320,7 +320,7 @@ module TargetFrameworks =
 // type ProjectProjectMap = ProjectMap<Project>
 // type ProjectGraphMap = ProjectMap<ProjectGraphNode>
 
-module ProjectLoading =
+module internal ProjectLoading =
 
     // let getAllTfms (projectPath: ProjectPath) pc props =
     //     let p = findOrCreateMatchingProject projectPath pc props
@@ -339,7 +339,7 @@ module ProjectLoading =
     //     getAllTfms projectPath
     //     |> Option.bind Array.tryHead
 
-    let defaultProjectInstanceFactory (projectPath: string) (xml: Dictionary<string, string>) (collection: ProjectCollection) =
+    let inline defaultProjectInstanceFactory (projectPath: string) (xml: Dictionary<string, string>) (collection: ProjectCollection) =
         let props = Map.union (Map.ofDict xml) (Map.ofDict collection.GlobalProperties)
         ProjectInstance(projectPath, props, toolsVersion = null, projectCollection = collection)
 
@@ -500,13 +500,13 @@ type ProjectLoader2 =
     /// or TargetFrameworks defined in the project files.</returns>
     /// <remarks>
     /// This method evaluates each project file and checks for the presence of a "TargetFramework"
-    /// property. If it exists, the project is returned as is. If it does not
-    ///     exist, it checks for the "TargetFrameworks"
+    /// property. If it exists, the project is returned as is. If it does not exist, it checks for the "TargetFrameworks"
     /// property and splits it into individual TargetFrameworks. For each TargetFramework, it creates
-    /// a new project
-    /// with the "TargetFramework" global property set to that TargetFramework.
+    /// a new project with the "TargetFramework" global property set to that TargetFramework.
     /// </remarks>
     static member EvaluateAsGraphAllTfms(entryProjectFile: ProjectGraphEntryPoint seq, ?projectCollection: ProjectCollection, ?projectInstanceFactory) =
+        // For some reason, the graph evaluation doesn't handle multiple TFMs well
+        // So first we evaluate the graph to find all projects
         let graph =
             ProjectLoader2.EvaluateAsGraph(entryProjectFile, ?projectCollection = projectCollection, ?projectInstanceFactory = projectInstanceFactory)
 
@@ -528,7 +528,7 @@ type ProjectLoader2 =
                 |> Option.map (fun _ -> ProjectGraphEntryPoint(node.ProjectInstance.FullPath, globalProperties = node.ProjectInstance.GlobalProperties))
             )
 
-
+        // Then, re-evaluate the graph with those projects
         ProjectLoader2.EvaluateAsGraph(projects, ?projectCollection = projectCollection, ?projectInstanceFactory = projectInstanceFactory)
 
     /// <summary>
@@ -585,8 +585,7 @@ type ProjectLoader2 =
     /// <param name="buildParameters">Function to get build parameters for each project.</param
     /// ><param name="targetsToBuild">Optional targets to build. Defaults to design-time build targets.</param>
     /// <param name="flags">Optional flags for the build request. Defaults to ProjectLoader2.DefaultFlags.</param>
-    /// <param name="ct">Optional cancellation token to cancel the
-    /// build.</param>
+    /// <param name="ct">Optional cancellation token to cancel the build.</param>
     /// <returns>A task that returns an array of BuildResult or an error containing the failed build and message.</returns>
     /// <remarks>
     /// This method will visit each project, build it, and then recursively visit its references.

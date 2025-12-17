@@ -17,11 +17,11 @@ open Patterns
 type ProjectNotRestoredError<'e, 'buildResult> =
     static abstract NotRestored: 'buildResult -> 'e
 
-type ProjectNotRestoredDU<'BuildResult> =
-    | BuildErr of 'BuildResult
+type ParseError<'BuildResult> =
+    | NotRestored of 'BuildResult
 
-    interface ProjectNotRestoredError<ProjectNotRestoredDU<'BuildResult>, 'BuildResult> with
-        static member NotRestored(result) = BuildErr result
+    interface ProjectNotRestoredError<ParseError<'BuildResult>, 'BuildResult> with
+        static member NotRestored(result) = NotRestored result
 
 
 /// functions for .net sdk probing
@@ -966,6 +966,7 @@ module ProjectLoader =
         (analyzers: Analyzer list)
         (allProps: Map<string, Set<string>>)
         (allItems: Map<string, Set<string * Map<string, string>>>)
+        (imports: string list)
         =
         let projDir = Path.GetDirectoryName path
 
@@ -1041,6 +1042,7 @@ module ProjectLoader =
             Analyzers = analyzers
             AllProperties = allProps
             AllItems = allItems
+            Imports = imports
         }
 
 
@@ -1051,7 +1053,6 @@ module ProjectLoader =
         | StandardProjectInfo of ProjectOptions
         | TraversalProjectInfo of ProjectReference list
         | OtherProjectInfo of ProjectInstance
-
 
     let getLoadedProjectInfo<'e when ProjectNotRestoredError<'e, LoadedProject>> (path: string) customProperties project =
 
@@ -1166,12 +1167,16 @@ module ProjectLoader =
                 )
                 |> Seq.toList
 
+            let imports =
+                p.ImportPaths
+                |> Seq.toList
+
 
             if not sdkInfo.RestoreSuccess then
                 Error('e.NotRestored project)
             else
                 let proj =
-                    mapToProject path commandLineArgs p2pRefs compileItems nuGetRefs sdkInfo props customProps analyzers allProperties allItems
+                    mapToProject path commandLineArgs p2pRefs compileItems nuGetRefs sdkInfo props customProps analyzers allProperties allItems imports
 
                 Ok(LoadedProjectInfo.StandardProjectInfo proj)
         | LoadedProject.Other p -> Ok(LoadedProjectInfo.OtherProjectInfo p)
@@ -1432,7 +1437,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                             | Ok projectOptions ->
 
                                 Some projectOptions
-                            | Error(ProjectNotRestoredDU.BuildErr e) ->
+                            | Error(ParseError.NotRestored e) ->
                                 logger.error (
                                     Log.setMessage "Failed loading projects {error}"
                                     >> Log.addContextDestructured "error" e
@@ -1608,7 +1613,7 @@ type WorkspaceLoader private (toolsPath: ToolsPath, ?globalProperties: (string *
                             | ProjectLoader.LoadedProjectInfo.OtherProjectInfo p -> None
 
                         lst, info
-                    | Error(ProjectNotRestoredDU.BuildErr e) ->
+                    | Error(ParseError.NotRestored e) ->
                         loadingNotification.Trigger(WorkspaceProjectState.Failed(p, GenericError(p, "Not restored")))
                         [], None
 

@@ -1728,7 +1728,7 @@ let testLoadProject toolsPath =
                 match ProjectLoader.getLoadedProjectInfo projPath [] proj with
                 | Ok(ProjectLoader.LoadedProjectInfo.StandardProjectInfo proj) -> Expect.equal proj.ProjectFileName projPath "project file names"
                 | Ok(ProjectLoader.LoadedProjectInfo.TraversalProjectInfo refs) -> failwith "expected standard project, not a traversal project"
-                | Result.Error(ProjectNotRestoredDU.BuildErr exn) -> failwith $"Project Not Restored {exn}"
+                | Result.Error(ParseError.NotRestored exn) -> failwith $"Project Not Restored {exn}"
                 | otherwise -> failwith $"Unexpected result {otherwise}"
         )
 

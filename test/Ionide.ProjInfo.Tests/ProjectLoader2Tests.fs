@@ -96,7 +96,7 @@ module ProjectLoader2Tests =
                     |> Seq.choose (fun x ->
                         match x with
                         | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
-                        | Result.Error(ProjectNotRestoredDU.BuildErr _) -> None
+                        | Result.Error(ParseError.NotRestored _) -> None
                         | _ -> None
                     )
                 | Result.Error(BuildErrors.BuildErr(result, errorLogs)) ->
@@ -150,8 +150,11 @@ module ProjectLoader2Tests =
                     function
                     | Ok result ->
                         match ProjectLoader2.Parse result with
-                        | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
-                        | Result.Error(ProjectNotRestoredDU.BuildErr _) -> None
+                        | Ok(LoadedProjectInfo.StandardProjectInfo x) ->
+                            let validProjectRestore = Newtonsoft.Json.JsonConvert.SerializeObject x
+                            File.WriteAllText(Path.Combine(env.TestDir.FullName, "restored-project.json"), validProjectRestore)
+                            Some x
+                        | Result.Error(ParseError.NotRestored _) -> None
                         | _ -> None
                     | _ -> None
                 )
@@ -310,10 +313,12 @@ module ProjectLoader2Tests =
                         | Ok result ->
                             ProjectLoader2.Parse result
                             |> Seq.choose (
-
                                 function
-                                | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
-                                | Result.Error(ProjectNotRestoredDU.BuildErr _) -> None
+                                | Ok(LoadedProjectInfo.StandardProjectInfo x) ->
+                                    let validProjectRestore = Newtonsoft.Json.JsonConvert.SerializeObject x
+                                    File.WriteAllText(Path.Combine(env.TestDir.FullName, "restored-project.json"), validProjectRestore)
+                                    Some x
+                                | Result.Error(ParseError.NotRestored _) -> None
                                 | _ -> None
                             )
                             |> Seq.iter (fun x -> Expect.equal x.SourceFiles expectedSources "")
@@ -322,6 +327,17 @@ module ProjectLoader2Tests =
 
                     }
                 )
+
+            let contains (s: string) (o: string) = o.Contains(s)
+            let endsWith (s: string) (o: string) = o.EndsWith(s)
+
+            let filesOfInterest = [
+                endsWith "Directory.Build.props"
+                endsWith "Directory.Build.targets"
+                endsWith "Directory.Build.props"
+                endsWith ".sln.targets"
+                endsWith ".Build.rsp"
+            ]
 
 
             testCaseTask
@@ -359,6 +375,7 @@ module ProjectLoader2Tests =
 
                         let projs = ProjectLoader2.EvaluateAsProjectsAllTfms(entryPoints, projectCollection = pc)
 
+                        let projs = Seq.toList projs
                         // Execution
 
                         let bm = new BuildManagerSession()
@@ -383,11 +400,16 @@ module ProjectLoader2Tests =
                         match result with
                         | Result.Error _ -> failwith "expected success"
                         | Ok result ->
+                            ignore result.ProjectStateAfterBuild.ImportPaths
+
                             match ProjectLoader2.Parse result with
 
+                            | Ok(LoadedProjectInfo.StandardProjectInfo x) ->
+                                let validProjectRestore = Newtonsoft.Json.JsonConvert.SerializeObject x
+                                File.WriteAllText(Path.Combine(env.TestDir.FullName, "restored-project.json"), validProjectRestore)
 
-                            | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Expect.equal x.SourceFiles expectedSources ""
-                            | Result.Error(ProjectNotRestoredDU.BuildErr e) -> failwith "%A" e
+                                Expect.equal x.SourceFiles expectedSources ""
+                            | Result.Error(ParseError.NotRestored e) -> failwithf "%A" e
                             | otherwise -> failwith $"Unexpected result {otherwise}"
 
                     }
@@ -565,7 +587,7 @@ module ProjectLoader2Tests =
 
                         //     File.WriteAllText(Path.Combine(env.TestDir.FullName, "non-restored-project.json"), validProjectRestore)
                         //     Expect.isFalse x.ProjectSdkInfo.RestoreSuccess "expected restore to fail"
-                        | Result.Error(ProjectNotRestoredDU.BuildErr(StandardProject e)) -> ()
+                        | Result.Error(ParseError.NotRestored(StandardProject e)) -> ()
                         | e -> failwithf "%A" e
 
                         return ()
