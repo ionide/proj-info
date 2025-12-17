@@ -1457,6 +1457,7 @@ let testFCSmapManyProjCheckCaching =
                 Analyzers = []
                 AllProperties = Map.empty
                 AllItems = Map.empty
+                Imports = []
             }
 
             let makeReference (options: ProjectOptions) = {

@@ -612,3 +612,107 @@ let ``sample10-NetSdk-library-with-custom-targets-2`` = {
     ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
     ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
 }
+
+
+let ``sample-referenced-csharp-project`` = {
+    ProjDir = "sample-referenced-csharp-project"
+    EntryPoints = [
+        "fsharp-exe"
+        / "fsharp-exe.fsproj"
+    ]
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
+}
+
+let ``sample-workload`` = {
+    ProjDir = "sample-workload"
+    EntryPoints = [ "sample-workload.fsproj" ]
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
+}
+
+let ``traversal-project`` = {
+    ProjDir = "traversal-project"
+    EntryPoints = [ "dirs.proj" ]
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
+}
+
+let ``sample11-solution-with-other-projects`` = {
+    ProjDir = "sample11-solution-with-other-projects"
+    EntryPoints = [ "sample11-solution-with-other-projects.sln" ]
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
+}
+
+let ``sample12-solution-filter-with-one-project`` = {
+    ProjDir = "sample12-solution-filter-with-one-project"
+    EntryPoints = [ "sample12-solution-filter-with-one-project.slnf" ]
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
+}
+
+let ``sample13-solution-with-solution-files`` = {
+    ProjDir = "sample13-solution-with-solution-files"
+    EntryPoints = [ "sample13-solution-with-solution-files.sln" ]
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
+}
+
+let ``sample-14-slnx-solution`` = {
+    ProjDir = "sample-14-slnx-solution"
+    EntryPoints = [ "sample-14-slnx-solution.slnx" ]
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
+}
+
+let ``sample15-nuget-analyzers`` = {
+    ProjDir = "sample15-nuget-analyzers"
+    EntryPoints = [ "sample15-nuget-analyzers.fsproj" ]
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
+}
+
+let ``sample16-solution-with-solution-folders`` = {
+    ProjDir = "sample16-solution-with-solution-folders"
+    EntryPoints = [ "sample16-solution-with-solution-folders.sln" ]
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
+}
+
+let ``missing-import`` = {
+    ProjDir = "missing-import"
+    EntryPoints = [ "missing-import.fsproj" ]
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
+}
+
+let ``sample-netsdk-prodref`` = {
+    ProjDir = "sample-netsdk-prodref"
+    EntryPoints = [
+        "l2"
+        / "l2.fsproj"
+    ]
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
+}
+
+let ``sample-netsdk-bad-cache-2`` = {
+    ProjDir = ``sample NetSdk library with a bad FSAC cache``.ProjDir
+    EntryPoints = [ ``sample NetSdk library with a bad FSAC cache``.ProjectFile ]
+
+    ExpectsProjectOptions = fun _ -> ValueTask.CompletedTask
+    ExpectsGraphResult = fun _ -> ValueTask.CompletedTask
+    ExpectsProjectResult = fun _ -> ValueTask.CompletedTask
+}

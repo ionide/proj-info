@@ -267,6 +267,32 @@ module ProjectLoader2Tests =
             yield! applyTests "sample9-NetSdk-library" ``sample9-NetSdk-library-2``
             yield! applyTests "sample10-NetSdk-custom-targets" ``sample10-NetSdk-library-with-custom-targets-2``
 
+            yield! applyTests "sample-referenced-csharp-project" ``sample-referenced-csharp-project``
+            // yield! applyTests "sample-workload" ``sample-workload``
+            yield! applyTests "traversal-project" ``traversal-project``
+            yield! applyTests "sample11-solution-with-other-projects" ``sample11-solution-with-other-projects``
+            // yield! applyTests "sample12-solution-filter-with-one-project" ``sample12-solution-filter-with-one-project``
+            yield! applyTests "sample13-solution-with-solution-files" ``sample13-solution-with-solution-files``
+            // yield! applyTests "sample-14-slnx-solution" ``sample-14-slnx-solution``
+            yield! applyTests "sample15-nuget-analyzers" ``sample15-nuget-analyzers``
+            yield! applyTests "sample16-solution-with-solution-folders" ``sample16-solution-with-solution-folders``
+            yield! applyTests "sample-netsdk-prodref" ``sample-netsdk-prodref``
+            yield! applyTests "sample-netsdk-bad-cache" ``sample-netsdk-bad-cache-2``
+
+            testCaseTask
+            |> testWithEnv2
+                SkipRestore
+                "missing-import"
+                ``missing-import``
+                (fun env ->
+                    task {
+                        let! result, projectsAfterBuild = parseWithProjectWalker env
+
+                        do! env.Data.ExpectsProjectResult result
+                        do! env.Data.ExpectsProjectOptions projectsAfterBuild
+                    }
+                )
+
 
             testCaseTask
             |> testWithEnv
