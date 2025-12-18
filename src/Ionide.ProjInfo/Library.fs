@@ -655,9 +655,7 @@ module ProjectLoader =
                 "CoreCompile"
             |]
         else
-            [|
-                yield! designTimeBuildTargetsCore
-            |]
+            [| yield! designTimeBuildTargetsCore |]
 
     let setLegacyMsbuildProperties isOldStyleProjFile =
         match LegacyFrameworkDiscovery.msbuildBinary.Value with
