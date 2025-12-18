@@ -3,6 +3,7 @@ open Fake.DotNet
 open Fake.IO
 open Fake.IO.Globbing.Operators
 open Fake.Core.TargetOperators
+open System
 
 System.Environment.CurrentDirectory <- (Path.combine __SOURCE_DIRECTORY__ "..")
 
@@ -123,7 +124,15 @@ let init args =
                 | Some envVar -> Map.ofSeq [ envVar, "true" ]
                 | None -> Map.empty
 
-            exec "dotnet" $"test --blame --blame-hang-timeout 120s --framework {tfm} --logger trx --logger GitHubActions -c %s{configuration} .\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj -- %s{failedOnFocus}" "test" envs
+            let timeoutInSeconds =
+                (TimeSpan.FromMinutes 5).TotalSeconds
+                |> int
+
+            exec
+                "dotnet"
+                $"test --blame --blame-hang-timeout %d{timeoutInSeconds}s --framework %s{tfm} --logger trx --logger GitHubActions -c %s{configuration} .\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj -- %s{failedOnFocus}"
+                "test"
+                envs
             |> ignore
         finally
             System.IO.File.Delete "test\\global.json"
