@@ -253,7 +253,7 @@ module ProjectLoader2Tests =
 
 
     let buildManagerSessionTests toolsPath =
-        ftestList "buildManagerSessionTests" [
+        testList "buildManagerSessionTests" [
             yield! applyTests "loader2-no-solution-with-2-projects" ``loader2-no-solution-with-2-projects``
 
             yield! applyTests "sample2-NetSdk-library2" ``sample2-NetSdk-library2``

@@ -1,4 +1,4 @@
-﻿namespace Ionide.ProjInfo
+namespace Ionide.ProjInfo
 
 open System
 open System.Collections.Generic
@@ -657,7 +657,6 @@ module ProjectLoader =
         else
             [|
                 yield! designTimeBuildTargetsCore
-                "DispatchToInnerBuilds"
             |]
 
     let setLegacyMsbuildProperties isOldStyleProjFile =
@@ -906,9 +905,6 @@ module ProjectLoader =
                 msbuildPropString "ProjectAssetsFile"
                 |> Option.defaultValue ""
             RestoreSuccess =
-                // match msbuildPropString "TargetFrameworkVersion" with
-                // | Some _ -> true
-                // | None ->
                 msbuildPropBool "RestoreSuccess"
                 |> Option.defaultValue false
 
