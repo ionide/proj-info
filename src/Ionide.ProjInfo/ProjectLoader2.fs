@@ -10,17 +10,18 @@ open Microsoft.Build.Evaluation
 open Microsoft.Build.Framework
 open ProjectLoader
 
-/// <summary>
-/// An awaitable wrapper around a task whose result is disposable. The wrapper is not disposable, so this prevents usage errors like "use _lock = myAsync()" when the appropriate usage should be "use! _lock = myAsync())".
-/// </summary>
-[<Struct>]
-type AwaitableDisposable<'T when 'T :> IDisposable>(t: Task<'T>) =
-    member x.GetAwaiter() = t.GetAwaiter()
-    member x.AsTask() = t
-    static member op_Implicit(source: AwaitableDisposable<'T>) = source.AsTask()
-
 [<AutoOpenAttribute>]
 module SemaphoreSlimExtensions =
+
+    /// <summary>
+    /// An awaitable wrapper around a task whose result is disposable. The wrapper is not disposable, so this prevents usage errors like "use _lock = myAsync()" when the appropriate usage should be "use! _lock = myAsync())".
+    /// </summary>
+    [<Struct>]
+    type AwaitableDisposable<'T when 'T :> IDisposable>(t: Task<'T>) =
+        member x.GetAwaiter() = t.GetAwaiter()
+        member x.AsTask() = t
+        static member op_Implicit(source: AwaitableDisposable<'T>) = source.AsTask()
+
 
     type SemaphoreSlim with
 
