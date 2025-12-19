@@ -500,37 +500,51 @@ type ProjectLoader2 =
     /// <returns>A project graph representing the evaluated projects, each corresponding to a specific TargetFramework
     /// or TargetFrameworks defined in the project files.</returns>
     /// <remarks>
-    /// This method evaluates each project file and checks for the presence of a "TargetFramework"
-    /// property. If it exists, the project is returned as is. If it does not exist, it checks for the "TargetFrameworks"
-    /// property and splits it into individual TargetFrameworks. For each TargetFramework, it creates
-    /// a new project with the "TargetFramework" global property set to that TargetFramework.
+    ///
+    /// MSBuild's ProjectGraph natively handles multi-targeting by creating "outer build" nodes (with TargetFrameworks)
+    /// that reference "inner build" nodes (with individual TargetFramework values). However, when building a graph,
+    /// only entry point nodes are built directly. This method performs two evaluations:
+    /// 1. First pass: Discover all nodes in the graph (including outer/inner builds and all references)
+    /// 2. Second pass: Create a new graph with only nodes that have a TargetFramework property set
+    ///
+    /// This ensures that all inner builds are treated as entry points and get built directly, which is required
+    /// for design-time analysis scenarios where we need build results for each TFM.
     /// </remarks>
     static member EvaluateAsGraphAllTfms(entryProjectFile: ProjectGraphEntryPoint seq, ?projectCollection: ProjectCollection, ?projectInstanceFactory) =
-        // For some reason, the graph evaluation doesn't handle multiple TFMs well
-        // So first we evaluate the graph to find all projects
+        // MSBuild's ProjectGraph handles multi-TFM projects by creating:
+        // - OuterBuild nodes: TargetFramework is empty, TargetFrameworks is set (dispatchers)
+        // - InnerBuild nodes: TargetFramework is set (actual builds per TFM)
+        // - NonMultitargeting nodes: Neither property meaningfully set
+        //
+        // First pass: Evaluate to discover all project nodes including inner builds created from outer builds
         let graph =
             ProjectLoader2.EvaluateAsGraph(entryProjectFile, ?projectCollection = projectCollection, ?projectInstanceFactory = projectInstanceFactory)
 
-        let inline tryGetTfmFromGlobalProps (node: ProjectGraphNode) =
+        // Helper to get TargetFramework from global properties or project properties
+        let tryGetTargetFramework (node: ProjectGraphNode) =
             match node.ProjectInstance.GlobalProperties.TryGetValue "TargetFramework" with
-            | true, tfm -> Some tfm
-            | _ -> None
+            | true, tfm when not (String.IsNullOrWhiteSpace tfm) -> Some tfm
+            | _ ->
+                node.ProjectInstance.Properties
+                |> ProjectPropertyInstance.tryFind "TargetFramework"
+                |> Option.filter (
+                    not
+                    << String.IsNullOrWhiteSpace
+                )
 
-        let inline tryGetFromProps (node: ProjectGraphNode) =
-            node.ProjectInstance.Properties
-            |> ProjectPropertyInstance.tryFind "TargetFramework"
-
-        // Then we only care about those with a TargetFramework
-        let projects =
+        // Extract only nodes with a TargetFramework as new entry points
+        // This filters out outer builds (which have TargetFrameworks but not TargetFramework)
+        // and includes inner builds (which have TargetFramework set)
+        let innerBuildEntryPoints =
             graph.ProjectNodes
             |> Seq.choose (fun node ->
-                tryGetTfmFromGlobalProps node
-                |> Option.orElseWith (fun () -> tryGetFromProps node)
+                tryGetTargetFramework node
                 |> Option.map (fun _ -> ProjectGraphEntryPoint(node.ProjectInstance.FullPath, globalProperties = node.ProjectInstance.GlobalProperties))
             )
 
-        // Then, re-evaluate the graph with those projects
-        ProjectLoader2.EvaluateAsGraph(projects, ?projectCollection = projectCollection, ?projectInstanceFactory = projectInstanceFactory)
+        // Second pass: Re-evaluate with inner builds as entry points
+        // This ensures all inner builds are built directly and appear in ResultsByNode
+        ProjectLoader2.EvaluateAsGraph(innerBuildEntryPoints, ?projectCollection = projectCollection, ?projectInstanceFactory = projectInstanceFactory)
 
     /// <summary>
     /// Executes a build request against the BuildManagerSession.
@@ -664,47 +678,6 @@ type ProjectLoader2 =
     /// <param name="graphBuildResult">The GraphBuildResult to get the project instances from.</param>
     /// <returns>The project instances from the GraphBuildResult.</returns>
     static member GetProjectInstances(graphBuildResult: GraphBuildResult) =
-
-        // let start =
-        //     graphBuildResult.ResultsByNode
-        //     |> Seq.map (fun (KeyValue(node, _)) -> node)
-
-        // let projectsToVisit = Queue<ProjectGraphNode>(start)
-
-        // let visited = HashSet<ProjectGraphNode>()
-        // let results = ResizeArray<ProjectInstance>()
-
-        // while projectsToVisit.Count > 0 do
-        //     let p = projectsToVisit.Dequeue()
-
-        //     match visited.TryGetValue p with
-        //     | true, _ -> ()
-        //     | _ ->
-        //         visited.Add(p)
-        //         |> ignore
-
-        //         p.ProjectReferences
-        //         |> Seq.iter (fun r -> projectsToVisit.Enqueue r)
-
-
-        //         p.ProjectInstance.Properties
-        //         |> ProjectPropertyInstance.tryFind "TargetFramework"
-        //         |> Option.iter (fun _ -> results.Add p.ProjectInstance)
-
-
-        // results :> seq<_>
-        // graphBuildResult.ResultsByNode
-        // |> Seq.collect(fun (KeyValue(node,_)) ->
-
-        //     let pi = node.ProjectInstance
-        //     match pi.Properties |> ProjectPropertyInstance.tryFind "TargetFrameworks" with
-        //     | Some x ->
-        //         Seq.empty
-        //     | _ ->
-        //         Seq.singleton pi
-
-        // )
-
         graphBuildResult.ResultsByNode
         |> Seq.map (fun (KeyValue(node, result)) -> ProjectLoader2.GetProjectInstance result)
 
