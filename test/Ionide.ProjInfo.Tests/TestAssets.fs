@@ -1017,7 +1017,10 @@ let ``sample16-solution-with-solution-folders`` = {
 
             let proj1 =
                 projectsAfterBuild
-                |> Seq.find (fun x -> x.ProjectFileName.EndsWith("proj1.fsproj") && x.ProjectFileName.Contains("src"))
+                |> Seq.find (fun x ->
+                    x.ProjectFileName.EndsWith("proj1.fsproj")
+                    && x.ProjectFileName.Contains("src")
+                )
 
             Expect.isTrue
                 (proj1.SourceFiles
