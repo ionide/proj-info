@@ -224,7 +224,7 @@ module ProjectLoader2Tests =
     let testWithEnv name (data: TestAssetProjInfo2) f test = testWithEnv2 DoRestore name data f test
 
 
-    let applyTests name (info: TestAssetProjInfo2) = [
+    let applyTests testCaseTask name (info: TestAssetProjInfo2) = [
         testCaseTask
         |> testWithEnv
             $"Graph.{name}"
@@ -254,30 +254,30 @@ module ProjectLoader2Tests =
 
     let buildManagerSessionTests toolsPath =
         testList "buildManagerSessionTests" [
-            yield! applyTests "loader2-no-solution-with-2-projects" ``loader2-no-solution-with-2-projects``
+            yield! applyTests testCaseTask "loader2-no-solution-with-2-projects" ``loader2-no-solution-with-2-projects``
 
-            yield! applyTests "sample2-NetSdk-library2" ``sample2-NetSdk-library2``
-            yield! applyTests "sample3-Netsdk-projs" ``sample3-Netsdk-projs-2``
+            yield! applyTests testCaseTask "sample2-NetSdk-library2" ``sample2-NetSdk-library2``
+            yield! applyTests ptestCaseTask "sample3-Netsdk-projs" ``sample3-Netsdk-projs-2``
 
-            yield! applyTests "sample4-NetSdk-multitfm" ``sample4-NetSdk-multitfm-2``
-            yield! applyTests "sample5-NetSdk-lib-cs" ``sample5-NetSdk-lib-cs-2``
-            yield! applyTests "sample6-NetSdk-sparse" ``sample6-Netsdk-Sparse-sln-2``
-            yield! applyTests "sample7-oldsdk-projs" ``sample7-legacy-framework-multi-project-2``
-            yield! applyTests "sample8-NetSdk-Explorer" ``sample8-NetSdk-Explorer-2``
-            yield! applyTests "sample9-NetSdk-library" ``sample9-NetSdk-library-2``
-            yield! applyTests "sample10-NetSdk-custom-targets" ``sample10-NetSdk-library-with-custom-targets-2``
+            yield! applyTests testCaseTask "sample4-NetSdk-multitfm" ``sample4-NetSdk-multitfm-2``
+            yield! applyTests testCaseTask "sample5-NetSdk-lib-cs" ``sample5-NetSdk-lib-cs-2``
+            yield! applyTests testCaseTask "sample6-NetSdk-sparse" ``sample6-Netsdk-Sparse-sln-2``
+            yield! applyTests testCaseTask "sample7-oldsdk-projs" ``sample7-legacy-framework-multi-project-2``
+            yield! applyTests testCaseTask "sample8-NetSdk-Explorer" ``sample8-NetSdk-Explorer-2``
+            yield! applyTests testCaseTask "sample9-NetSdk-library" ``sample9-NetSdk-library-2``
+            yield! applyTests testCaseTask "sample10-NetSdk-custom-targets" ``sample10-NetSdk-library-with-custom-targets-2``
 
-            yield! applyTests "sample-referenced-csharp-project" ``sample-referenced-csharp-project``
-            // yield! applyTests "sample-workload" ``sample-workload``
-            yield! applyTests "traversal-project" ``traversal-project``
-            yield! applyTests "sample11-solution-with-other-projects" ``sample11-solution-with-other-projects``
-            // yield! applyTests "sample12-solution-filter-with-one-project" ``sample12-solution-filter-with-one-project``
-            yield! applyTests "sample13-solution-with-solution-files" ``sample13-solution-with-solution-files``
-            // yield! applyTests "sample-14-slnx-solution" ``sample-14-slnx-solution``
-            yield! applyTests "sample15-nuget-analyzers" ``sample15-nuget-analyzers``
-            yield! applyTests "sample16-solution-with-solution-folders" ``sample16-solution-with-solution-folders``
-            yield! applyTests "sample-netsdk-prodref" ``sample-netsdk-prodref``
-            yield! applyTests "sample-netsdk-bad-cache" ``sample-netsdk-bad-cache-2``
+            yield! applyTests testCaseTask "sample-referenced-csharp-project" ``sample-referenced-csharp-project``
+            // yield! applyTests testCaseTask "sample-workload" ``sample-workload``
+            yield! applyTests testCaseTask "traversal-project" ``traversal-project``
+            yield! applyTests testCaseTask "sample11-solution-with-other-projects" ``sample11-solution-with-other-projects``
+            // yield! applyTests testCaseTask "sample12-solution-filter-with-one-project" ``sample12-solution-filter-with-one-project``
+            yield! applyTests testCaseTask "sample13-solution-with-solution-files" ``sample13-solution-with-solution-files``
+            // yield! applyTests testCaseTask "sample-14-slnx-solution" ``sample-14-slnx-solution``
+            yield! applyTests testCaseTask "sample15-nuget-analyzers" ``sample15-nuget-analyzers``
+            yield! applyTests testCaseTask "sample16-solution-with-solution-folders" ``sample16-solution-with-solution-folders``
+            yield! applyTests testCaseTask "sample-netsdk-prodref" ``sample-netsdk-prodref``
+            yield! applyTests testCaseTask "sample-netsdk-bad-cache" ``sample-netsdk-bad-cache-2``
 
             testCaseTask
             |> testWithEnv2

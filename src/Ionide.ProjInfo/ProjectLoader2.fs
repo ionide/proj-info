@@ -520,17 +520,16 @@ type ProjectLoader2 =
         let graph =
             ProjectLoader2.EvaluateAsGraph(entryProjectFile, ?projectCollection = projectCollection, ?projectInstanceFactory = projectInstanceFactory)
 
-        // Helper to get TargetFramework from global properties or project properties
-        let tryGetTargetFramework (node: ProjectGraphNode) =
+        // Helper to get TargetFramework from global properties
+        let inline tryGetTfmFromGlobalProps (node: ProjectGraphNode) =
             match node.ProjectInstance.GlobalProperties.TryGetValue "TargetFramework" with
-            | true, tfm when not (String.IsNullOrWhiteSpace tfm) -> Some tfm
-            | _ ->
-                node.ProjectInstance.Properties
-                |> ProjectPropertyInstance.tryFind "TargetFramework"
-                |> Option.filter (
-                    not
-                    << String.IsNullOrWhiteSpace
-                )
+            | true, tfm -> Some tfm
+            | _ -> None
+
+        // Helper to get TargetFramework from project properties
+        let inline tryGetFromProps (node: ProjectGraphNode) =
+            node.ProjectInstance.Properties
+            |> ProjectPropertyInstance.tryFind "TargetFramework"
 
         // Extract only nodes with a TargetFramework as new entry points
         // This filters out outer builds (which have TargetFrameworks but not TargetFramework)
@@ -538,7 +537,8 @@ type ProjectLoader2 =
         let innerBuildEntryPoints =
             graph.ProjectNodes
             |> Seq.choose (fun node ->
-                tryGetTargetFramework node
+                tryGetTfmFromGlobalProps node
+                |> Option.orElseWith (fun () -> tryGetFromProps node)
                 |> Option.map (fun _ -> ProjectGraphEntryPoint(node.ProjectInstance.FullPath, globalProperties = node.ProjectInstance.GlobalProperties))
             )
 
