@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open Microsoft.Build.Evaluation
 open Microsoft.Build.Framework
+open Microsoft.Build.Construction
 open System.Runtime.Loader
 open System.IO
 open Microsoft.Build.Execution
@@ -871,6 +872,39 @@ module ProjectLoader =
             |> Seq.tryFind (fun n -> n.Name = prop)
             |> Option.map (fun n -> n.Value.Trim())
 
+        let projectAssetsFile =
+            msbuildPropString "ProjectAssetsFile"
+            |> Option.defaultValue ""
+
+        let assetsFileExists =
+            not (String.IsNullOrWhiteSpace projectAssetsFile)
+            && File.Exists projectAssetsFile
+
+        let hasTargetFramework =
+            match msbuildPropString "TargetFramework" with
+            | Some tfm -> not (String.IsNullOrWhiteSpace tfm)
+            | None -> false
+
+        let hasTargetFrameworks =
+            match msbuildPropStringList "TargetFrameworks" with
+            | Some tfms ->
+                tfms
+                |> List.exists (fun tfm -> not (String.IsNullOrWhiteSpace tfm))
+            | None -> false
+
+        let isSdkStyleProject =
+            not (String.IsNullOrWhiteSpace projectAssetsFile)
+            || hasTargetFramework
+            || hasTargetFrameworks
+
+        let restoreSuccess =
+            if isSdkStyleProject then
+                match msbuildPropBool "RestoreSuccess" with
+                | Some restoreSuccess -> restoreSuccess
+                | None -> assetsFileExists
+            else
+                true
+
         {
             IsTestProject =
                 msbuildPropBool "IsTestProject"
@@ -898,15 +932,8 @@ module ProjectLoader =
                 msbuildPropString "MSBuildToolsVersion"
                 |> Option.defaultValue ""
 
-            ProjectAssetsFile =
-                msbuildPropString "ProjectAssetsFile"
-                |> Option.defaultValue ""
-            RestoreSuccess =
-                match msbuildPropString "TargetFrameworkVersion" with
-                | Some _ -> true
-                | None ->
-                    msbuildPropBool "RestoreSuccess"
-                    |> Option.defaultValue false
+            ProjectAssetsFile = projectAssetsFile
+            RestoreSuccess = restoreSuccess
 
             Configurations =
                 msbuildPropStringList "Configurations"
@@ -1050,6 +1077,46 @@ module ProjectLoader =
         | TraversalProjectInfo of ProjectReference list
         | OtherProjectInfo of ProjectInstance
 
+    let private hasMissingImports (projectInstance: ProjectInstance) =
+        let projectPath = projectInstance.FullPath
+
+        if
+            String.IsNullOrWhiteSpace projectPath
+            || not (File.Exists projectPath)
+        then
+            false
+        else
+            try
+                let projectDir = Path.GetDirectoryName projectPath
+
+                ProjectRootElement.Open(projectPath).Imports
+                |> Seq.exists (fun importElement ->
+                    let condition = importElement.Condition
+
+                    if not (String.IsNullOrWhiteSpace condition) then
+                        false
+                    else
+                        let projectAttr = importElement.Project
+
+                        if String.IsNullOrWhiteSpace projectAttr then
+                            false
+                        else
+                            let expanded = projectInstance.ExpandString projectAttr
+
+                            if String.IsNullOrWhiteSpace expanded then
+                                false
+                            else
+                                let resolvedPath =
+                                    if Path.IsPathRooted expanded then
+                                        expanded
+                                    else
+                                        Path.Combine(projectDir, expanded)
+
+                                not (File.Exists resolvedPath)
+                )
+            with _ ->
+                false
+
     let getLoadedProjectInfo<'e when ProjectNotRestoredError<'e, LoadedProject>> (path: string) customProperties project =
 
         match project with
@@ -1168,8 +1235,14 @@ module ProjectLoader =
                 |> Seq.toList
 
 
-            if not sdkInfo.RestoreSuccess then
+            let hasMissingImports = hasMissingImports p
+
+            if
+                not sdkInfo.RestoreSuccess
+                && not hasMissingImports
+            then
                 Error('e.NotRestored project)
+
             else
                 let proj =
                     mapToProject path commandLineArgs p2pRefs compileItems nuGetRefs sdkInfo props customProps analyzers allProperties allItems imports
