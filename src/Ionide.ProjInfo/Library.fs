@@ -450,8 +450,7 @@ module ProjectLoader =
         let combined = Dictionary(collection.GlobalProperties)
 
         for kvp in otherProperties do
-            combined.TryAdd(kvp.Key, kvp.Value)
-            |> ignore
+            combined.Add(kvp.Key, kvp.Value)
 
         combined
 
@@ -674,7 +673,7 @@ module ProjectLoader =
                     let legacyProjFormatXmlns = "xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\""
                     let lines: seq<string> = File.ReadLines path
 
-                    Seq.tryFind (fun (line: string) -> line.Contains legacyProjFormatXmlns) lines
+                    (Seq.tryFind (fun (line: string) -> line.Contains legacyProjFormatXmlns) lines)
                     |> Option.isSome
                 else
                     false
@@ -903,8 +902,11 @@ module ProjectLoader =
                 msbuildPropString "ProjectAssetsFile"
                 |> Option.defaultValue ""
             RestoreSuccess =
-                msbuildPropBool "RestoreSuccess"
-                |> Option.defaultValue false
+                match msbuildPropString "TargetFrameworkVersion" with
+                | Some _ -> true
+                | None ->
+                    msbuildPropBool "RestoreSuccess"
+                    |> Option.defaultValue false
 
             Configurations =
                 msbuildPropStringList "Configurations"
