@@ -303,7 +303,7 @@ module ProjectLoader2Tests =
 
             yield! applyTests testCaseTask "sample4-NetSdk-multitfm" ``sample4-NetSdk-multitfm-2``
             yield! applyTests testCaseTask "sample5-NetSdk-lib-cs" ``sample5-NetSdk-lib-cs-2``
-            // yield! applyTests testCaseTask "sample6-NetSdk-sparse" ``sample6-Netsdk-Sparse-sln-2`` // netcoreapp2.1 graph build hang under net10 SDK
+            yield! applyTests ptestCaseTask "sample6-NetSdk-sparse" ``sample6-Netsdk-Sparse-sln-2`` // pending: netcoreapp2.1 graph build hang under net10 SDK
             yield! applyTests testCaseTask "sample7-oldsdk-projs" ``sample7-legacy-framework-multi-project-2``
             yield! applyTests testCaseTask "sample8-NetSdk-Explorer" ``sample8-NetSdk-Explorer-2``
             yield! applyTests testCaseTask "sample9-NetSdk-library" ``sample9-NetSdk-library-2``
