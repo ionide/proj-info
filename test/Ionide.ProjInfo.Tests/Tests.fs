@@ -2187,13 +2187,12 @@ let traversalProjectTest toolsPath loaderType workspaceFactory =
 
             let fs = FileUtils(logger)
             let projPath = pathForProject ``traversal project``
-            // // need to build the projects first so that there's something to latch on to
-            // dotnet fs [
-            //     "build"
-            //     projPath
-            //     "-bl"
-            // ]
-            // |> checkExitCodeZero
+            // need to restore the projects first so that there's something to latch on to
+            dotnet fs [
+                "restore"
+                projPath
+            ]
+            |> checkExitCodeZero
 
             let loader: IWorkspaceLoader = workspaceFactory toolsPath
 
@@ -2209,6 +2208,8 @@ let sample11OtherProjectsTest toolsPath loaderType workspaceFactory =
     testCase
         $"Can load sample11 with other projects like shproj in sln - {loaderType}"
         (fun () ->
+            let logger = Log.create "Test 'Can load sample11 with other projects like shproj in sln'"
+            let fs = FileUtils(logger)
 
             let projPath = pathForProject ``sample 11 sln with other project types``
 
@@ -2217,6 +2218,22 @@ let sample11OtherProjectsTest toolsPath loaderType workspaceFactory =
                 InspectSln.tryParseSln projPath
                 |> getResult
                 |> InspectSln.loadingBuildOrder
+
+            // need to restore the projects first so that there's something to latch on to
+            // Only restore .fsproj and .csproj files - .shproj requires VS MSBuild
+            let restorableProjects =
+                projPaths
+                |> List.filter (fun p ->
+                    p.EndsWith(".fsproj")
+                    || p.EndsWith(".csproj")
+                )
+
+            for proj in restorableProjects do
+                dotnet fs [
+                    "restore"
+                    proj
+                ]
+                |> checkExitCodeZero
 
             let loader: IWorkspaceLoader = workspaceFactory toolsPath
 
@@ -2231,6 +2248,8 @@ let sample12SlnFilterTest toolsPath loaderType workspaceFactory =
     testCase
         $"Can load sample12 with solution folder with one project - {loaderType}"
         (fun () ->
+            let logger = Log.create "Test 'Can load sample12 with solution folder with one project'"
+            let fs = FileUtils(logger)
 
             let projPath = pathForProject ``sample 12 slnf with one project``
 
@@ -2239,6 +2258,22 @@ let sample12SlnFilterTest toolsPath loaderType workspaceFactory =
                 InspectSln.tryParseSln projPath
                 |> getResult
                 |> InspectSln.loadingBuildOrder
+
+            // need to restore the projects first so that there's something to latch on to
+            // Only restore .fsproj and .csproj files
+            let restorableProjects =
+                projPaths
+                |> List.filter (fun p ->
+                    p.EndsWith(".fsproj")
+                    || p.EndsWith(".csproj")
+                )
+
+            for proj in restorableProjects do
+                dotnet fs [
+                    "restore"
+                    proj
+                ]
+                |> checkExitCodeZero
 
             let loader: IWorkspaceLoader = workspaceFactory toolsPath
 
