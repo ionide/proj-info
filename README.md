@@ -9,11 +9,6 @@ Parsing and evaluating of `.fsproj` files. This repository contains several pack
 * `Ionide.ProjInfo.Tool` - a CLI tool intended to help with debugging the cracking of various projects easily
 
 ---
-You can support Ionide development on [Open Collective](https://opencollective.com/ionide).
-
-[![Open Collective](https://opencollective.com/ionide/donate/button.png?color=blue)](https://opencollective.com/ionide)
-
----
 
 ## Used by:
 
