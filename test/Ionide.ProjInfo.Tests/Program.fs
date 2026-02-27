@@ -13,6 +13,9 @@ let toolsPath = Init.init (IO.DirectoryInfo Environment.CurrentDirectory) None
 [<Tests>]
 let tests = Tests.tests toolsPath
 
+[<Tests>]
+let visualTreeTests = Tests.visualTreeTests
+
 
 [<EntryPoint>]
 let main argv =

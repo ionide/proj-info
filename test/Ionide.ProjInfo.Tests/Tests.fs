@@ -2465,6 +2465,70 @@ let sample16SolutionFoldersSlnxTest toolsPath loaderType workspaceFactory =
 
     testCase $"Can load sample16 solution folders test (.slnx) - {loaderType}" (fun () -> sample16SolutionFoldersTest ``sample 16 solution folders (.slnx)``)
 
+let visualTreeTests =
+    testList "VisualTree" [
+        test "relativePathOf returns relative path for file in subdirectory" {
+            let fromPath =
+                if Environment.OSVersion.Platform = PlatformID.Win32NT then
+                    @"C:\projects\myproj\"
+                else
+                    "/projects/myproj/"
+
+            let toPath =
+                if Environment.OSVersion.Platform = PlatformID.Win32NT then
+                    @"C:\projects\myproj\src\File.fs"
+                else
+                    "/projects/myproj/src/File.fs"
+
+            let result = VisualTree.relativePathOf fromPath toPath
+            Expect.equal result "src/File.fs" "should return relative path with forward slashes"
+        }
+
+        test "relativePathOf returns relative path for sibling directory" {
+            let fromPath =
+                if Environment.OSVersion.Platform = PlatformID.Win32NT then
+                    @"C:\projects\myproj\src\"
+                else
+                    "/projects/myproj/src/"
+
+            let toPath =
+                if Environment.OSVersion.Platform = PlatformID.Win32NT then
+                    @"C:\projects\myproj\tests\Test.fs"
+                else
+                    "/projects/myproj/tests/Test.fs"
+
+            let result = VisualTree.relativePathOf fromPath toPath
+            Expect.equal result "../tests/Test.fs" "should return relative path going up then down"
+        }
+
+        test "relativePathOf returns filename for file in same directory" {
+            let fromPath =
+                if Environment.OSVersion.Platform = PlatformID.Win32NT then
+                    @"C:\projects\myproj\"
+                else
+                    "/projects/myproj/"
+
+            let toPath =
+                if Environment.OSVersion.Platform = PlatformID.Win32NT then
+                    @"C:\projects\myproj\File.fs"
+                else
+                    "/projects/myproj/File.fs"
+
+            let result = VisualTree.relativePathOf fromPath toPath
+            Expect.equal result "File.fs" "should return just the filename"
+        }
+
+        test "relativePathOf handles relative input paths" {
+            // This test case covers the bug where Uri constructor throws
+            // UriFormatException for paths it can't determine the format of
+            let fromPath = "myproj/"
+            let toPath = "myproj/src/File.fs"
+
+            let result = VisualTree.relativePathOf fromPath toPath
+            Expect.equal result "src/File.fs" "should handle relative paths"
+        }
+    ]
+
 let tests toolsPath =
     let testSample3WorkspaceLoaderExpected = [
         ExpectNotification.loading "c1.fsproj"
