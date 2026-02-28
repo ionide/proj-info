@@ -1,12 +1,12 @@
 module Tests
 
+
 open DotnetProjInfo.TestAssets
 open Expecto
 open Expecto.Logging
 open Expecto.Logging.Message
 open FileUtils
 open FSharp.Compiler.CodeAnalysis
-open Ionide.ProjInfo
 open Ionide.ProjInfo
 open Ionide.ProjInfo.Types
 open Medallion.Shell
@@ -19,121 +19,13 @@ open System.Linq
 
 #nowarn "25"
 
-let RepoDir =
-    (__SOURCE_DIRECTORY__
-     / ".."
-     / "..")
-    |> Path.GetFullPath
+open Microsoft.Build.Execution
+open Microsoft.Build.Graph
+open System.Threading.Tasks
+open Microsoft.Build.Evaluation
+open Ionide.ProjInfo.ProjectLoader
+open Ionide.ProjInfo.Tests.TestUtils
 
-let ExamplesDir =
-    RepoDir
-    / "test"
-    / "examples"
-
-let pathForTestAssets (test: TestAssetProjInfo) =
-    ExamplesDir
-    / test.ProjDir
-
-let pathForProject (test: TestAssetProjInfo) =
-    pathForTestAssets test
-    / test.ProjectFile
-
-let implAssemblyForProject (test: TestAssetProjInfo) = $"{test.AssemblyName}.dll"
-
-let refAssemblyForProject (test: TestAssetProjInfo) =
-    Path.Combine("ref", implAssemblyForProject test)
-
-let getResult (r: Result<_, _>) =
-    match r with
-    | Ok x -> x
-    | Result.Error e -> failwithf "%A" e
-
-let TestRunDir =
-    RepoDir
-    / "test"
-    / "testrun_ws"
-
-let TestRunInvariantDir =
-    TestRunDir
-    / "invariant"
-
-let checkExitCodeZero (cmd: Command) =
-    Expect.equal 0 cmd.Result.ExitCode "command finished with exit code non-zero."
-
-let findByPath path parsed =
-    parsed
-    |> Array.tryPick (fun (kv: KeyValuePair<string, ProjectOptions>) ->
-        if kv.Key = path then
-            Some kv
-        else
-            None
-    )
-    |> function
-        | Some x -> x
-        | None ->
-            failwithf
-                "key '%s' not found in %A"
-                path
-                (parsed
-                 |> Array.map (fun kv -> kv.Key))
-
-let expectFind projPath msg (parsed: ProjectOptions list) =
-    let p =
-        parsed
-        |> List.tryFind (fun n -> n.ProjectFileName = projPath)
-
-    Expect.isSome p msg
-    p.Value
-
-
-let inDir (fs: FileUtils) dirName =
-    let outDir =
-        TestRunDir
-        / dirName
-
-    fs.rm_rf outDir
-    fs.mkdir_p outDir
-    fs.cd outDir
-    outDir
-
-let copyDirFromAssets (fs: FileUtils) source outDir =
-    fs.mkdir_p outDir
-
-    let path =
-        ExamplesDir
-        / source
-
-    fs.cp_r path outDir
-    ()
-
-let dotnet (fs: FileUtils) args = fs.shellExecRun "dotnet" args
-
-let withLog name f test =
-    test
-        name
-        (fun () ->
-
-            let logger = Log.create (sprintf "Test '%s'" name)
-            let fs = FileUtils(logger)
-            f logger fs
-        )
-
-let renderOf sampleProj sources = {
-    ProjectViewerTree.Name =
-        sampleProj.ProjectFile
-        |> Path.GetFileNameWithoutExtension
-    Items =
-        sources
-        |> List.map (fun (path, link) -> ProjectViewerItem.Compile(path, { ProjectViewerItemConfig.Link = link }))
-}
-
-let createFCS () =
-    let checker = FSharpChecker.Create(projectCacheSize = 200, keepAllBackgroundResolutions = true, keepAssemblyContents = true)
-    checker
-
-let sleepABit () =
-    // CI has apparent occasional slowness
-    System.Threading.Thread.Sleep 5000
 
 [<AutoOpen>]
 module ExpectNotification =
@@ -437,8 +329,8 @@ let testSample2 toolsPath workspaceLoader isRelease (workspaceFactory: ToolsPath
             Expect.equal n1Parsed.SourceFiles expectedSources "check sources"
         )
 
-let testSample3 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) expected =
-    testCase
+let testSample3 testCaseBuilder toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) expected =
+    testCaseBuilder
     |> withLog
         (sprintf "can load sample3 - %s" workspaceLoader)
         (fun logger fs ->
@@ -548,6 +440,7 @@ let testSample3 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
             Expect.equal l2Parsed l2Loaded "l2 notificaton and parsed should be the same"
             Expect.equal c1Parsed c1Loaded "c1 notificaton and parsed should be the same"
         )
+
 
 let testSample4 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
@@ -682,8 +575,8 @@ let testSample5 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
             Expect.equal l2Parsed l2Loaded "l2 notificaton and parsed should be the same"
         )
 
-let testLoadSln toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) expected =
-    testCase
+let testLoadSln testCaseBuilder toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) expected =
+    testCaseBuilder
     |> withLog
         (sprintf "can load sln - %s" workspaceLoader)
         (fun logger fs ->
@@ -792,8 +685,8 @@ let testLoadSln toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
 
         )
 
-let testParseSln toolsPath =
-    testCase
+let testParseSln testCaseBuilder toolsPath =
+    testCaseBuilder
     |> withLog
         "can parse sln"
         (fun logger fs ->
@@ -1012,8 +905,8 @@ let testRender2 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorks
             Expect.equal rendered (renderOf sampleProj expectedSources) "check rendered project"
         )
 
-let testRender3 toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
-    testCase
+let testRender3 testCaseBuilder toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
+    testCaseBuilder
     |> withLog
         (sprintf "can render sample3 - %s" workspaceLoader)
         (fun logger fs ->
@@ -1378,6 +1271,61 @@ let testFCSmap toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorksp
 
         )
 
+module Task =
+    let RunSynchronously (task: Task<'T>) = task.GetAwaiter().GetResult()
+
+module File =
+
+    let combinePaths path1 (path2: string) =
+        Path.Combine(
+            path1,
+            path2.TrimStart [|
+                '\\'
+                '/'
+            |]
+        )
+
+    let (</>) path1 path2 = combinePaths path1 path2
+
+    let rec copyDirectory (sourceDir: DirectoryInfo) destDir =
+        // Get the subdirectories for the specified directory.
+        // let dir = DirectoryInfo(sourceDir)
+
+        if not sourceDir.Exists then
+            raise (
+                DirectoryNotFoundException(
+                    "Source directory does not exist or could not be found: "
+                    + sourceDir.FullName
+                )
+            )
+
+        let dirs = sourceDir.GetDirectories()
+
+        // If the destination directory doesn't exist, create it.
+        Directory.CreateDirectory(destDir)
+        |> ignore
+
+        // Get the files in the directory and copy them to the new location.
+        sourceDir.GetFiles()
+        |> Seq.iter (fun file ->
+            let tempPath = Path.Combine(destDir, file.Name)
+
+            file.CopyTo(tempPath, false)
+            |> ignore
+        )
+
+        // If copying subdirectories, copy them and their contents to new location.
+        dirs
+        |> Seq.iter (fun dir ->
+            let tempPath = Path.Combine(destDir, dir.Name)
+            copyDirectory dir tempPath
+        )
+
+open File
+open Microsoft.Build.Framework
+open Ionide.ProjInfo.Tests
+
+
 let testFCSmapManyProj toolsPath workspaceLoader (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     ptestCase
     |> withLog
@@ -1509,6 +1457,7 @@ let testFCSmapManyProjCheckCaching =
                 Analyzers = []
                 AllProperties = Map.empty
                 AllItems = Map.empty
+                Imports = []
             }
 
             let makeReference (options: ProjectOptions) = {
@@ -1780,7 +1729,8 @@ let testLoadProject toolsPath =
                 match ProjectLoader.getLoadedProjectInfo projPath [] proj with
                 | Ok(ProjectLoader.LoadedProjectInfo.StandardProjectInfo proj) -> Expect.equal proj.ProjectFileName projPath "project file names"
                 | Ok(ProjectLoader.LoadedProjectInfo.TraversalProjectInfo refs) -> failwith "expected standard project, not a traversal project"
-                | Result.Error err -> failwith $"{err}"
+                | Result.Error(ParseError.NotRestored exn) -> failwith $"Project Not Restored {exn}"
+                | otherwise -> failwith $"Unexpected result {otherwise}"
         )
 
 let testProjectSystem toolsPath workspaceLoader workspaceFactory =
@@ -2234,15 +2184,15 @@ let traversalProjectTest toolsPath loaderType workspaceFactory =
         $"can crack traversal projects - {loaderType}"
         (fun () ->
             let logger = Log.create "Test 'can crack traversal projects'"
+
             let fs = FileUtils(logger)
             let projPath = pathForProject ``traversal project``
-            // // need to build the projects first so that there's something to latch on to
-            // dotnet fs [
-            //     "build"
-            //     projPath
-            //     "-bl"
-            // ]
-            // |> checkExitCodeZero
+            // need to restore the projects first so that there's something to latch on to
+            dotnet fs [
+                "restore"
+                projPath
+            ]
+            |> checkExitCodeZero
 
             let loader: IWorkspaceLoader = workspaceFactory toolsPath
 
@@ -2258,6 +2208,8 @@ let sample11OtherProjectsTest toolsPath loaderType workspaceFactory =
     testCase
         $"Can load sample11 with other projects like shproj in sln - {loaderType}"
         (fun () ->
+            let logger = Log.create "Test 'Can load sample11 with other projects like shproj in sln'"
+            let fs = FileUtils(logger)
 
             let projPath = pathForProject ``sample 11 sln with other project types``
 
@@ -2266,6 +2218,22 @@ let sample11OtherProjectsTest toolsPath loaderType workspaceFactory =
                 InspectSln.tryParseSln projPath
                 |> getResult
                 |> InspectSln.loadingBuildOrder
+
+            // need to restore the projects first so that there's something to latch on to
+            // Only restore .fsproj and .csproj files - .shproj requires VS MSBuild
+            let restorableProjects =
+                projPaths
+                |> List.filter (fun p ->
+                    p.EndsWith(".fsproj")
+                    || p.EndsWith(".csproj")
+                )
+
+            for proj in restorableProjects do
+                dotnet fs [
+                    "restore"
+                    proj
+                ]
+                |> checkExitCodeZero
 
             let loader: IWorkspaceLoader = workspaceFactory toolsPath
 
@@ -2280,6 +2248,8 @@ let sample12SlnFilterTest toolsPath loaderType workspaceFactory =
     testCase
         $"Can load sample12 with solution folder with one project - {loaderType}"
         (fun () ->
+            let logger = Log.create "Test 'Can load sample12 with solution folder with one project'"
+            let fs = FileUtils(logger)
 
             let projPath = pathForProject ``sample 12 slnf with one project``
 
@@ -2288,6 +2258,22 @@ let sample12SlnFilterTest toolsPath loaderType workspaceFactory =
                 InspectSln.tryParseSln projPath
                 |> getResult
                 |> InspectSln.loadingBuildOrder
+
+            // need to restore the projects first so that there's something to latch on to
+            // Only restore .fsproj and .csproj files
+            let restorableProjects =
+                projPaths
+                |> List.filter (fun p ->
+                    p.EndsWith(".fsproj")
+                    || p.EndsWith(".csproj")
+                )
+
+            for proj in restorableProjects do
+                dotnet fs [
+                    "restore"
+                    proj
+                ]
+                |> checkExitCodeZero
 
             let loader: IWorkspaceLoader = workspaceFactory toolsPath
 
@@ -2563,15 +2549,16 @@ let tests toolsPath =
         ExpectNotification.loaded "l1.fsproj"
     ]
 
-
     testSequenced
     <| testList "Main tests" [
+
+        ProjectLoader2Tests.buildManagerSessionTests toolsPath
         testSample2 toolsPath "WorkspaceLoader" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
         testSample2 toolsPath "WorkspaceLoader" true (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
         testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" false (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))
         testSample2 toolsPath "WorkspaceLoaderViaProjectGraph" true (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))
-        //   testSample3 toolsPath "WorkspaceLoader" WorkspaceLoader.Create testSample3WorkspaceLoaderExpected //- Sample 3 having issues, was also marked pending on old test suite
-        //   testSample3 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create testSample3GraphExpected //- Sample 3 having issues, was also marked pending on old test suite
+        testSample3 ptestCase toolsPath "WorkspaceLoader" WorkspaceLoader.Create testSample3WorkspaceLoaderExpected // pending: Sample 3 having issues, was also marked pending on old test suite
+        testSample3 ptestCase toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create testSample3GraphExpected // pending: Sample 3 having issues, was also marked pending on old test suite
         testSample4 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
         testSample4 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
         testSample5 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
@@ -2581,14 +2568,14 @@ let tests toolsPath =
         testSample10 toolsPath "WorkspaceLoader" false (fun (tools, props) -> WorkspaceLoader.Create(tools, globalProperties = props))
         testSample10 toolsPath "WorkspaceLoaderViaProjectGraph" false (fun (tools, props) -> WorkspaceLoaderViaProjectGraph.Create(tools, globalProperties = props))
         //Sln tests
-        //   testLoadSln toolsPath "WorkspaceLoader" WorkspaceLoader.Create testSlnExpected // Having issues on CI
-        //   testLoadSln toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create testSlnGraphExpected // Having issues on CI
-        //   testParseSln toolsPath
+        testLoadSln ptestCase toolsPath "WorkspaceLoader" WorkspaceLoader.Create testSlnExpected // pending: having issues on CI
+        testLoadSln ptestCase toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create testSlnGraphExpected // pending: having issues on CI
+        testParseSln ptestCase toolsPath // pending: having issues on CI
         //Render tests
         testRender2 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
         testRender2 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
-        //   testRender3 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
-        //   testRender3 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create //- Sample 3 having issues, was also marked pending on old test suite
+        testRender3 ptestCase toolsPath "WorkspaceLoader" WorkspaceLoader.Create // pending: sample3 rendering issues
+        testRender3 ptestCase toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create // pending: sample3 rendering issues
         testRender4 toolsPath "WorkspaceLoader" WorkspaceLoader.Create
         testRender4 toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
         testRender5 toolsPath "WorkspaceLoader" WorkspaceLoader.Create

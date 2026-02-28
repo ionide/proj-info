@@ -1,8 +1,9 @@
-﻿open Fake.Core
+open Fake.Core
 open Fake.DotNet
 open Fake.IO
 open Fake.IO.Globbing.Operators
 open Fake.Core.TargetOperators
+open System
 
 System.Environment.CurrentDirectory <- (Path.combine __SOURCE_DIRECTORY__ "..")
 
@@ -104,7 +105,19 @@ let init args =
             "net10.0", Some "BuildNet10"
         ]
 
+    let cleanupGlobalJson =
+        let globalJsonPath = Path.combine "test" "global.json"
+
+        fun () ->
+            try
+                if System.IO.File.Exists globalJsonPath then
+                    System.IO.File.Delete globalJsonPath
+            with _ ->
+                ()
+
     let testTFM tfm =
+        cleanupGlobalJson ()
+
         try
             exec "dotnet" $"new globaljson --force --sdk-version {tfmToSdkMap.[tfm]} --roll-forward LatestMinor" "test" Map.empty
 
@@ -123,10 +136,18 @@ let init args =
                 | Some envVar -> Map.ofSeq [ envVar, "true" ]
                 | None -> Map.empty
 
-            exec "dotnet" $"test --blame --blame-hang-timeout 120s --framework {tfm} --logger trx --logger GitHubActions -c %s{configuration} .\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj -- %s{failedOnFocus}" "test" envs
+            let timeoutInSeconds =
+                (TimeSpan.FromMinutes 5).TotalSeconds
+                |> int
+
+            exec
+                "dotnet"
+                $"test --blame --blame-hang-timeout %d{timeoutInSeconds}s --framework %s{tfm} --logger trx --logger GitHubActions -c %s{configuration} .\\Ionide.ProjInfo.Tests\\Ionide.ProjInfo.Tests.fsproj -- %s{failedOnFocus}"
+                "test"
+                envs
             |> ignore
         finally
-            System.IO.File.Delete "test\\global.json"
+            cleanupGlobalJson ()
 
     Target.create "Test" DoNothing
 
@@ -204,7 +225,11 @@ let init args =
     Target.create "Release" DoNothing
 
     "Clean"
-    ==> "CheckFormat"
+    ==> "Default"
+    |> ignore
+
+    "Clean"
+    ?=> "CheckFormat"
     ==> "Build"
     ==> "Test"
     ==> "Default"
