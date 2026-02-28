@@ -20,9 +20,7 @@ module VisualTree =
             + Path.DirectorySeparatorChar.ToString()
 
     let relativePathOf fromPath toPath =
-        let fromUri = Uri(fromPath)
-        let toUri = Uri(toPath)
-        fromUri.MakeRelativeUri(toUri).OriginalString
+        Path.GetRelativePath(fromPath, toPath).Replace('\\', '/')
 
     let relativeToProjDir projPath filePath =
         filePath
