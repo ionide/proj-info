@@ -107,6 +107,7 @@ let init args =
     let testTFM tfm =
         try
             exec "dotnet" $"new globaljson --force --sdk-version {tfmToSdkMap.[tfm]} --roll-forward LatestMinor" "test" Map.empty
+            exec "dotnet" "restore .\\examples\\traversal-project\\dirs.proj" "test" Map.empty
 
             let failedOnFocus =
                 if isCI.Value then
