@@ -465,17 +465,66 @@ module ProjectLoader =
 
     // it's _super_ important that the 'same' project (path + properties) is only created once in a project collection, so we have to check on this here
     let findOrCreateMatchingProject path (collection: ProjectCollection) globalProps =
+        let rec hasSharingViolation (e: exn) =
+            match e with
+            | null -> false
+            | :? IOException as ioEx ->
+                match
+                    ioEx.HResult
+                    &&& 0xFFFF
+                with
+                | 32 // ERROR_SHARING_VIOLATION
+                | 33 -> // ERROR_LOCK_VIOLATION
+                    true
+                | _ -> hasSharingViolation ioEx.InnerException
+            | _ -> hasSharingViolation e.InnerException
+
+        let createProjectWithRetry (projectPath: string) (createProject: unit -> Project) =
+            let maxRetries = 4
+
+            let rec loop attempt =
+                try
+                    createProject ()
+                with :? Microsoft.Build.Exceptions.InvalidProjectFileException as ex when
+                    attempt < maxRetries
+                    && hasSharingViolation ex ->
+                    let delayMs =
+                        25
+                        * (1
+                           <<< attempt)
+
+                    projectLoaderLogger.Value.debug (
+                        Log.setMessage
+                            $"Transient file sharing violation while loading '{projectPath}'. Retrying in {delayMs}ms (attempt {attempt
+                                                                                                                                + 1}/{maxRetries
+                                                                                                                                      + 1})."
+                        >> Log.addExn ex
+                    )
+
+                    System.Threading.Thread.Sleep delayMs
+
+                    loop (
+                        attempt
+                        + 1
+                    )
+
+            loop 0
+
         let createNewProject properties =
             try
-                Project(
-                    projectFile = path,
-                    projectCollection = collection,
-                    globalProperties = properties,
-                    toolsVersion = null,
-                    loadSettings =
-                        (ProjectLoadSettings.IgnoreMissingImports
-                         ||| ProjectLoadSettings.IgnoreInvalidImports)
-                )
+                createProjectWithRetry
+                    path
+                    (fun _ ->
+                        Project(
+                            projectFile = path,
+                            projectCollection = collection,
+                            globalProperties = properties,
+                            toolsVersion = null,
+                            loadSettings =
+                                (ProjectLoadSettings.IgnoreMissingImports
+                                 ||| ProjectLoadSettings.IgnoreInvalidImports)
+                        )
+                    )
             with :? System.InvalidOperationException as ex ->
                 raise (ProjectAlreadyLoaded(path, collection, properties, ex))
 
@@ -1190,6 +1239,11 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
             |> Some
         with
         | InvalidProjectException e ->
+            logger.warn (
+                Log.setMessage "InvalidProjectException error while building projects via graph build"
+                >> Log.addExn e
+            )
+
             let p = e.ProjectFile
             loadingNotification.Trigger(WorkspaceProjectState.Failed(p, ProjectNotFound(p)))
             None
