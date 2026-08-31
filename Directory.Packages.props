@@ -38,7 +38,7 @@
     <PackageVersion Include="Expecto" Version="$(ExpectoVersion)" />
     <PackageVersion Include="Expecto.Diff" Version="$(ExpectoVersion)" />
     <PackageVersion Include="MedallionShell" Version="1.5.1" />
-    <PackageVersion Include="YoloDev.Expecto.TestSdk" Version="0.15.3" />
+    <PackageVersion Include="YoloDev.Expecto.TestSdk" Version="0.15.5" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageVersion Include="GitHubActionsTestLogger" Version="2.4.1" />
     <!-- Build Dependencies-->

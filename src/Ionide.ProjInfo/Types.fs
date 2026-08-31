@@ -84,6 +84,10 @@ module Types =
         /// Will have Key Value pairs like "PkgIonide_Analyzers" -> "C:\Users\username\.nuget\packages\ionide.analyzers\0.14.7"
         /// The "analyzers/dotnet/fs" subfolder is not included here, just the package root
         Analyzers: Analyzer list
+        /// The full file paths of all the files that during evaluation contributed to this project instance.
+        /// This does not include projects that were never imported because a condition on an Import element was false.
+        /// The outer ProjectRootElement that maps to this project instance itself is not included.
+        Imports: string list
     } with
 
         /// ResolvedTargetPath is the path to the primary reference assembly for this project.
