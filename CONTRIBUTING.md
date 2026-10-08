@@ -14,15 +14,17 @@ Our current algorithm is
 
 So if you set global.json to a 9.0.xxx SDK, you'll _always_ use the 9.x MSBuild libraries, which will require the 9.0 runtime to load.  If you want to test while loading older MSBuilds, you'll need to somehow constraint the tests to 8.0.xxx SDKs, and the easiest way to do this is to make a global.json with a 8.0.xxx version and a  `rollForward: latestPatch` constraint on it.
 
-### Running tests from FAKE
+### Running tests from the build script
 
-Our FAKE build project will handle creating/deleting a temporary `global.json` file in the `test` directory for you.
+Our `build.fsx` script will handle creating/deleting a temporary `global.json` file in the `test` directory for you.
 
-1. `dotnet run --project .\build\ -- -t Test`
-    1. This will run the following test targets against their respective runtime.
-        * `Test:net8.0` 
-        * `Test:net9.0` 
-        * `Test:net10.0`
+1. `dotnet fsi build.fsx -- -p Test`
+    1. This will build the solution and run the tests against each runtime, one stage per target framework:
+        * `Test net8.0`
+        * `Test net9.0`
+        * `Test net10.0`
+
+`dotnet fsi build.fsx` without a pipeline also checks the formatting first, like CI does. `dotnet fsi build.fsx -- -p Format` formats the code.
 
 ### Manually invoking dotnet test
 
@@ -76,7 +78,7 @@ The newest version in CHANGELOG.md drives the release. Do not create tags by han
 
 When `main` gets a CHANGELOG.md whose newest version has no GitHub release yet (for example, `v0.45.0`), the [Release workflow](.github/workflows/release.yml) starts a release job. That job pushes the packages to NuGet (with trusted publishing) and creates the GitHub release and its tag, with the changelog section as notes and the packages attached. If a release fails part way, rerun it with "Run workflow" on `main`.
 
-To see what a release would do without publishing, run `dotnet run --project build -- -t Release --dry-run`.
+To see what a release would do without publishing, run `dotnet fsi build.fsx -- -p Release --dry-run`.
 
 
 ## Nighty

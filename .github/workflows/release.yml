@@ -80,9 +80,6 @@ jobs:
       - name: Remove global.json
         run: rm global.json
 
-      - name: Restore tools
-        run: dotnet tool restore
-
       # Trusted publishing: exchanges the GitHub OIDC token for a short-lived NuGet API key.
       - name: NuGet login
         id: login
@@ -91,7 +88,7 @@ jobs:
           user: ${{ secrets.NUGET_USER }}
 
       - name: Publish to NuGet and create the GitHub release
-        run: dotnet run --project build -- -t Release
+        run: dotnet fsi build.fsx -- -p Release
         env:
           BuildNet9: true
           BuildNet10: true
