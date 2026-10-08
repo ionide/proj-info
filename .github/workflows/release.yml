@@ -1,0 +1,97 @@
+name: Release
+
+# CHANGELOG.md drives releases. When main gets a changelog whose newest version has no
+# GitHub release yet, the release job publishes the packages to NuGet, then tags the commit
+# and creates the GitHub release, with that version's changelog section as its notes and
+# the packages as its assets.
+#
+# The release is the last step, and its absence is what starts one. A run that failed part
+# way is retried with "Run workflow" on main: pushing to NuGet skips packages that are
+# already there.
+#
+# One-time setup, outside this file:
+#   1. On nuget.org, a trusted publishing policy for the Ionide.ProjInfo* packages naming
+#      repository ionide/proj-info, workflow file `release.yml` and environment `release`.
+#   2. A `NUGET_USER` secret with the nuget.org account that owns that policy.
+#   3. Optionally, required reviewers on the `release` environment, so a release waits
+#      for approval before it reaches NuGet.
+
+on:
+  push:
+    branches: [main]
+    paths: [CHANGELOG.md]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.detect.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Is the newest changelog version released?
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(sed -nE 's/^## \[([0-9]+\.[0-9]+\.[0-9]+[^]]*)\].*/\1/p' CHANGELOG.md | head -n 1)"
+          if [ -z "$version" ]; then
+            echo "no version in CHANGELOG.md yet, only [Unreleased]"
+            exit 0
+          fi
+          if gh release view "v$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "v$version is already released"
+            exit 0
+          fi
+          echo "releasing $version"
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+
+  release:
+    needs: detect
+    if: needs.detect.outputs.version != ''
+    runs-on: windows-latest
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            9.x
+            10.x
+
+      # global.json pins SDK 8, but the packages also target net9.0 and net10.0.
+      - name: Remove global.json
+        run: rm global.json
+
+      # Trusted publishing: exchanges the GitHub OIDC token for a short-lived NuGet API key.
+      - name: NuGet login
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Publish to NuGet and create the GitHub release
+        run: dotnet fsi build.fsx -- -p Release
+        env:
+          BuildNet9: true
+          BuildNet10: true
+          RELEASE_VERSION: ${{ needs.detect.outputs.version }}
+          NUGET_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
