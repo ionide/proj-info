@@ -22,5 +22,6 @@
     <PackageReference Include="Fake.IO.FileSystem" />
     <PackageReference Include="Fake.DotNet.MsBuild" />
     <PackageReference Include="Fake.Api.GitHub" />
+    <PackageReference Include="Ionide.KeepAChangelog" />
   </ItemGroup>
 </Project>

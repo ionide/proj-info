@@ -54,5 +54,6 @@
     <PackageVersion Include="Fake.IO.FileSystem" Version="$(FakeVersion)" />
     <PackageVersion Include="Fake.DotNet.MsBuild" Version="$(FakeVersion)" />
     <PackageVersion Include="Fake.Api.GitHub" Version="$(FakeVersion)" />
+    <PackageVersion Include="Ionide.KeepAChangelog" Version="0.2.0" />
   </ItemGroup>
 </Project>

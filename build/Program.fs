@@ -53,6 +53,34 @@ let getBuildParam = Environment.environVar
 let DoNothing = ignore
 
 
+/// Version and GitHub release notes of the newest release in CHANGELOG.md.
+let latestChangelogRelease () =
+    match Ionide.KeepAChangelog.Parser.parseChangeLog (System.IO.FileInfo "CHANGELOG.md") with
+    | Error error -> failwithf "Could not parse CHANGELOG.md: %A" error
+    | Ok changelogs ->
+        let version, _, data =
+            changelogs.Releases
+            |> List.maxBy (fun (_, date, _) -> date)
+
+        let notes =
+            match data with
+            | None -> ""
+            | Some data ->
+                [
+                    "Added", data.Added
+                    "Changed", data.Changed
+                    "Fixed", data.Fixed
+                    "Deprecated", data.Deprecated
+                    "Removed", data.Removed
+                    "Security", data.Security
+                    yield! Map.toList data.Custom
+                ]
+                |> List.filter (fun (_, body) -> not (isNullOrWhiteSpace body))
+                |> List.map (fun (header, body) -> $"### %s{header}\n\n%s{body.Trim()}")
+                |> String.concat "\n\n"
+
+        string version, notes
+
 let init args =
     initializeContext args
 
@@ -158,25 +186,87 @@ let init args =
             |> Seq.iter (fun pkg -> printfn $"Found package at: {pkg}")
         )
 
+    // Publishes the latest version in CHANGELOG.md to NuGet and as a GitHub release.
+    // The Release workflow only runs this when that GitHub release does not exist yet.
+    // Pass `--dry-run` after the target to only print what would happen:
+    // dotnet run --project build -- -t Release --dry-run
     Target.create
-        "Push"
-        (fun _ ->
-            let key =
-                match getBuildParam "nuget-key" with
-                | s when not (isNullOrWhiteSpace s) -> s
-                | _ -> UserInput.getUserPassword "NuGet Key: "
+        "Release"
+        (fun p ->
+            let dryRun =
+                p.Context.Arguments
+                |> List.contains "--dry-run"
 
-            let pushPkg (opts: DotNet.NuGetPushOptions) = {
-                opts with
-                    PushParams = {
-                        opts.PushParams with
-                            ApiKey = Some key
-                            Source = Some "https://api.nuget.org/v3/index.json"
-                    }
-            }
+            let version, notes = latestChangelogRelease ()
+            let tag = $"v%s{version}"
 
-            packages ()
-            |> Seq.iter (fun pkg -> DotNet.nugetPush pushPkg pkg)
+            // The workflow reads the version with sed, guard against it disagreeing with the parser.
+            match getBuildParam "RELEASE_VERSION" with
+            | expected when
+                not (isNullOrWhiteSpace expected)
+                && expected
+                   <> version
+                ->
+                failwithf "The workflow detected version %s, but CHANGELOG.md parses as %s." expected version
+            | _ -> ()
+
+            let pkgs =
+                packages ()
+                |> Seq.toList
+
+            let expectedSuffix = $".%s{version}.nupkg"
+
+            match
+                pkgs
+                |> List.filter (fun pkg -> not (pkg.EndsWith(expectedSuffix, System.StringComparison.Ordinal)))
+            with
+            | [] when not pkgs.IsEmpty -> ()
+            | [] -> failwith "No packages found, run the Build target first."
+            | unexpected -> failwithf "Packages do not match changelog version %s: %A" version unexpected
+
+            let notesFile = System.IO.Path.GetTempFileName()
+            System.IO.File.WriteAllText(notesFile, notes)
+
+            try
+                if dryRun then
+                    Trace.log $"Release notes for %s{tag}:\n%s{notes}"
+
+                let key =
+                    match getBuildParam "NUGET_KEY" with
+                    | s when not (isNullOrWhiteSpace s) -> s
+                    | _ when dryRun -> "dry-run-key"
+                    | _ -> failwith "NUGET_KEY is not set."
+
+                TraceSecrets.register "<NUGET_KEY>" key
+
+                for pkg in pkgs do
+                    if dryRun then
+                        Trace.log $"[dry-run] dotnet nuget push %s{pkg} --skip-duplicate"
+                    else
+                        // Not `exec`: its failure message would contain the API key.
+                        CreateProcess.fromRawCommandLine "dotnet" $"nuget push \"%s{pkg}\" --api-key %s{key} --source https://api.nuget.org/v3/index.json --skip-duplicate"
+                        |> CreateProcess.ensureExitCodeWithMessage $"Failed to push %s{pkg}"
+                        |> Proc.run
+                        |> ignore
+
+                let target =
+                    match getBuildParam "GITHUB_SHA" with
+                    | s when not (isNullOrWhiteSpace s) -> $" --target %s{s}"
+                    | _ -> ""
+
+                let assets =
+                    pkgs
+                    |> List.map (sprintf "\"%s\"")
+                    |> String.concat " "
+
+                let ghArgs = $"release create %s{tag} %s{assets} --title %s{tag} --notes-file \"%s{notesFile}\"%s{target}"
+
+                if dryRun then
+                    Trace.log $"[dry-run] gh %s{ghArgs}"
+                else
+                    exec "gh" ghArgs "" Map.empty
+            finally
+                System.IO.File.Delete notesFile
         )
 
     Target.create
@@ -203,13 +293,15 @@ let init args =
 
     Target.create "Default" DoNothing
 
-    Target.create "Release" DoNothing
-
     "Clean"
     ==> "CheckFormat"
     ==> "Build"
     ==> "Test"
     ==> "Default"
+    |> ignore
+
+    "Build"
+    ==> "Release"
     |> ignore
 
 [<EntryPoint>]
