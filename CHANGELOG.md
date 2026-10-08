@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- [Let WorkspaceLoader and WorkspaceLoaderViaProjectGraph load projects at the same time](https://github.com/ionide/proj-info/issues/184)
+- [Let WorkspaceLoader and WorkspaceLoaderViaProjectGraph load projects at the same time](https://github.com/ionide/proj-info/pull/250) (thanks @nojaf)
 
 ## [0.75.0] - 2026-08-28
 
