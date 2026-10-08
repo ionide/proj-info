@@ -1,0 +1,666 @@
+namespace Ionide.ProjInfo.Tests
+
+module ProjectLoader2Tests =
+
+
+    open System
+    open System.IO
+    open System.Diagnostics
+    open System.Threading
+    open System.Threading.Tasks
+    open Expecto
+    open Ionide.ProjInfo
+    open Ionide.ProjInfo.Types
+    open FileUtils
+    open Ionide.ProjInfo.Tests.TestUtils
+    open DotnetProjInfo.TestAssets
+    open Ionide.ProjInfo.Logging
+    open Expecto.Logging
+    open Ionide.ProjInfo.ProjectLoader
+    open Microsoft.Build.Graph
+    open Microsoft.Build.Evaluation
+    open Microsoft.Build.Framework
+    open Microsoft.Build.Execution
+    open System.Linq
+
+
+    type Binlogs(binlog: FileInfo) =
+        let sw = new StringWriter()
+        let errorLogger = new ErrorLogger()
+
+        let loggers name =
+            ProjectLoader.createLoggers name (BinaryLogGeneration.Within(binlog.Directory)) sw (Some errorLogger)
+
+        member x.ErrorLogger = errorLogger
+        member x.Loggers name = loggers name
+
+        member x.Directory = binlog.Directory
+        member x.File = binlog
+
+        interface IDisposable with
+            member this.Dispose() = sw.Dispose()
+
+
+    type TestEnv = {
+        Logger: Logger
+        FS: FileUtils
+        Binlog: Binlogs
+        Data: TestAssetProjInfo2
+        Entrypoints: string seq
+        TestDir: DirectoryInfo
+    } with
+
+        interface IDisposable with
+            member this.Dispose() = (this.Binlog :> IDisposable).Dispose()
+
+
+    let projectCollection () =
+        new ProjectCollection(
+            globalProperties = dict ProjectLoader.defaultGlobalProps,
+            loggers = null,
+            remoteLoggers = null,
+            toolsetDefinitionLocations = ToolsetDefinitionLocations.Local,
+            maxNodeCount = Environment.ProcessorCount,
+            onlyLogCriticalEvents = false,
+            loadProjectsReadOnly = true
+        )
+
+    type IWorkspaceLoader2 =
+        abstract member Load: paths: string list * ct: CancellationToken -> Task<seq<Result<BuildResult, BuildResult * ErrorLogger>>>
+
+
+    let isSupportedProjectPath (path: string) =
+        path.EndsWith(".fsproj")
+        || path.EndsWith(".csproj")
+        || path.EndsWith(".vbproj")
+
+    let parseWithGraph (env: TestEnv) =
+        task {
+            let entrypoints =
+                env.Entrypoints
+                |> Seq.collect (fun entrypoint ->
+                    if
+                        entrypoint.EndsWith(".sln")
+                        || entrypoint.EndsWith(".slnf")
+                        || entrypoint.EndsWith(".slnx")
+                    then
+                        entrypoint
+                        |> InspectSln.tryParseSln
+                        |> getResult
+                        |> InspectSln.loadingBuildOrder
+                    else
+                        [ entrypoint ]
+                )
+                |> Seq.filter isSupportedProjectPath
+                |> Seq.map ProjectGraphEntryPoint
+
+            let loggers = env.Binlog.Loggers env.Binlog.File.Name
+
+            // Evaluation
+            use pc = projectCollection ()
+            let graph = ProjectLoader2.EvaluateAsGraphAllTfms(entrypoints, pc)
+
+            // Execution
+            let bp = BuildParameters(Loggers = loggers)
+            let bm = new BuildManagerSession()
+
+            let! (result: Result<GraphBuildResult, BuildErrors<GraphBuildResult>>) = ProjectLoader2.Execution(bm, graph, bp)
+
+
+            // Parse
+            let projectsAfterBuild =
+                match result with
+                | Ok result ->
+                    ProjectLoader2.Parse result
+                    |> Seq.choose (fun x ->
+                        match x with
+                        | Ok(LoadedProjectInfo.StandardProjectInfo x) -> Some x
+                        | Result.Error(ParseError.NotRestored _) -> None
+                        | _ -> None
+                    )
+                | Result.Error(BuildErrors.BuildErr(result, errorLogs)) ->
+
+                    Seq.empty
+
+            return result, projectsAfterBuild
+        }
+
+    let parseWithProjectWalker (env: TestEnv) =
+        task {
+            let path = env.Entrypoints
+
+            let entrypoints =
+                path
+                |> Seq.collect (fun p ->
+                    if
+                        p.EndsWith(".sln")
+                        || p.EndsWith(".slnf")
+                        || p.EndsWith(".slnx")
+                    then
+                        p
+                        |> InspectSln.tryParseSln
+                        |> getResult
+                        |> InspectSln.loadingBuildOrder
+                    else
+                        [ p ]
+                )
+                |> Seq.filter isSupportedProjectPath
+            // Evaluation
+            use pc = projectCollection ()
+
+            let allprojects =
+                ProjectLoader2.EvaluateAsProjectsAllTfms(entrypoints, projectCollection = pc)
+                |> Seq.toList
+
+            let createBuildParametersFromProject (p: Project) =
+                let fi = FileInfo p.FullPath
+                let projectName = Path.GetFileNameWithoutExtension fi.Name
+
+                let tfm =
+                    match p.GlobalProperties.TryGetValue("TargetFramework") with
+                    | true, tfm -> tfm.Replace('.', '_')
+                    | _ -> ""
+
+                let normalized = $"{projectName}-{tfm}"
+                Some(BuildParameters(Loggers = env.Binlog.Loggers normalized))
+
+            // Execution
+            let bm = new BuildManagerSession()
+            let! (results: Result<BuildResult, BuildErrors<BuildResult>> array) = ProjectLoader2.ExecutionWalkReferences(bm, allprojects, createBuildParametersFromProject)
+
+            let projectsAfterBuild =
+                results
+                |> Seq.choose (
+                    function
+                    | Ok result ->
+                        match ProjectLoader2.Parse result with
+                        | Ok(LoadedProjectInfo.StandardProjectInfo x) ->
+                            let validProjectRestore = Newtonsoft.Json.JsonConvert.SerializeObject x
+                            File.WriteAllText(Path.Combine(env.TestDir.FullName, "restored-project.json"), validProjectRestore)
+                            Some x
+                        | Result.Error(ParseError.NotRestored _) -> None
+                        | _ -> None
+                    | _ -> None
+                )
+
+            return results, projectsAfterBuild
+        }
+
+    type RestoreCfg =
+        | DoRestore
+        | SkipRestore
+
+    let testWithEnv2 restore name (data: TestAssetProjInfo2) f test =
+        test
+            name
+            (fun () ->
+                task {
+                    let logger = Log.create (sprintf "Test '%s'" name)
+                    let fs = FileUtils logger
+
+                    let testDir = inDir fs name
+                    copyDirFromAssets fs data.ProjDir testDir
+
+                    let entrypoints =
+                        data.EntryPoints
+                        |> Seq.map (fun x ->
+                            testDir
+                            / x
+                        )
+
+                    match restore with
+                    | DoRestore ->
+                        let restoreTargets =
+                            entrypoints
+                            |> Seq.collect (fun entrypoint ->
+                                if
+                                    entrypoint.EndsWith(".sln")
+                                    || entrypoint.EndsWith(".slnf")
+                                    || entrypoint.EndsWith(".slnx")
+                                then
+                                    entrypoint
+                                    |> InspectSln.tryParseSln
+                                    |> getResult
+                                    |> InspectSln.loadingBuildOrder
+                                else
+                                    [ entrypoint ]
+                            )
+                            |> Seq.distinct
+
+                        restoreTargets
+                        |> Seq.filter isSupportedProjectPath
+                        |> Seq.iter (fun x ->
+                            dotnet fs [
+                                "restore"
+                                x
+                            ]
+                            |> checkExitCodeZero
+                        )
+                    | SkipRestore -> ()
+
+                    let binlog = new FileInfo(Path.Combine(testDir, $"{name}.binlog"))
+                    use blc = new Binlogs(binlog)
+
+                    let env = {
+                        Logger = logger
+                        FS = fs
+                        Binlog = blc
+                        Data = data
+                        Entrypoints = entrypoints
+                        TestDir = DirectoryInfo testDir
+                    }
+
+                    try
+                        do! f env
+                    with e ->
+
+                        logger.error (
+                            Message.eventX "binlog path {binlog}"
+                            >> Message.setField "binlog" binlog.FullName
+                        )
+
+                        Exception.reraiseAny e
+                }
+            )
+
+    let testWithEnv name (data: TestAssetProjInfo2) f test = testWithEnv2 DoRestore name data f test
+
+
+    let applyTests testCaseTask name (info: TestAssetProjInfo2) = [
+        testCaseTask
+        |> testWithEnv
+            $"Graph.{name}"
+            info
+            (fun env ->
+                task {
+                    let! result, projectsAfterBuild = parseWithGraph env
+
+                    do! env.Data.ExpectsGraphResult result
+                    do! env.Data.ExpectsProjectOptions projectsAfterBuild
+                }
+            )
+        testCaseTask
+        |> testWithEnv
+            $"Project.{name}"
+            info
+            (fun env ->
+                task {
+                    let! result, projectsAfterBuild = parseWithProjectWalker env
+
+                    do! env.Data.ExpectsProjectResult result
+                    do! env.Data.ExpectsProjectOptions projectsAfterBuild
+                }
+            )
+    ]
+
+
+    let buildManagerSessionTests toolsPath =
+        testList "buildManagerSessionTests" [
+            yield! applyTests testCaseTask "loader2-no-solution-with-2-projects" ``loader2-no-solution-with-2-projects``
+
+            yield! applyTests testCaseTask "sample2-NetSdk-library2" ``sample2-NetSdk-library2``
+            yield! applyTests ptestCaseTask "sample3-Netsdk-projs" ``sample3-Netsdk-projs-2``
+
+            yield! applyTests testCaseTask "sample4-NetSdk-multitfm" ``sample4-NetSdk-multitfm-2``
+            yield! applyTests testCaseTask "sample5-NetSdk-lib-cs" ``sample5-NetSdk-lib-cs-2``
+            yield! applyTests ptestCaseTask "sample6-NetSdk-sparse" ``sample6-Netsdk-Sparse-sln-2`` // pending: netcoreapp2.1 graph build hang under net10 SDK
+            yield! applyTests testCaseTask "sample7-oldsdk-projs" ``sample7-legacy-framework-multi-project-2``
+            yield! applyTests testCaseTask "sample8-NetSdk-Explorer" ``sample8-NetSdk-Explorer-2``
+            yield! applyTests testCaseTask "sample9-NetSdk-library" ``sample9-NetSdk-library-2``
+            yield! applyTests testCaseTask "sample10-NetSdk-custom-targets" ``sample10-NetSdk-library-with-custom-targets-2``
+
+            yield! applyTests testCaseTask "sample-referenced-csharp-project" ``sample-referenced-csharp-project``
+            yield! applyTests ptestCaseTask "sample-workload" ``sample-workload`` // requires android workload + sdk
+            yield! applyTests testCaseTask "traversal-project" ``traversal-project``
+            yield! applyTests testCaseTask "sample11-solution-with-other-projects" ``sample11-solution-with-other-projects``
+            yield! applyTests testCaseTask "sample12-solution-filter-with-one-project" ``sample12-solution-filter-with-one-project``
+            yield! applyTests testCaseTask "sample13-solution-with-solution-files" ``sample13-solution-with-solution-files``
+            yield! applyTests testCaseTask "sample-14-slnx-solution" ``sample-14-slnx-solution``
+            yield! applyTests testCaseTask "sample15-nuget-analyzers" ``sample15-nuget-analyzers``
+            yield! applyTests testCaseTask "sample16-solution-with-solution-folders" ``sample16-solution-with-solution-folders``
+            yield! applyTests testCaseTask "sample-netsdk-prodref" ``sample-netsdk-prodref``
+            yield! applyTests testCaseTask "sample-netsdk-bad-cache" ``sample-netsdk-bad-cache-2``
+
+            testCaseTask
+            |> testWithEnv2
+                SkipRestore
+                "missing-import"
+                ``missing-import``
+                (fun env ->
+                    task {
+                        let! result, projectsAfterBuild = parseWithProjectWalker env
+
+                        do! env.Data.ExpectsProjectResult result
+                        do! env.Data.ExpectsProjectOptions projectsAfterBuild
+                    }
+                )
+
+
+            testCaseTask
+            |> testWithEnv
+                "sample2-NetSdk-library2 - Graph"
+                ``sample2-NetSdk-library2``
+                (fun env ->
+                    task {
+                        let projPath =
+                            env.TestDir.FullName
+                            / env.Data.EntryPoints.Single()
+
+                        let projDir = Path.GetDirectoryName projPath
+
+                        let path =
+                            env.Entrypoints
+                            |> Seq.map ProjectGraphEntryPoint
+
+                        let loggers = env.Binlog.Loggers env.Binlog.File.Name
+
+                        // Evaluation
+                        use pc = projectCollection ()
+
+                        let graph = ProjectLoader2.EvaluateAsGraphAllTfms(path, pc)
+
+                        // Execution
+                        let bp = BuildParameters(Loggers = loggers)
+                        let bm = new BuildManagerSession()
+
+                        let! (result: Result<GraphBuildResult, BuildErrors<GraphBuildResult>>) = ProjectLoader2.Execution(bm, graph, bp)
+
+                        let expectedSources =
+                            [
+                                projDir
+                                / "obj/Debug/netstandard2.0/n1.AssemblyInfo.fs"
+                                projDir
+                                / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
+                                projDir
+                                / "Library.fs"
+                            ]
+                            |> List.map Path.GetFullPath
+
+                        match result with
+                        | Result.Error _ -> failwith "expected success"
+                        | Ok result ->
+                            ProjectLoader2.Parse result
+                            |> Seq.choose (
+                                function
+                                | Ok(LoadedProjectInfo.StandardProjectInfo x) ->
+                                    let validProjectRestore = Newtonsoft.Json.JsonConvert.SerializeObject x
+                                    File.WriteAllText(Path.Combine(env.TestDir.FullName, "restored-project.json"), validProjectRestore)
+                                    Some x
+                                | Result.Error(ParseError.NotRestored _) -> None
+                                | _ -> None
+                            )
+                            |> Seq.iter (fun x -> Expect.equal x.SourceFiles expectedSources "")
+
+                            ()
+
+                    }
+                )
+
+            let contains (s: string) (o: string) = o.Contains(s)
+            let endsWith (s: string) (o: string) = o.EndsWith(s)
+
+            let filesOfInterest = [
+                endsWith "Directory.Build.props"
+                endsWith "Directory.Build.targets"
+                endsWith "Directory.Build.props"
+                endsWith ".sln.targets"
+                endsWith ".Build.rsp"
+            ]
+
+
+            testCaseTask
+            |> testWithEnv
+                "sample2-NetSdk-library2"
+                ``sample2-NetSdk-library2``
+                (fun env ->
+                    task {
+                        let projPath =
+                            env.TestDir.FullName
+                            / env.Data.EntryPoints.Single()
+
+                        let projDir = Path.GetDirectoryName projPath
+
+
+                        let entryPoints = env.Entrypoints
+
+                        let loggers = env.Binlog.Loggers
+
+                        // Evaluation
+                        use pc = projectCollection ()
+
+                        let createBuildParametersFromProject (p: Project) =
+                            let fi = FileInfo p.FullPath
+                            let projectName = Path.GetFileNameWithoutExtension fi.Name
+
+                            let tfm =
+                                match p.GlobalProperties.TryGetValue("TargetFramework") with
+                                | true, tfm -> tfm.Replace('.', '_')
+                                | _ -> ""
+
+                            let normalized = $"{projectName}-{tfm}"
+
+                            Some(BuildParameters(Loggers = env.Binlog.Loggers normalized))
+
+                        let projs = ProjectLoader2.EvaluateAsProjectsAllTfms(entryPoints, projectCollection = pc)
+
+                        let projs = Seq.toList projs
+                        // Execution
+
+                        let bm = new BuildManagerSession()
+
+                        let! (results: Result<_, BuildErrors<BuildResult>> array) = ProjectLoader2.ExecutionWalkReferences(bm, projs, createBuildParametersFromProject)
+
+                        let result =
+                            results
+                            |> Seq.head
+
+                        let expectedSources =
+                            [
+                                projDir
+                                / "obj/Debug/netstandard2.0/n1.AssemblyInfo.fs"
+                                projDir
+                                / "obj/Debug/netstandard2.0/.NETStandard,Version=v2.0.AssemblyAttributes.fs"
+                                projDir
+                                / "Library.fs"
+                            ]
+                            |> List.map Path.GetFullPath
+
+                        match result with
+                        | Result.Error _ -> failwith "expected success"
+                        | Ok result ->
+                            ignore result.ProjectStateAfterBuild.ImportPaths
+
+                            match ProjectLoader2.Parse result with
+
+                            | Ok(LoadedProjectInfo.StandardProjectInfo x) ->
+                                let validProjectRestore = Newtonsoft.Json.JsonConvert.SerializeObject x
+                                File.WriteAllText(Path.Combine(env.TestDir.FullName, "restored-project.json"), validProjectRestore)
+
+                                Expect.equal x.SourceFiles expectedSources ""
+                            | Result.Error(ParseError.NotRestored e) -> failwithf "%A" e
+                            | otherwise -> failwith $"Unexpected result {otherwise}"
+
+                    }
+                )
+
+            testCaseTask
+            |> testWithEnv
+                "Concurrency - don't crash on concurrent builds"
+                ``loader2-concurrent``
+                (fun env ->
+                    task {
+                        let path =
+                            env.Entrypoints
+                            |> Seq.map ProjectGraphEntryPoint
+
+                        use pc = projectCollection ()
+
+                        let bp = BuildParameters(Loggers = env.Binlog.Loggers env.Binlog.File.Name)
+
+                        let bm = new BuildManagerSession()
+
+                        let work: Async<Result<GraphBuildResult, BuildErrors<GraphBuildResult>>> =
+                            async {
+
+                                // Evaluation
+                                let graph = ProjectLoader2.EvaluateAsGraph(path, pc)
+
+                                // Execution
+                                return!
+                                    ProjectLoader2.Execution(bm, graph, buildParameters = bp)
+                                    |> Async.AwaitTask
+                            }
+
+                        // Should be throttled so concurrent builds won't fail
+                        let! _ =
+                            Async.Parallel [
+                                work
+                                work
+                                work
+                            // work
+                            ]
+
+
+                        ()
+
+                    }
+                )
+
+            testCaseTask
+            |> testWithEnv
+                "Failure mode 1"
+                ``loader2-failure-case1``
+                (fun env ->
+
+                    task {
+                        let path =
+                            env.Entrypoints
+                            |> Seq.map ProjectGraphEntryPoint
+
+                        let loggers = env.Binlog.Loggers env.Binlog.File.Name
+
+                        // Evaluation
+                        use pc = projectCollection ()
+                        let graph = ProjectLoader2.EvaluateAsGraphAllTfms(path, pc)
+
+                        // Execution
+                        let bp = BuildParameters(Loggers = loggers)
+                        let bm = new BuildManagerSession()
+
+                        let! (result: Result<GraphBuildResult, BuildErrors<GraphBuildResult>>) = ProjectLoader2.Execution(bm, graph, bp)
+                        Expect.isError result "expected error"
+
+                        match result with
+                        | Ok _ -> failwith "expected error"
+                        | Result.Error(BuildErrors.BuildErr(result, errorLogs)) ->
+                            let results: (ProjectGraphNode * BuildErrors<BuildResult>) seq = GraphBuildResult.isolateFailures result errorLogs
+
+                            let _, BuildErr(_, errors) =
+                                results
+                                |> Seq.head
+
+                            let actualError =
+                                errors
+                                |> Seq.head
+                                |> _.Message
+
+                            Expect.equal actualError "Intentional failure" "expected error message"
+                    }
+                )
+
+
+            testCaseTask
+            |> testWithEnv
+                "Cancellation"
+                ``loader2-cancel-slow``
+                (fun env ->
+                    task {
+                        let path =
+                            env.Entrypoints
+                            |> Seq.map ProjectGraphEntryPoint
+
+                        // Evaluation
+                        use pc = projectCollection ()
+
+                        let graph = ProjectLoader2.EvaluateAsGraph(path, pc)
+
+                        // Execution
+                        let bp = BuildParameters(Loggers = env.Binlog.Loggers env.Binlog.File.Name)
+                        let bm = new BuildManagerSession()
+                        use cts = new CancellationTokenSource()
+
+                        try
+                            cts.CancelAfter(TimeSpan.FromSeconds 1.)
+
+                            let! (_: Result<GraphBuildResult, BuildErrors<GraphBuildResult>>) = ProjectLoader2.Execution(bm, graph, bp, ct = cts.Token)
+                            ()
+                        with
+                        | :? OperationCanceledException as oce -> Expect.equal oce.CancellationToken cts.Token "expected cancellation"
+                        | e -> Exception.reraiseAny e
+
+                    }
+                )
+
+            testCaseTask
+            |> testWithEnv2
+                SkipRestore
+                "Handle non-restored projects gracefully"
+                ``sample2-NetSdk-library2``
+                (fun env ->
+                    task {
+                        let path =
+                            env.Entrypoints
+                            |> Seq.map ProjectGraphEntryPoint
+
+                        let entryPoints = env.Entrypoints
+                        // Evaluation
+                        use pc = projectCollection ()
+
+                        // let graph = ProjectLoader2.EvaluateAsGraph(path, pc)
+
+                        // Execution
+                        let bp = BuildParameters(Loggers = env.Binlog.Loggers env.Binlog.File.Name)
+                        let bm = new BuildManagerSession()
+
+                        let createBuildParametersFromProject (p: Project) =
+                            let fi = FileInfo p.FullPath
+                            let projectName = Path.GetFileNameWithoutExtension fi.Name
+
+                            let tfm =
+                                match p.GlobalProperties.TryGetValue("TargetFramework") with
+                                | true, tfm -> tfm.Replace('.', '_')
+                                | _ -> ""
+
+                            let normalized = $"{projectName}-{tfm}"
+
+                            Some(BuildParameters(Loggers = env.Binlog.Loggers normalized))
+
+                        let projs = ProjectLoader2.EvaluateAsProjectsAllTfms(entryPoints, projectCollection = pc)
+
+
+                        let! (results: Result<_, BuildErrors<BuildResult>> array) = ProjectLoader2.ExecutionWalkReferences(bm, projs, createBuildParametersFromProject)
+
+
+                        let result =
+                            results
+                            |> Seq.head
+
+                        let result = Ionide.ProjInfo.Tests.Expect.isOk result "expected success on non-restored project"
+
+                        match ProjectLoader2.Parse result with
+                        // | Ok(LoadedProjectInfo.StandardProjectInfo x) ->
+                        //     ignore x
+
+                        //     let validProjectRestore = Newtonsoft.Json.JsonConvert.SerializeObject x
+
+                        //     File.WriteAllText(Path.Combine(env.TestDir.FullName, "non-restored-project.json"), validProjectRestore)
+                        //     Expect.isFalse x.ProjectSdkInfo.RestoreSuccess "expected restore to fail"
+                        | Result.Error(ParseError.NotRestored(StandardProject e)) -> ()
+                        | e -> failwithf "%A" e
+
+                        return ()
+
+                    }
+                )
+
+        ]
