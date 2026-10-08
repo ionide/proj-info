@@ -133,9 +133,11 @@ let latestChangelogRelease () =
     with
     | Error error -> failwithf "Could not parse CHANGELOG.md: %A" error
     | Ok changelogs ->
+        // The topmost entry, the same one the Release workflow's detect job reads.
         let version, _, data =
-            changelogs.Releases
-            |> List.maxBy (fun (_, date, _) -> date)
+            match changelogs.Releases with
+            | [] -> failwith "CHANGELOG.md has no release entry."
+            | release :: _ -> release
 
         let notes =
             match data with
