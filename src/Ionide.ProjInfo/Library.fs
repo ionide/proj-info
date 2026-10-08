@@ -361,6 +361,10 @@ module ProjectLoader =
 
     let internal projectLoaderLogger = lazy (LogProvider.getLoggerByName "ProjectLoader")
 
+    /// Design-time builds go through MSBuild's process-wide BuildManager.DefaultBuildManager, which runs one build at a time.
+    /// Every loader in the process takes this lock around its build, so they take turns instead of failing.
+    let internal buildManagerLock = obj ()
+
     let msBuildToLogProvider () =
         let msBuildLogger = LogProvider.getLoggerByName "MsBuild"
 
@@ -651,7 +655,7 @@ module ProjectLoader =
             let designTimeTargets = designTimeBuildTargets isLegacyFrameworkProjFile
 
             let doDesignTimeBuild () =
-                let build = pi.Build(designTimeTargets, loggers)
+                let build = lock buildManagerLock (fun () -> pi.Build(designTimeTargets, loggers))
 
                 if build then
                     Ok(StandardProject pi)
@@ -1165,7 +1169,7 @@ type IWorkspaceLoader =
     abstract Notifications: IEvent<WorkspaceProjectState>
 
 module WorkspaceLoaderViaProjectGraph =
-    let locker = obj ()
+    let locker = ProjectLoader.buildManagerLock
 
 
 type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (string * string) list) =

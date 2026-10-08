@@ -2105,6 +2105,65 @@ let loadProjfileFromDiskTests toolsPath workspaceLoader (workspaceFactory: Tools
             Expect.equal result.SourceFiles.Length 4 "Should have 3 source file"
         )
 
+let concurrentLoadersTest toolsPath =
+    testCase
+    |> withLog
+        "can load projects with WorkspaceLoader and WorkspaceLoaderViaProjectGraph at the same time"
+        (fun logger fs ->
+            let testDir = inDir fs "concurrent_loaders"
+
+            // Each loader gets its own copy of sample2, so only the shared BuildManager is contended.
+            let projPaths = [
+                for i in 1..4 do
+                    let copyDir =
+                        testDir
+                        / $"copy{i}"
+
+                    copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir copyDir
+
+                    let projPath =
+                        copyDir
+                        / (``sample2 NetSdk library``.ProjectFile)
+
+                    dotnet fs [
+                        "restore"
+                        projPath
+                    ]
+                    |> checkExitCodeZero
+
+                    projPath
+            ]
+
+            let factories = [
+                WorkspaceLoader.Create
+                WorkspaceLoaderViaProjectGraph.Create
+                WorkspaceLoader.Create
+                WorkspaceLoaderViaProjectGraph.Create
+            ]
+
+            for _ in 1..3 do
+                let failures = Collections.Concurrent.ConcurrentBag<string * GetProjectOptionsErrors>()
+
+                List.zip factories projPaths
+                |> List.map (fun (factory, projPath) ->
+                    let loader = factory toolsPath
+
+                    loader.Notifications.Add(
+                        function
+                        | WorkspaceProjectState.Failed(p, e) -> failures.Add(p, e)
+                        | _ -> ()
+                    )
+
+                    Tasks.Task.Run(fun () ->
+                        loader.LoadProjects [ projPath ]
+                        |> Seq.toList
+                    )
+                )
+                |> List.iter (fun task -> Expect.hasLength task.Result 1 "should load the project")
+
+                Expect.isEmpty failures "no load should fail"
+        )
+
 let csharpLibTest toolsPath (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog
@@ -2618,6 +2677,7 @@ let tests toolsPath =
         testLoadProject toolsPath
         loadProjfileFromDiskTests toolsPath "WorkspaceLoader" WorkspaceLoader.Create
         loadProjfileFromDiskTests toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
+        concurrentLoadersTest toolsPath
 
         //Binlog test
         testSample2WithBinLog "n1.binlog" toolsPath "WorkspaceLoader" WorkspaceLoader.Create
