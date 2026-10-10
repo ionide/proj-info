@@ -619,6 +619,31 @@ module ProjectLoader =
             Init.setupForLegacyFramework msbuildBinaryDir
         | _ -> ()
 
+    /// Shuts down the in-process node when a build finishes. Without this MSBuild 18 leaves one in-process node thread behind per build,
+    /// and that thread keeps the evaluated projects in memory.
+    /// Node reuse must be off as well: MSBuild 17 otherwise hands the next build to the node that has already shut down, and that build hangs.
+    let shutDownInProcNodeAfterBuild (parameters: BuildParameters) =
+        parameters.ShutdownInProcNodeOnBuildFinish <- true
+        parameters.EnableNodeReuse <- false
+
+    /// Builds targets of a project instance the way ProjectInstance.Build does, which cannot shut down the in-process node.
+    let buildProjectInstance (projectCollection: ProjectCollection) (pi: ProjectInstance) (targets: string array) (loggers: ILogger list) =
+        let diagnostic =
+            loggers
+            |> List.exists (fun logger -> logger.Verbosity = LoggerVerbosity.Diagnostic)
+
+        let parameters = BuildParameters(projectCollection, Loggers = loggers, MaxNodeCount = 1)
+        shutDownInProcNodeAfterBuild parameters
+
+        parameters.LogTaskInputs <-
+            parameters.LogTaskInputs
+            || diagnostic
+
+        let result =
+            BuildManager.DefaultBuildManager.Build(parameters, BuildRequestData(pi, targets, projectCollection.HostServices))
+
+        result.OverallResult = BuildResultCode.Success
+
     let loadProject (path: string) (binaryLogs: BinaryLogGeneration) (projectCollection: ProjectCollection) =
         try
             let isLegacyFrameworkProjFile =
@@ -655,7 +680,7 @@ module ProjectLoader =
             let designTimeTargets = designTimeBuildTargets isLegacyFrameworkProjFile
 
             let doDesignTimeBuild () =
-                let build = lock buildManagerLock (fun () -> pi.Build(designTimeTargets, loggers))
+                let build = lock buildManagerLock (fun () -> buildProjectInstance projectCollection pi designTimeTargets loggers)
 
                 if build then
                     Ok(StandardProject pi)
@@ -1340,6 +1365,7 @@ type WorkspaceLoaderViaProjectGraph private (toolsPath, ?globalProperties: (stri
                     ||| ProjectLoadSettings.IgnoreInvalidImports
 
                 buildParameters.LogInitialPropertiesAndItems <- true
+                ProjectLoader.shutDownInProcNodeAfterBuild buildParameters
                 bm.BeginBuild(buildParameters)
 
                 let result = bm.BuildRequest gbr

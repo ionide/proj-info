@@ -2164,6 +2164,70 @@ let concurrentLoadersTest toolsPath =
                 Expect.isEmpty failures "no load should fail"
         )
 
+/// Counts the threads of this process that run an MSBuild in-process node.
+/// Linux exposes the native thread names (cut to 15 characters) in /proc, so this works on Linux only.
+let inProcNodeThreadCount () =
+    Directory.GetDirectories "/proc/self/task"
+    |> Array.filter (fun task ->
+        try
+            let name = File.ReadAllText(Path.Combine(task, "comm"))
+            name.StartsWith "In-proc Node"
+        with _ ->
+            // the thread exited after the directory listing
+            false
+    )
+    |> Array.length
+
+let inProcNodeThreadsTest toolsPath =
+    testCase
+    |> withLog
+        "repeated loads with WorkspaceLoader and WorkspaceLoaderViaProjectGraph do not leave in-proc node threads behind"
+        (fun logger fs ->
+            if not (OperatingSystem.IsLinux()) then
+                skiptest "counts threads through /proc, which only exists on Linux"
+
+            let testDir = inDir fs "in_proc_node_threads"
+            copyDirFromAssets fs ``sample2 NetSdk library``.ProjDir testDir
+
+            let projPath =
+                testDir
+                / (``sample2 NetSdk library``.ProjectFile)
+
+            dotnet fs [
+                "restore"
+                projPath
+            ]
+            |> checkExitCodeZero
+
+            let loadAll () =
+                for factory in
+                    [
+                        WorkspaceLoader.Create
+                        WorkspaceLoaderViaProjectGraph.Create
+                    ] do
+                    let loaded =
+                        (factory toolsPath).LoadProjects [ projPath ]
+                        |> Seq.toList
+
+                    Expect.hasLength loaded 1 "should load the project"
+
+            // The first loads may start threads that MSBuild keeps for the life of the process.
+            loadAll ()
+            let before = inProcNodeThreadCount ()
+
+            for _ in 1..5 do
+                loadAll ()
+
+            // A node thread exits shortly after its build ends, so give the last ones some time.
+            let deadline = DateTime.UtcNow.AddSeconds 10.
+
+            while inProcNodeThreadCount () > before
+                  && DateTime.UtcNow < deadline do
+                Thread.Sleep 100
+
+            Expect.equal (inProcNodeThreadCount ()) before "in-proc node threads should not grow with every load"
+        )
+
 let csharpLibTest toolsPath (workspaceFactory: ToolsPath -> IWorkspaceLoader) =
     testCase
     |> withLog
@@ -2678,6 +2742,7 @@ let tests toolsPath =
         loadProjfileFromDiskTests toolsPath "WorkspaceLoader" WorkspaceLoader.Create
         loadProjfileFromDiskTests toolsPath "WorkspaceLoaderViaProjectGraph" WorkspaceLoaderViaProjectGraph.Create
         concurrentLoadersTest toolsPath
+        inProcNodeThreadsTest toolsPath
 
         //Binlog test
         testSample2WithBinLog "n1.binlog" toolsPath "WorkspaceLoader" WorkspaceLoader.Create
