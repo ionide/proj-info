@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- [Update FSharp.Compiler.Service to 43.13.404](https://github.com/ionide/proj-info/pull/PRNUM) (thanks @TheAngryByrd)
+- [Update FSharp.Compiler.Service to 43.13.404](https://github.com/ionide/proj-info/pull/254) (thanks @TheAngryByrd)
 
 ## [0.75.3] - 2026-10-10
 
