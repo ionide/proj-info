@@ -86,7 +86,21 @@ let expectFind projPath msg (parsed: ProjectOptions list) =
     p.Value
 
 
+let private isolateTestRunDirFromRepoPackageManagement () =
+    Directory.CreateDirectory TestRunDir
+    |> ignore
+
+    // Central package management disables the implicit FSharp.Core reference. Without it, FCS type checks
+    // the samples against the FSharp.Core of the test host, which can target a newer framework than the sample.
+    File.WriteAllText(
+        TestRunDir
+        / "Directory.Packages.props",
+        "<Project><PropertyGroup><ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally></PropertyGroup></Project>"
+    )
+
 let inDir (fs: FileUtils) dirName =
+    isolateTestRunDirFromRepoPackageManagement ()
+
     let outDir =
         TestRunDir
         / dirName

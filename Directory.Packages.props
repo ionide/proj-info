@@ -7,8 +7,8 @@
     <FSharpCoreVersion>6.0.0</FSharpCoreVersion>
     <!-- However for the FCS project, FSharpCoreCompilerVersion needs to match whats specified in
     the FSharp.Compiler.Service dependency -->
-    <FSharpCoreCompilerVersion>10.1.201</FSharpCoreCompilerVersion>
-    <FSharpCompilerVersion>43.12.201</FSharpCompilerVersion>
+    <FSharpCoreCompilerVersion>10.1.404</FSharpCoreCompilerVersion>
+    <FSharpCompilerVersion>43.13.404</FSharpCompilerVersion>
     <ExpectoVersion>10.2.3</ExpectoVersion>
     <NuGetAuditMode>direct</NuGetAuditMode>
   </PropertyGroup>
